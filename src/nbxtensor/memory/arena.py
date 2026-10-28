@@ -1,0 +1,75 @@
+"""Triton Arena — NBXTensor slot storage for compiled execution.
+
+Memory layout: [weights | inputs | intermediates]
+All slots hold NBXTensor. Zero torch dependency.
+"""
+
+from operator import is_ as _is
+
+
+class Arena:
+    """O(1) tensor storage via integer-indexed list."""
+
+    __slots__ = ('_slots', '_num_weights', '_num_inputs', 'epoch', 'views')
+
+    def __init__(self, size: int, num_weights: int = 0, num_inputs: int = 0):
+        self._slots: list = [None] * size
+        self._num_weights = num_weights
+        self._num_inputs = num_inputs
+        # bumped whenever the weight slots may have been dropped or replaced (`clear_all`, `restore_from`): a bind
+        # memoized against an older epoch binds again (`TritonSequence.bind_weights`)
+        self.epoch = 0
+        # {tensor id: (source weight, its view)}: the views a bind derives from weights (a pre-transposed weight), one
+        # per source object so a re-bind of the same weights hands the same views back; dropped with the weights
+        self.views = {}
+
+    def __getitem__(self, idx: int):
+        return self._slots[idx]
+
+    def __setitem__(self, idx: int, value):
+        self._slots[idx] = value
+
+    def __len__(self) -> int:
+        return len(self._slots)
+
+    def restore_from(self, snapshot: list) -> None:
+        """Bulk-restore every slot from a same-length snapshot list.
+
+        C-level slice assign. The frozen-plan replay restores the full
+        arena after every replayed step; the per-slot Python loop it
+        replaces cost ~140k `__setitem__` calls per decode token on the
+        30B row (2026-08-23 host profile), most of one of the two
+        ~16 ms GPU-idle holes in the step.
+        """
+        if len(snapshot) != len(self._slots):
+            raise ValueError(
+                f"arena restore length mismatch: snapshot "
+                f"{len(snapshot)} vs arena {len(self._slots)}")
+        # The epoch moves only when the weight slots really change: a replayed step restores the very weight objects
+        # its bind put there, and an epoch bumped regardless made every next step re-bind them all (~20k weights,
+        # 24 ms a token on Qwen3-30B-A3B's expert-store decode, 2026-10-28). Identity, compared at C level.
+        nw = self._num_weights
+        same = all(map(_is, snapshot[:nw], self._slots[:nw]))
+        self._slots[:] = snapshot
+        if not same:
+            self.epoch += 1
+
+    def clear_intermediates(self):
+        """Free intermediate slots (keep weights + inputs)."""
+        start = self._num_weights + self._num_inputs
+        for i in range(start, len(self._slots)):
+            self._slots[i] = None
+
+    def clear_inputs(self) -> None:
+        """Clear input tensors (for next inference)."""
+        start = self._num_weights
+        end = self._num_weights + self._num_inputs
+        for i in range(start, end):
+            self._slots[i] = None
+
+    def clear_all(self) -> None:
+        """Clear all tensors."""
+        for i in range(len(self._slots)):
+            self._slots[i] = None
+        self.views.clear()
+        self.epoch += 1
