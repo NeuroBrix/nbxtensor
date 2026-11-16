@@ -784,7 +784,7 @@ def _build_recurrent_ops():
 
     return {
         "lstm": _nbx_elementwise_wrappers.lstm_wrapper,                 # triton-pure assembly
-        "gated_delta_rule": _nbx_gated_delta_rule.gated_delta_rule_wrapper,   # the serial scan
+        "gated_delta_rule": _nbx_gated_delta_rule.gated_delta_rule_op,   # the scan or the chunked form, by the census
     }
 
 def _build_op_map() -> Dict[str, Callable]:

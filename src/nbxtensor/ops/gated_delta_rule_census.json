@@ -1,0 +1,151 @@
+{
+ "format": "nbx-gated-delta-rule-census/1",
+ "what": "Every call of the gated delta rule the library and its callers make, by its dimensions; each cell is a certification cell of `ops.gated_delta_rule.gated_delta_rule_path`. A call of ONE token runs the serial scan whatever the cell (the token step). A longer call runs the chunked form when its cell's `chunked_from_length` is a length and the call is at least that long, the serial scan otherwise; `chunked_from_length` null means the chunked form is not certified for the cell (the serial scan, the measured path, runs). A call whose dimensions are in no cell is refused by name. A cell is certified only by `tools/measure_the_chunked_gated_delta_rule.py` on a named card: its `proof` then names the card, the commit, the date and the result file, and `chunked_from_length` the shortest measured length from which the chunked form is exact and faster than the serial scan at every longer measured length.",
+ "callers": [
+  {
+   "caller": "nbxtensor: dispatch name 'gated_delta_rule'",
+   "calls": "ops.gated_delta_rule.gated_delta_rule_op",
+   "dimensions": "the caller's"
+  },
+  {
+   "caller": "nbxtensor: any other op of the library",
+   "calls": null,
+   "dimensions": "none: no op of the library calls the gated delta rule"
+  },
+  {
+   "caller": "neurobrix engine at main 394c3b30b",
+   "calls": null,
+   "dimensions": "none yet: the engine's sources carry no call of the gated delta rule"
+  },
+  {
+   "caller": "a published model configuration declaring linear-attention layers (the layers that compute the rule)",
+   "calls": "the op of its graph, one call a layer for a prompt (L tokens) and one a layer a generated token (L = 1)",
+   "dimensions": {
+    "Hk": 16,
+    "Hv": 48,
+    "dk": 128,
+    "dv": 128,
+    "dtype": "bfloat16 (the configuration's)",
+    "B": "1 and 4, the batches of the serial scan's measured prompt grid",
+    "L": "1 (a token) and 512 to 16384 (a prompt, the serial scan's measured grid)"
+   }
+  },
+  {
+   "caller": "the serial scan's measured prompt grid (the measurement the chunked form must beat)",
+   "calls": "the op at the configuration's head geometry, the inputs at float32 and float16",
+   "dimensions": {
+    "Hk": 16,
+    "Hv": 48,
+    "dk": 128,
+    "dv": 128,
+    "dtype": "float32 and float16",
+    "B": "1 and 4",
+    "L": "512, 2048, 4096, 8192, 16384"
+   }
+  }
+ ],
+ "cells": [
+  {
+   "B": 1,
+   "Hk": 16,
+   "Hv": 48,
+   "dk": 128,
+   "dv": 128,
+   "dtype": "float32",
+   "lengths": [
+    512,
+    2048,
+    4096,
+    8192,
+    16384
+   ],
+   "chunked_from_length": null,
+   "proof": null
+  },
+  {
+   "B": 4,
+   "Hk": 16,
+   "Hv": 48,
+   "dk": 128,
+   "dv": 128,
+   "dtype": "float32",
+   "lengths": [
+    512,
+    2048,
+    4096,
+    8192,
+    16384
+   ],
+   "chunked_from_length": null,
+   "proof": null
+  },
+  {
+   "B": 1,
+   "Hk": 16,
+   "Hv": 48,
+   "dk": 128,
+   "dv": 128,
+   "dtype": "float16",
+   "lengths": [
+    512,
+    2048,
+    4096,
+    8192,
+    16384
+   ],
+   "chunked_from_length": null,
+   "proof": null
+  },
+  {
+   "B": 4,
+   "Hk": 16,
+   "Hv": 48,
+   "dk": 128,
+   "dv": 128,
+   "dtype": "float16",
+   "lengths": [
+    512,
+    2048,
+    4096,
+    8192,
+    16384
+   ],
+   "chunked_from_length": null,
+   "proof": null
+  },
+  {
+   "B": 1,
+   "Hk": 16,
+   "Hv": 48,
+   "dk": 128,
+   "dv": 128,
+   "dtype": "bfloat16",
+   "lengths": [
+    512,
+    2048,
+    4096,
+    8192,
+    16384
+   ],
+   "chunked_from_length": null,
+   "proof": null
+  },
+  {
+   "B": 4,
+   "Hk": 16,
+   "Hv": 48,
+   "dk": 128,
+   "dv": 128,
+   "dtype": "bfloat16",
+   "lengths": [
+    512,
+    2048,
+    4096,
+    8192,
+    16384
+   ],
+   "chunked_from_length": null,
+   "proof": null
+  }
+ ]
+}

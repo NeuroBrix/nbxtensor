@@ -29,7 +29,7 @@ def _ops(B=2, L=1, Hk=2, Hv=6, dk=16, dv=8, dt=F16, g=F32, state=F32):
 
 def test_the_op_is_in_the_dispatch_table_as_its_wrapper():
     from nbxtensor.ops import dispatch
-    assert dispatch._build_op_map()["gated_delta_rule"] is G.gated_delta_rule_wrapper
+    assert dispatch._build_op_map()["gated_delta_rule"] is G.gated_delta_rule_op
     assert G.gated_delta_rule_wrapper.self_manages_dtype is True
 
 

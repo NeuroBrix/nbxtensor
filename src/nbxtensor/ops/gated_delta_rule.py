@@ -23,8 +23,16 @@ token at a time, is the same recurrence as one call.
 
 Its float64 reference is `nbxtensor.ops.oracles.fp64.delta_rule_oracle`; its launch is `launch_keys.
 gated_delta_rule_launches`; its cost is `nbxtensor.ops._cost.gated_delta_rule`.
+
+The scan is one of the op's two forms: `gated_delta_rule_op` (the dispatch name) runs it or the chunked form
+(`ops.gated_delta_rule_chunked`) as `gated_delta_rule_path` reads the call's cell in the census beside this file; one
+token always runs the scan.
 """
 from __future__ import annotations
+
+import json
+from functools import lru_cache
+from pathlib import Path
 
 import triton
 import triton.language as tl
@@ -186,3 +194,70 @@ def gated_delta_rule_wrapper(q, k, v, g, beta, state=None, *, qk_l2norm: bool, e
 
 gated_delta_rule_wrapper.self_manages_dtype = True
 
+
+
+# --- the choice between the serial scan and the chunked form (`ops.gated_delta_rule_chunked`) ------------------------
+
+#: The census of the op's calls, beside this file: its cells are the certification cells of the choice.
+GATED_DELTA_RULE_CENSUS = Path(__file__).with_name("gated_delta_rule_census.json")
+GATED_DELTA_RULE_CENSUS_FORMAT = "nbx-gated-delta-rule-census/1"
+#: The forms the op runs, by name.
+GATED_DELTA_RULE_PATHS = ("serial", "chunked")
+_CELL_DIMS = ("B", "Hk", "Hv", "dk", "dv", "dtype")
+
+
+@lru_cache(maxsize=None)
+def gated_delta_rule_census() -> dict:
+    """The census file read and checked: its format, and every cell's dimensions and `chunked_from_length` (null or a
+    length of at least two tokens). A file that does not hold is refused by name, with what is wrong in it."""
+    try:
+        doc = json.loads(GATED_DELTA_RULE_CENSUS.read_text())
+    except (OSError, ValueError) as e:
+        raise RuntimeError(f"gated_delta_rule: the census {GATED_DELTA_RULE_CENSUS.name} cannot be read ({e}); it "
+                           f"ships beside ops/gated_delta_rule.py: reinstall the library") from None
+    if doc.get("format") != GATED_DELTA_RULE_CENSUS_FORMAT:
+        raise RuntimeError(f"gated_delta_rule: the census {GATED_DELTA_RULE_CENSUS.name} has format "
+                           f"{doc.get('format')!r}; this release reads {GATED_DELTA_RULE_CENSUS_FORMAT!r}")
+    for cell in doc.get("cells", ()):
+        missing = [d for d in _CELL_DIMS + ("chunked_from_length",) if d not in cell]
+        start = cell.get("chunked_from_length")
+        if missing or not (start is None or (isinstance(start, int) and start > GATED_DELTA_RULE_MIN_LENGTH)):
+            raise RuntimeError(f"gated_delta_rule: census cell {cell} is malformed: missing {missing}, or "
+                               f"chunked_from_length {start!r} is neither null nor a length above "
+                               f"{GATED_DELTA_RULE_MIN_LENGTH} (one token always runs the serial scan)")
+    return doc
+
+
+def gated_delta_rule_path(B: int, L: int, Hk: int, Hv: int, dk: int, dv: int, dtype: NBXDtype) -> str:
+    """The form a call runs, from its dimensions and its inputs' dtype (v's): "serial" for one token (the token step);
+    otherwise the census cell of (B, Hk, Hv, dk, dv, dtype) answers: "chunked" when the cell certifies the chunked form
+    from a length the call reaches, "serial" when it does not. Dimensions in no cell are refused by name: the census
+    lists every call the library and its callers make, a call outside it has never been measured."""
+    if L <= GATED_DELTA_RULE_MIN_LENGTH:
+        return "serial"
+    want = dict(B=int(B), Hk=int(Hk), Hv=int(Hv), dk=int(dk), dv=int(dv), dtype=dtype.name)
+    for cell in gated_delta_rule_census()["cells"]:
+        if all(cell[d] == want[d] for d in _CELL_DIMS):
+            start = cell["chunked_from_length"]
+            return "chunked" if start is not None and L >= start else "serial"
+    raise ValueError(f"gated_delta_rule: no census cell for {want} (a call of {L} tokens); the census "
+                     f"{GATED_DELTA_RULE_CENSUS.name} beside ops/gated_delta_rule.py lists the calls the library and "
+                     f"its callers make: add the cell, then certify it with "
+                     f"tools/measure_the_chunked_gated_delta_rule.py on a card")
+
+
+def gated_delta_rule_op(q, k, v, g, beta, state=None, *, qk_l2norm: bool, eps: float, scale: float, compute_dtype):
+    """The op (dispatch name "gated_delta_rule"): `gated_delta_rule_wrapper` (the serial scan) or
+    `gated_delta_rule_chunked.gated_delta_rule_chunked_wrapper`, as `gated_delta_rule_path` answers for the call's
+    dimensions; both have the same contract, refusals and state, so the state either hands back is the next call's
+    start whatever form the next call runs."""
+    B, L, Hk, Hv, dk, dv = gated_delta_rule_shapes(q, k, v, g, beta, state)
+    if gated_delta_rule_path(B, L, Hk, Hv, dk, dv, v.nbx_dtype) == "serial":
+        return gated_delta_rule_wrapper(q, k, v, g, beta, state, qk_l2norm=qk_l2norm, eps=eps, scale=scale,
+                                        compute_dtype=compute_dtype)
+    from nbxtensor.ops.gated_delta_rule_chunked import gated_delta_rule_chunked_wrapper   # it imports this module
+    return gated_delta_rule_chunked_wrapper(q, k, v, g, beta, state, qk_l2norm=qk_l2norm, eps=eps, scale=scale,
+                                            compute_dtype=compute_dtype)
+
+
+gated_delta_rule_op.self_manages_dtype = True
