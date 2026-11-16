@@ -1,3 +1,4 @@
+# Copyright NeuroBrix, Apache-2.0
 """The fused mixture-of-experts grouped GEMM on the m8n8k4 matrix unit — `fused_moe_kernel`'s contract where the
 hardware profile declares `matrix_unit` and the experts are the unit's operand dtype in memory.
 

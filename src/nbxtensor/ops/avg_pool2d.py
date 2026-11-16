@@ -1,3 +1,6 @@
+# Rewritten by NeuroBrix (Copyright NeuroBrix, Apache-2.0); derived from FlagGems (Apache-2.0), original notice kept
+# Change: rewritten as a pure Triton kernel with no PyTorch import.
+# Original notice: the provenance statement in the docstring below, unchanged, and THIRD_PARTY_NOTICES.md.
 """Average pooling 2D — pure @triton.jit kernel.
 
 Extracted from FlagGems avg_pool2d.py. Forward only (inference).

@@ -1,3 +1,6 @@
+# Rewritten by NeuroBrix (Copyright NeuroBrix, Apache-2.0); derived from FlagGems (Apache-2.0), original notice kept
+# Change: rewritten as a pure Triton kernel with no PyTorch import, its launch configurations certified through nbxtensor's own autotune.
+# Original notice: the provenance statement in the docstring below, unchanged, and THIRD_PARTY_NOTICES.md.
 """Vector (SIMT) fp16 GEMV — the decode projection kernel, no tl.dot.
 
 Second member of the SIMT decode family (after ops/decode_attn_vec.py,

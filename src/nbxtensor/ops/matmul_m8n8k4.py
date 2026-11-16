@@ -1,3 +1,4 @@
+# Copyright NeuroBrix, Apache-2.0
 """GEMM on the m8n8k4 matrix unit — `mm` and `addmm` where the hardware profile declares `matrix_unit`.
 
 Same contract as `matmul_kernel` / `addmm_kernel` / `baddbmm_kernel` (ops/matmul.py) for operands that are both the unit's operand

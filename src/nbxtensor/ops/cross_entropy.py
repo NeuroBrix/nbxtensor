@@ -1,3 +1,6 @@
+# Rewritten by NeuroBrix (Copyright NeuroBrix, Apache-2.0); derived from attorch (MIT), original notice kept
+# Change: rewritten as a pure Triton kernel with no PyTorch import.
+# Original notice: the provenance statement in the docstring below, unchanged, and THIRD_PARTY_NOTICES.md.
 """Cross entropy loss — pure @triton.jit kernel.
 
 Extracted from attorch (BobMcDear/attorch) cross_entropy_loss_kernels.py.

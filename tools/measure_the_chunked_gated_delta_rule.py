@@ -1,3 +1,4 @@
+# Copyright NeuroBrix, Apache-2.0
 """Measure, on a named card, the gated delta rule's two forms in the library (the chunked form,
 `ops.gated_delta_rule_chunked.gated_delta_rule_chunked_wrapper`, and the serial scan,
 `ops.gated_delta_rule.gated_delta_rule_wrapper`) and the flash-linear-attention library's `chunk_gated_delta_rule` (the

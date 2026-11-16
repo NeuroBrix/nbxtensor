@@ -1,3 +1,6 @@
+# Rewritten by NeuroBrix (Copyright NeuroBrix, Apache-2.0); derived from FlagGems (Apache-2.0), original notice kept
+# Change: rewritten as a pure Triton kernel with no PyTorch import.
+# Original notice: the provenance statement in the docstring below, unchanged, and THIRD_PARTY_NOTICES.md.
 """Weight normalization (_weight_norm_interface) — pure @triton.jit kernels.
 
 Computes w = g * v / ||v|| where g is a per-channel gain scalar.

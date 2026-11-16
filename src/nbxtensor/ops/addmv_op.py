@@ -1,3 +1,6 @@
+# Rewritten by NeuroBrix (Copyright NeuroBrix, Apache-2.0); derived from FlagGems (Apache-2.0), original notice kept
+# Change: rewritten as a pure Triton kernel with no PyTorch import, its launch configurations certified through nbxtensor's own autotune.
+# Original notice: the provenance statement in the docstring below, unchanged, and THIRD_PARTY_NOTICES.md.
 """Addmv — pure @triton.jit kernel.
 
 Ported from FlagGems addmv (Apache-2.0 license).

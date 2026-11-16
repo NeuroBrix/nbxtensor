@@ -1,3 +1,4 @@
+# Copyright NeuroBrix, Apache-2.0
 """The m8n8k4 matrix unit (sm_70 tensor cores, SASS HMMA.884) as a Gluon building block.
 
 Triton >= 3.3 lowers `tl.dot` to scalar FMA below sm_80 (triton-lang/triton#5066), so an arch whose profile
