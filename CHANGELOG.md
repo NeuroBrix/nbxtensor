@@ -21,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `nbxtensor.io.safetensors.stack_shards` / `concat_shards` (`ShardRef`, `ShardConcat`, `ShardStack`): one parameter
   built from several stored tensors, in the stored dtype, peak memory the result plus one source; disagreements raise
   `ShardsRefused` naming the sources.
+- `nbxtensor.ops.moe_route.moe_route`: the routing of a mixture-of-experts layer for one token as one kernel (the
+  float32 router product, sigmoid or softmax scores, an optional choice bias, grouped or ungrouped top-k, the
+  renormalised and scaled weights), refused by name outside its shapes, dtypes and attributes; its launch key
+  `launch_keys.moe_route_launches`, its float64 reference `oracles.fp64.moe_route_oracle`. It stays outside the
+  dispatch table and reaches `fused_moe` through its precomputed-routing entry.
 
 ## [0.1.8] - 2026-11-15
 
