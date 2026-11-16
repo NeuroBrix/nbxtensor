@@ -7,7 +7,8 @@ argv[1] is a JSON list of cases; one JSON line per case goes to stdout: the case
     B, L, Hk, Hv, dk, dv, dtype ("float32" | "float16"), seed, nonzero (a non-zero start state), cfg (the index of the
     configuration each kernel is pinned to, modulo its count), cut (null, or the length after which the chunked form
     hands its state to a second chunked call), oracle_cut (null, or the length up to which the oracle runs, its state
-    rounded to float32 then handed to the chunked form: the state a serial scan hands over).
+    rounded to float32 then handed to the chunked form: the state a serial scan hands over), decay_max (optional, 0.1 when absent:
+    the bound of the decay the draw uses).
 """
 import json
 import os
@@ -66,7 +67,7 @@ def run(case):
     B, L, Hk, Hv, dk, dv, dt = (case[n] for n in ("B", "L", "Hk", "Hv", "dk", "dv", "dtype"))
     attrs = dict(qk_l2norm=True, eps=1e-6, scale=dk ** -0.5)
     pin(case["cfg"])
-    q, k, v, g, beta, s = draw(B, L, Hk, Hv, dk, dv, case["seed"], case["nonzero"], decay_max=0.1)
+    q, k, v, g, beta, s = draw(B, L, Hk, Hv, dk, dv, case["seed"], case["nonzero"], decay_max=case.get("decay_max", 0.1))
     # the oracle reads what the kernels read: q, k, v and beta at the case's dtype, g and the state float32
     q, k, v, beta = (a.astype(NUMPY[dt]).astype(np.float32) for a in (q, k, v, beta))
     ref_o, ref_s = O.delta_rule_oracle(q, k, v, g, beta, s, **attrs)()
