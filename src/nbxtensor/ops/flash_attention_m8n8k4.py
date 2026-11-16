@@ -1,3 +1,4 @@
+# Copyright NeuroBrix, Apache-2.0
 """Flash-attention forward on the m8n8k4 matrix unit (sm_70 tensor cores) — our Gluon kernel.
 
 The same contract as `flash_attention.py` (the wrapper's flash path): Q is scaled by `softmax_scale` and rounded to

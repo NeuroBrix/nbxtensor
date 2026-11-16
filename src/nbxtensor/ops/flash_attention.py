@@ -1,3 +1,6 @@
+# Rewritten by NeuroBrix (Copyright NeuroBrix, Apache-2.0); derived from flash-attention (BSD-3-Clause), original notice kept
+# Change: rewritten as a pure Triton kernel with no PyTorch import, its launch configurations certified through nbxtensor's own autotune.
+# Original notice: the provenance statement in the docstring below, unchanged, and THIRD_PARTY_NOTICES.md.
 """Flash Attention forward — pure @triton.jit kernel.
 
 Extracted from Dao-AILab flash-attention (flash_attn_triton.py).

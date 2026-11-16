@@ -1,3 +1,4 @@
+# Copyright NeuroBrix, Apache-2.0
 """Convolution on the m8n8k4 matrix unit — `conv2d` where the hardware profile declares `matrix_unit`.
 
 An implicit GEMM over the operands in place: per group g, C[m, n] = sum_k A[m, k] B[n, k] with

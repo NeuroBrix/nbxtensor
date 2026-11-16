@@ -1,3 +1,6 @@
+# Rewritten by NeuroBrix (Copyright NeuroBrix, Apache-2.0); derived from FlagGems (Apache-2.0) and attorch (MIT), original notice kept
+# Change: rewritten as a pure Triton kernel with no PyTorch import, its launch configurations certified through nbxtensor's own autotune.
+# Original notice: the provenance statement in the docstring below, unchanged, and THIRD_PARTY_NOTICES.md.
 """Conv2D forward — pure @triton.jit kernel with autotune.
 
 From attorch (BobMcDear/attorch) conv_kernels.py — chosen over FlagGems

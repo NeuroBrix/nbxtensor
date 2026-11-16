@@ -1,3 +1,6 @@
+# Rewritten by NeuroBrix (Copyright NeuroBrix, Apache-2.0); derived from FlagGems (Apache-2.0), original notice kept
+# Change: rewritten as a pure Triton kernel with no PyTorch import.
+# Original notice: the provenance statement in the docstring below, unchanged, and THIRD_PARTY_NOTICES.md.
 """Any reduction (logical OR) — pure @triton.jit kernels.
 
 Tests if ANY element evaluates to True (non-zero).

@@ -1,3 +1,6 @@
+# Rewritten by NeuroBrix (Copyright NeuroBrix, Apache-2.0); derived from Liger-Kernel (BSD-2-Clause), original notice kept
+# Change: rewritten as a pure Triton kernel with no PyTorch import.
+# Original notice: the provenance statement in the docstring below, unchanged, and THIRD_PARTY_NOTICES.md.
 """RoPE (Rotary Position Embedding) — pure @triton.jit kernels.
 
 Fused forward kernel: applies rotary embedding in-place to Q and K.

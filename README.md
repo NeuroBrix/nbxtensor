@@ -481,6 +481,24 @@ CUDA (NVIDIA), HIP (AMD), Level Zero (Intel) and Apple Metal through triton-ext;
 `backend_table()` its entry points, `device_memory()` its memory primitives, and `set_device(tensor)` binds the
 driver to a tensor's device before a launch.
 
+## Kernels
+
+Whose kernels these are, file by file, is written in [`docs/kernels_provenance.md`](docs/kernels_provenance.md); the
+licence texts are in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+
+- **NeuroBrix's own** (Copyright NeuroBrix, Apache-2.0): the m8n8k4 family (`mma_m8n8k4`, `flash_attention_m8n8k4`,
+  `conv2d_m8n8k4`, `matmul_m8n8k4`, `fused_moe_m8n8k4`) and the card measurement tool. No upstream source exists for them.
+- **Rewritten by NeuroBrix** from [FlagGems](https://github.com/FlagOpen/FlagGems) (Apache-2.0),
+  [attorch](https://github.com/BobMcDear/attorch) (MIT), [Liger-Kernel](https://github.com/linkedin/Liger-Kernel)
+  (BSD-2-Clause) and [flash-attention](https://github.com/Dao-AILab/flash-attention) (BSD-3-Clause): each such file says
+  so in its header, states what was rewritten, and keeps the original provenance statement. The chunked gated delta rule
+  is rewritten from [flash-linear-attention](https://github.com/fla-org/flash-linear-attention) (MIT) and is classed
+  once its rewrite lands.
+- **Copied unchanged**: none; a file copied unchanged would carry the original notice alone.
+- A file the audit could not class with evidence is listed `UNSURE` in the table and its header is left as it is.
+
+Original notices are kept everywhere; none is removed or shortened.
+
 ## Exchange with other libraries: DLPack
 
 nbxtensor speaks DLPack and nothing else: `Tensor.__dlpack__` / `__dlpack_device__` and `nbxtensor.from_dlpack(x)`
