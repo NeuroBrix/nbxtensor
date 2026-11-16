@@ -10,20 +10,24 @@ Torch-free.
 from __future__ import annotations
 
 import ctypes
+import json
 import math
 import mmap
 import os
-from typing import Optional
+import struct
+from typing import NamedTuple, Optional
 
 import numpy as np
 
 from nbxtensor.tensor import NBXTensor
 from nbxtensor.dtype.nbx_dtype import NBXDtype
 from nbxtensor.memory.allocator import DeviceAllocator
+from nbxtensor.dtype.itemsize import FP16_MAX
 from nbxtensor.dtype.convert import bf16_abs_max, bf16_bits_to_f16, f32_to_bf16_bits
 from nbxtensor.shape import contiguous_strides, numel
 from nbxtensor.memory.memory_pool import ComponentArena, HostPinnedArena
 
+_STEP = 1 << 18
 PAGE = mmap.PAGESIZE      # os.sysconf does not exist on Windows (its import stopped every plan there)
 
 
@@ -38,6 +42,64 @@ def bf16_abs_maxima(path, header: dict, data_start: int):
             continue
         begin, end = entry["data_offsets"]
         yield key, numel(entry["shape"]), bf16_abs_max(raw[data_start + begin:data_start + end].view(np.uint16))
+
+
+class Fp16RangeScan(NamedTuple):
+    """What `fp16_range_scan` found. `fits`: every scanned floating value is within +-FP16_MAX. `scanned`: the number of
+    floating values read (0 = the files hold none: the caller says what that means, the library does not). When not
+    `fits`: `path`, `key`, `abs_max` name the first tensor holding a value outside the range and its largest magnitude."""
+    fits: bool
+    scanned: int
+    path: Optional[str] = None
+    key: Optional[str] = None
+    abs_max: Optional[float] = None
+
+
+_SCAN_NUMPY = {"F16": np.float16, "F32": np.float32, "F64": np.float64}
+
+
+def _abs_max_numpy(arr: np.ndarray) -> float:
+    top = 0.0
+    for i in range(0, arr.size, _STEP):
+        v = np.abs(arr[i:i + _STEP].astype(np.float32 if arr.dtype != np.float64 else np.float64))
+        v = v[~np.isnan(v)]
+        if v.size:
+            top = max(top, float(v.max()))
+    return top
+
+
+def fp16_range_scan(paths) -> Fp16RangeScan:
+    """Do all floating weights (BF16, F16, F32, F64) of the safetensors files `paths` fit float16's range (+-FP16_MAX)?
+    The decision a caller takes from it — load directly in the narrow type when they fit, fp32 when not — is the
+    caller's. Files are read by this library through a read-only map, one tensor at a time in fixed steps (_STEP
+    elements): the peak extra memory is a few steps of float32 (about 3 MB) whatever the model's size, never the model
+    widened to fp32. Non-finite values: NaN is ignored, an infinity is outside the range. Stops at the first tensor
+    outside the range, in the order of `paths` then of the file's header. Integer and other dtypes are not floating and
+    are skipped; a bad header raises."""
+    scanned = 0
+    for path in paths:
+        path = str(path)
+        with open(path, "rb") as f:
+            (hsize,) = struct.unpack("<Q", f.read(8))
+            header = json.loads(f.read(hsize))
+        raw = np.memmap(path, dtype=np.uint8, mode="r")
+        for key, entry in header.items():
+            if key == "__metadata__":
+                continue
+            dt = entry.get("dtype")
+            begin, end = entry["data_offsets"]
+            body = raw[8 + hsize + begin:8 + hsize + end]
+            if dt == "BF16":
+                top = bf16_abs_max(body.view(np.uint16))
+            elif dt in _SCAN_NUMPY:
+                top = _abs_max_numpy(body.view(_SCAN_NUMPY[dt]))
+            else:
+                continue
+            scanned += numel(entry["shape"])
+            if top > FP16_MAX:
+                return Fp16RangeScan(False, scanned, path, key, top)
+        del raw
+    return Fp16RangeScan(True, scanned)
 
 
 def spans(n: int, unit: int, align: int, workers: int):

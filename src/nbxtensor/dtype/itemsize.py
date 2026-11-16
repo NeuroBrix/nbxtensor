@@ -118,6 +118,9 @@ def finite_max(dtype: Any) -> float:
     return float(entry["max"])
 
 
+FP16_MAX = finite_max("float16")      # 65504.0, read once from the dtype table: the range a narrow-loaded model must fit
+
+
 def itemsize_table() -> Dict[str, int]:
     """{name: bytes per element} over every dense dtype (a copy: the caller may not edit the table)."""
     return {name: entry["bits"] // 8 for name, entry in _tables()[0].items()}
