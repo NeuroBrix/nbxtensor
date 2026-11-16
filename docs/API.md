@@ -3106,6 +3106,11 @@ def load_to_pinned_host(raw: bytes, shape: tuple, source_dtype: NBXDtype, target
 def place_in_arena(raw, shape: tuple, nbx_dtype: NBXDtype, np_dtype, target_dtype: NBXDtype, krsc: bool,
                    arena: ComponentArena, target_dev: int, io) -> NBXTensor
     # one safetensors tensor's raw bytes placed in a component's device arena at its target dtype
+def stack_shards(sources: Sequence[ShardRef | ShardConcat | ShardStack], axis: int, out_dtype=None) -> NBXTensor
+def concat_shards(sources, axis: int, out_dtype=None) -> NBXTensor
+    # ONE host tensor from stored tensors (ShardRef(path, name)), bit-equal to NBXTensor.stack / cat; peak memory =
+    # result + one source; a source may itself be a ShardConcat / ShardStack (concat per expert, then stack, no
+    # intermediate); dtype kept (out_dtype other than the stored one, mixed dtypes or shapes: ShardsRefused by name)
 def half_in_place(ptr: int, count: int, device_idx: int)
     # the loader's raw bf16 buffer at `ptr` rewritten in place as float16 by the library's one device conversion
     # (ops.wrappers.bf16_to_fp16_gpu with `out=` the same buffer)

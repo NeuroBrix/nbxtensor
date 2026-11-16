@@ -15,7 +15,7 @@ import math
 import mmap
 import os
 import struct
-from typing import NamedTuple, Optional
+from typing import NamedTuple, Optional, Sequence, Union
 
 import numpy as np
 
@@ -227,6 +227,142 @@ def mapped_view(mapping, offset: int, shape: tuple, sf_dtype: str) -> NBXTensor:
     address = np.frombuffer(mapping, dtype=np.uint8).ctypes.data
     return NBXTensor.from_raw(address + int(offset), tuple(shape), SF_DTYPE_INFO[sf_dtype][1], device="cpu",
                               owns_data=False, base=mapping)
+
+
+class ShardRef(NamedTuple):
+    """One stored tensor: the safetensors file `path` and the tensor's `name` in its header (the header `fp16_range_scan`
+    and `bf16_abs_maxima` read: 8-byte little-endian size, then the JSON)."""
+    path: str
+    name: str
+
+
+class ShardConcat(NamedTuple):
+    """A declaration: `sources` joined along existing axis `axis`. A source is a `ShardRef` or another declaration."""
+    sources: tuple
+    axis: int
+
+
+class ShardStack(NamedTuple):
+    """A declaration: `sources` stacked along a NEW axis `axis` (0..ndim of a source). A source is a `ShardRef` or
+    another declaration."""
+    sources: tuple
+    axis: int
+
+
+ShardSource = Union[ShardRef, ShardConcat, ShardStack]
+
+
+class ShardsRefused(ValueError):
+    """A declaration the library will not build (a missing tensor, shapes or dtypes that disagree, a bad axis, a
+    conversion it does not do); the message names the sources involved."""
+
+
+def _shard_label(node) -> str:
+    while not isinstance(node, ShardRef):
+        node = node.sources[0]
+    return f"{node.path}:{node.name}"
+
+
+def _shard_header(path, cache: dict) -> tuple:
+    path = str(path)
+    if path not in cache:
+        with open(path, "rb") as f:
+            (hsize,) = struct.unpack("<Q", f.read(8))
+            cache[path] = (json.loads(f.read(hsize)), 8 + hsize)
+    return cache[path]
+
+
+def _shard_plan(node, cache: dict):
+    """(shape, safetensors dtype code) of a source, every declared source checked, nothing read but headers."""
+    if isinstance(node, ShardRef):
+        header, _ = _shard_header(node.path, cache)
+        entry = header.get(node.name)
+        if node.name == "__metadata__" or entry is None:
+            raise ShardsRefused(f"{node.path} holds no tensor named {node.name!r}: name a tensor of its header")
+        if entry["dtype"] not in SF_DTYPE_INFO:
+            raise ShardsRefused(f"{node.path}:{node.name} is stored as {entry['dtype']}, which has no dtype here")
+        return tuple(entry["shape"]), entry["dtype"]
+    if not isinstance(node, (ShardConcat, ShardStack)) or not len(node.sources):
+        raise ShardsRefused(f"a source is a ShardRef or a non-empty ShardConcat / ShardStack, got {node!r}")
+    plans = [_shard_plan(s, cache) for s in node.sources]
+    first_shape, first_dt = plans[0]
+    stacking = isinstance(node, ShardStack)
+    nd = len(first_shape) + (1 if stacking else 0)
+    if not -nd <= node.axis < nd:
+        raise ShardsRefused(f"axis {node.axis} is outside a {nd}-dimensional result (from {_shard_label(node)})")
+    axis = node.axis % nd
+    total = 0
+    for src, (shape, dt) in zip(node.sources[1:], plans[1:]):
+        a, b = _shard_label(node), _shard_label(src)
+        if dt != first_dt:
+            raise ShardsRefused(f"sources {a} ({first_dt}) and {b} ({dt}) differ in dtype: no source is widened or "
+                                f"converted, store them alike")
+        rest = lambda sh: sh if stacking else sh[:axis] + sh[axis + 1:]
+        if len(shape) != len(first_shape) or rest(shape) != rest(first_shape):
+            raise ShardsRefused(f"sources {a} {first_shape} and {b} {shape} do not agree on every axis but "
+                                f"{'the new one' if stacking else axis}")
+    if stacking:
+        return first_shape[:axis] + (len(plans),) + first_shape[axis:], first_dt
+    total = sum(sh[axis] for sh, _ in plans)
+    return first_shape[:axis] + (total,) + first_shape[axis + 1:], first_dt
+
+
+def _shard_fill(node, dest: np.ndarray, cache: dict) -> None:
+    """Write `node` into `dest`, a view of the result: a leaf copies its one tensor from a read-only map, a declaration
+    hands each part its own slice of `dest`, so a nested declaration never builds an intermediate."""
+    if isinstance(node, ShardRef):
+        header, start = _shard_header(node.path, cache)
+        entry = header[node.name]
+        begin, end = entry["data_offsets"]
+        raw = np.memmap(str(node.path), dtype=np.uint8, mode="r")
+        dest[...] = raw[start + begin:start + end].view(dest.dtype).reshape(dest.shape)
+        del raw                                    # the map of one source is gone before the next opens
+        return
+    stacking = isinstance(node, ShardStack)
+    axis = node.axis % dest.ndim
+    at = 0
+    for src in node.sources:
+        index = [slice(None)] * dest.ndim
+        if stacking:
+            index[axis] = at
+            at += 1
+        else:
+            width = _shard_plan(src, cache)[0][axis]
+            index[axis] = slice(at, at + width)
+            at += width
+        _shard_fill(src, dest[tuple(index)], cache)
+
+
+def _build_shards(node, out_dtype) -> NBXTensor:
+    cache: dict = {}
+    shape, code = _shard_plan(node, cache)
+    np_dtype, nbx_dtype, size = SF_DTYPE_INFO[code]
+    if out_dtype is not None and out_dtype != nbx_dtype:
+        raise ShardsRefused(f"the sources of {_shard_label(node)} are stored as {nbx_dtype!r} and out_dtype is "
+                            f"{out_dtype!r}: this function never converts a stored weight, load it alike or convert "
+                            f"it with the loader")
+    out = NBXTensor.empty_cpu(shape, nbx_dtype)
+    if out.numel():
+        bits = {1: np.uint8, 2: np.uint16, 4: np.uint32, 8: np.uint64}[size]
+        dest = np.ctypeslib.as_array((ctypes.c_uint8 * out.nbytes()).from_address(out.data_ptr()))
+        _shard_fill(node, dest.view(bits).reshape(shape), cache)
+    return out
+
+
+def stack_shards(sources: Sequence[ShardSource], axis: int, out_dtype: Optional[NBXDtype] = None) -> NBXTensor:
+    """ONE host tensor: the stored tensors `sources` (each a `ShardRef`, or a `ShardConcat` / `ShardStack` declaration)
+    stacked along a new `axis`, bit-equal to `NBXTensor.stack` of the same tensors read whole. Peak memory = the result
+    plus ONE source: the result is allocated once, from the headers, and each source is copied from a read-only map of
+    its file straight into its slice of it, in the order given; a nested declaration writes into the slice of its
+    parent, so `ShardStack` of `ShardConcat`s holds no intermediate. Sources keep their stored dtype; `out_dtype` None
+    means that dtype, and a different one is refused (nothing is widened or converted). Sources that differ in dtype or
+    shape, a missing tensor and a bad axis raise `ShardsRefused` naming the sources, before any byte is read."""
+    return _build_shards(ShardStack(tuple(sources), axis), out_dtype)
+
+
+def concat_shards(sources: Sequence[ShardSource], axis: int, out_dtype: Optional[NBXDtype] = None) -> NBXTensor:
+    """The same as `stack_shards`, the sources joined along their existing `axis` (bit-equal to `NBXTensor.cat`)."""
+    return _build_shards(ShardConcat(tuple(sources), axis), out_dtype)
 
 
 def half_in_place(ptr: int, count: int, device_idx: int):

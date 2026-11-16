@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   by name. Every cell ships uncertified (the serial scan runs, the output bytes unchanged) until
   `tools/measure_the_chunked_gated_delta_rule.py` measures it on a card against the serial scan and flash-linear-
   attention's chunk form.
+- `nbxtensor.io.safetensors.stack_shards` / `concat_shards` (`ShardRef`, `ShardConcat`, `ShardStack`): one parameter
+  built from several stored tensors, in the stored dtype, peak memory the result plus one source; disagreements raise
+  `ShardsRefused` naming the sources.
 
 ## [0.1.8] - 2026-11-15
 
