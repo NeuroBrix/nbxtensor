@@ -14,6 +14,7 @@ carried when the code was taken).
 | [BobMcDear/attorch](https://github.com/BobMcDear/attorch) | MIT | `ops/_common.py`, `ops/conv2d.py`, `ops/conv_wrappers.py`, `ops/cross_entropy.py`, `ops/glu.py`, `ops/layernorm.py`, `ops/rmsnorm.py`, `ops/softmax.py` |
 | [linkedin/Liger-Kernel](https://github.com/linkedin/Liger-Kernel) | BSD-2-Clause | `ops/rope.py` |
 | [Dao-AILab/flash-attention](https://github.com/Dao-AILab/flash-attention) | BSD-3-Clause | `ops/flash_attention.py` (from the upstream flash_attn_triton.py), `ops/elementwise_wrappers.py` (its wrapper) |
+| [fla-org/flash-linear-attention](https://github.com/fla-org/flash-linear-attention) | MIT | `ops/gated_delta_rule_chunked.py` (its chunked gated delta rule forward, re-written; **pinned**: the PyPI release fla-core 0.6.0, its source files named by their sha256 in the file's header) |
 
 FlagGems publishes no NOTICE file; its Apache-2.0 license is reproduced below, and the changes are stated in each
 file's header.
@@ -285,3 +286,26 @@ SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+### fla-org/flash-linear-attention — MIT
+MIT License
+
+Copyright (c) 2023-2026 Songlin Yang, Yu Zhang, Zhiyuan Li
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

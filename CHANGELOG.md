@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- The gated delta rule over a sequence has a chunked form beside its serial scan
+  (`nbxtensor.ops.gated_delta_rule_chunked.gated_delta_rule_chunked_wrapper`, ported from flash-linear-attention, MIT):
+  64 tokens solved at a time with matrix products, every product and the state float32, the state handed to and from
+  the serial scan unchanged. Its cost is `nbxtensor.ops._cost.gated_delta_rule_chunked` (the float32 workspace by name),
+  its launch keys `launch_keys.gated_delta_rule_chunked_launches`.
+- The op `gated_delta_rule` runs the form the census beside the kernel (`ops/gated_delta_rule_census.json`) certifies
+  for the call's dimensions: one token always runs the serial scan; a call whose dimensions are in no cell is refused
+  by name. Every cell ships uncertified (the serial scan runs, the output bytes unchanged) until
+  `tools/measure_the_chunked_gated_delta_rule.py` measures it on a card against the serial scan and flash-linear-
+  attention's chunk form.
+
 ## [0.1.8] - 2026-11-15
 
 ### Added

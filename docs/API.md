@@ -1080,6 +1080,10 @@ def lstm_launches(B: int, T: int, I: int, H: int, num_layers: int, bidirectional
     # `lstm_wrapper` -> `_lstm_run_direction`, per layer and direction
 def gated_delta_rule_launches(dk: int, dv: int, q: NBXDtype, k: NBXDtype, v: NBXDtype, g: NBXDtype, beta: NBXDtype)
     # `gated_delta_rule_wrapper`: one launch of the serial scan at any length and batch (the length is never in the key)
+def gated_delta_rule_chunked_launches(dk: int, dv: int, q: NBXDtype, k: NBXDtype, v: NBXDtype, g: NBXDtype, beta: NBXDtype)
+    # `gated_delta_rule_chunked_wrapper`: its three launches (prepare, state, output) at any length and batch, keyed by dk, dv and dtype tags
+def gated_delta_rule_op_launches(B: int, L: int, Hk: int, Hv: int, dk: int, dv: int, q: NBXDtype, k: NBXDtype, v: NBXDtype, g: NBXDtype, beta: NBXDtype)
+    # `gated_delta_rule_op`: the launches of the form `gated_delta_rule_path` answers (refused by name where it refuses)
 def dft_r2c_launches(M: int, N: int, onesided: bool, native_bf16: bool)
     # `fft_r2c_wrapper` on a length that is not a power of two
 def dft_c2r_launches(M: int, bins: int, N: int, native_bf16: bool)
@@ -1795,12 +1799,42 @@ def gated_delta_rule_wrapper(q, k, v, g, beta, state=None, *, qk_l2norm: bool, e
     # handed back is the next call's start (a prompt in two calls, or then one token at a time, is one recurrence).
     # Refuses by name: compute dtype not float32, g or state not float32, inputs not float16/bfloat16/float32, bad
     # shapes, Hv % Hk != 0, L < 1. No chunk size anywhere: not an argument, not in the launch key.
+GATED_DELTA_RULE_CENSUS          # Path of gated_delta_rule_census.json beside the module: every call of the op, by its dimensions
+GATED_DELTA_RULE_CENSUS_FORMAT = "nbx-gated-delta-rule-census/1"
+GATED_DELTA_RULE_PATHS = ("serial", "chunked")
+def gated_delta_rule_census() -> dict
+    # the census read and checked (format; every cell's B, Hk, Hv, dk, dv, dtype and chunked_from_length: null or a
+    # length above one token); a file that does not hold is refused by name (RuntimeError)
+def gated_delta_rule_path(B: int, L: int, Hk: int, Hv: int, dk: int, dv: int, dtype: NBXDtype) -> str
+    # "serial" for one token; otherwise the call's cell: "chunked" when its chunked_from_length is a length <= L,
+    # "serial" when null or longer; dimensions in no cell: ValueError naming them and the measurement tool
+def gated_delta_rule_op(q, k, v, g, beta, state=None, *, qk_l2norm: bool, eps: float, scale: float, compute_dtype)
+    # the serial scan or the chunked form, as gated_delta_rule_path answers; the same contract and state either way.
     # Dispatch name: "gated_delta_rule".
+```
+
+`nbxtensor.ops.gated_delta_rule_chunked` (ported from flash-linear-attention, MIT; `THIRD_PARTY_NOTICES.md`)
+
+```python
+GATED_DELTA_RULE_SUB_BLOCK = 16                      # the sub-block of the fused triangular solve
+GATED_DELTA_RULE_CHUNK = 64                          # 4 sub-blocks: the tokens solved together
+def gated_delta_rule_chunk_prepare_kernel(...)       # grid (chunks, B * Hv): gc, W, U of each chunk
+def gated_delta_rule_chunk_state_kernel(...)         # grid (cdiv(dv, BV), B * Hv): the serial loop over chunks, V' and the states
+def gated_delta_rule_chunk_output_kernel(...)        # grid (cdiv(dv, BV), chunks, B * Hv): the output
+def gated_delta_rule_chunked_workspace(B: int, L: int, Hv: int, dk: int, dv: int) -> Dict[str, Tuple[int, ...]]
+    # the float32 workspace by name: w [B, L, Hv, dk], u [B, L, Hv, dv], gc [B, L, Hv], states [B, cdiv(L, 64), Hv, dk, dv]
+def gated_delta_rule_chunked_launch(q, k, v, g, beta, state, out, state_out, ws, *, qk_l2norm: bool, eps: float, scale: float) -> None
+    # the three launches over buffers already formed (the workspace by name)
+def gated_delta_rule_chunked_wrapper(q, k, v, g, beta, state=None, *, qk_l2norm: bool, eps: float, scale: float, compute_dtype)
+    # the contract of gated_delta_rule_wrapper (shapes, dtypes, refusals, the state in and out float32), chunked
 ```
 
 Its cost: `nbxtensor.ops._cost.gated_delta_rule(q, k, v, g, beta, state, *, qk_l2norm, compute_dtype) -> Cost` on
 `_cost.Spec`s, refused where the wrapper refuses: the output and the state out (both returned, no workspace), every
 operand read once, both outputs written once, the recurrence's flops at L tokens.
+The chunked form's: `nbxtensor.ops._cost.gated_delta_rule_chunked(q, k, v, g, beta, state, *, qk_l2norm,
+compute_dtype) -> Cost`, the same refusals: the output and the state out (returned), then the float32 workspace
+`gated_delta_rule_chunked_workspace` names; the bytes of its three launches; its products' flops per 64-token chunk.
 
 `nbxtensor.ops.ge`
 
