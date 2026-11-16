@@ -23,7 +23,7 @@ from nbxtensor.dtype.itemsize import itemsize
 from nbxtensor.shape import contiguous_strides, is_contiguous, numel
 
 __all__ = ["Spec", "Buffer", "Cost", "elementwise_unary", "elementwise_binary", "softmax", "rms_norm",
-           "native_layer_norm", "reduction", "gated_delta_rule"]
+           "native_layer_norm", "reduction", "gated_delta_rule", "gated_delta_rule_chunked"]
 
 
 @dataclass(frozen=True)
@@ -256,3 +256,45 @@ def gated_delta_rule(q: Spec, k: Spec, v: Spec, g: Spec, beta: Spec, state: Opti
     st.moved += sum(t.nbytes for t in (q, k, v, g, beta, state) if t is not None) + out.nbytes + state_out.nbytes
     norms = 2 * (3 * dk + 1) if qk_l2norm else 0
     return st.done(B * L * Hv * (7 * dk * dv + 2 * dv + dk + norms))
+
+
+def gated_delta_rule_chunked(q: Spec, k: Spec, v: Spec, g: Spec, beta: Spec, state: Optional[Spec], *,
+                             qk_l2norm: bool, compute_dtype) -> Cost:
+    """`ops.gated_delta_rule_chunked.gated_delta_rule_chunked_wrapper` over a length L, refused by name where the
+    wrapper refuses (the same `gated_delta_rule_shapes` and `gated_delta_rule_dtypes`): the output [B, L, Hv, dv] at
+    v's dtype and the state out [B, Hv, dk, dv] float32, both returned, then the float32 workspace
+    `gated_delta_rule_chunked_workspace` names (W, U, gc, the chunk states), alive until the wrapper returns.
+    Bytes moved, launch by launch: the prepare kernel reads k, v, g, beta and writes W, U, gc; the state kernel reads
+    k, W, U, gc and the state in (when given), writes the chunk states, V' over U and the state out; the output kernel
+    reads q, k, V', gc and the chunk states and writes the output. Flops per (batch row, value head, chunk of C
+    tokens, the last one counted whole), the matrix products at two a multiply-add: the Gram matrix 2 C^2 dk, its
+    triangular solve 2 C^3 / 3, W and U 2 C^2 (dk + dv), the corrected values 2 C dk dv, the state's write
+    2 C dk dv and decay dk dv, the output's 2 C dk dv + 2 C^2 (dk + dv); with `qk_l2norm`, the norms of q and k,
+    3 dk + 1 each, per token and value head."""
+    from nbxtensor.dtype.nbx_dtype import NBXDtype
+    from nbxtensor.ops.gated_delta_rule import gated_delta_rule_dtypes, gated_delta_rule_shapes
+    from nbxtensor.ops.gated_delta_rule_chunked import GATED_DELTA_RULE_CHUNK, gated_delta_rule_chunked_workspace
+    B, L, Hk, Hv, dk, dv = gated_delta_rule_shapes(q, k, v, g, beta, state)
+    gated_delta_rule_dtypes(*(None if t is None else NBXDtype[t.dtype] for t in (q, k, v, g, beta, state)),
+                            compute_dtype)
+    f32 = NBXDtype.float32.name
+    st = _Steps()
+    out = Spec.contiguous((B, L, Hv, dv), v.dtype)
+    state_out = Spec.contiguous((B, Hv, dk, dv), f32)
+    st.alloc("output", out.nbytes, returned=True)
+    st.alloc("state out", state_out.nbytes, returned=True)
+    ws = {name: Spec.contiguous(shape, f32).nbytes for name, shape in
+          gated_delta_rule_chunked_workspace(B, L, Hv, dk, dv).items()}
+    for name, nbytes in ws.items():
+        st.alloc(f"workspace {name}", nbytes)
+    state_in = 0 if state is None else state.nbytes
+    st.moved += (k.nbytes + v.nbytes + g.nbytes + beta.nbytes + ws["w"] + ws["u"] + ws["gc"]          # prepare
+                 + k.nbytes + ws["w"] + ws["u"] + ws["gc"] + state_in + ws["states"] + ws["u"]
+                 + state_out.nbytes                                                                    # state
+                 + q.nbytes + k.nbytes + ws["u"] + ws["gc"] + ws["states"] + out.nbytes)              # output
+    C = GATED_DELTA_RULE_CHUNK
+    chunks = -(-L // C)
+    per_chunk = (2 * C * C * dk + 2 * C ** 3 // 3 + 2 * C * C * (dk + dv) + 2 * C * dk * dv
+                 + 2 * C * dk * dv + dk * dv + 2 * C * dk * dv + 2 * C * C * (dk + dv))
+    norms = 2 * (3 * dk + 1) if qk_l2norm else 0
+    return st.done(B * Hv * (chunks * per_chunk + L * norms))
