@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-11-17
+
+### Fixed
+- The chunked gated delta rule's kernels take their program ids as 64-bit integers (`tl.program_id(..).to(tl.int64)`),
+  so the flat offsets they compute do not wrap on a long sequence.
+
+### Changed
+- The gated delta rule's census names follow the public-name rule (a public name states nothing of the application):
+  `GATED_DELTA_RULE_CENSUS`, `GATED_DELTA_RULE_CENSUS_FORMAT` and `gated_delta_rule_census` are private
+  (`_GATED_DELTA_RULE_CENSUS`, `_GATED_DELTA_RULE_CENSUS_FORMAT`, `_gated_delta_rule_census`); the six
+  `cache_clear` call sites of the tests name the private reader.
+
 ## [0.1.9] - 2026-11-17
 
 ### Added

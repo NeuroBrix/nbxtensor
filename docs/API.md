@@ -1801,11 +1801,10 @@ def gated_delta_rule_wrapper(q, k, v, g, beta, state=None, *, qk_l2norm: bool, e
     # handed back is the next call's start (a prompt in two calls, or then one token at a time, is one recurrence).
     # Refuses by name: compute dtype not float32, g or state not float32, inputs not float16/bfloat16/float32, bad
     # shapes, Hv % Hk != 0, L < 1. No chunk size anywhere: not an argument, not in the launch key.
-GATED_DELTA_RULE_CENSUS          # Path of gated_delta_rule_census.json beside the module: every call of the op, by its dimensions
-GATED_DELTA_RULE_CENSUS_FORMAT = "nbx-gated-delta-rule-census/1"
+# The census beside the module (gated_delta_rule_census.json: every call of the op, by its dimensions) is read by
+# private names (_GATED_DELTA_RULE_CENSUS, _GATED_DELTA_RULE_CENSUS_FORMAT, _gated_delta_rule_census: format and cells
+# checked, a file that does not hold refused by name with RuntimeError); they are not API.
 GATED_DELTA_RULE_PATHS = ("serial", "chunked")
-def gated_delta_rule_census() -> dict
-    # the census read and checked (format; every cell's B, Hk, Hv, dk, dv, dtype and chunked_from_length: null or a
     # length above one token); a file that does not hold is refused by name (RuntimeError)
 def gated_delta_rule_path(B: int, L: int, Hk: int, Hv: int, dk: int, dv: int, dtype: NBXDtype) -> str
     # "serial" for one token; otherwise the call's cell: "chunked" when its chunked_from_length is a length <= L,
