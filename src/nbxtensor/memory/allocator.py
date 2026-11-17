@@ -3,6 +3,7 @@ own accounting (live bytes, peaks), with the malloc call-site trace (NBX_MALLOC_
 unchanged."""
 
 from __future__ import annotations
+from nbxtensor.backend import cuda_profile as _profile
 from nbxtensor.backend import faults as _faults
 
 import bisect
@@ -1439,7 +1440,10 @@ class DeviceAllocator:
     @staticmethod
     def memset_direct(ptr: int, value: int, nbytes: int):
         if nbytes > 0 and ptr:
+            mark = None if _profile.SESSION is None else _profile.SESSION.begin(0)
             _rt.device_memory().memset(ptr, value, nbytes)
+            if mark is not None:
+                mark[0].end(mark, _profile.SET_ROW)
 
     @staticmethod
     def memcpy(dst: int, src: int, nbytes: int, kind: int = 3):
@@ -1461,7 +1465,11 @@ class DeviceAllocator:
         stream ordering, never by host program order.
         """
         if nbytes > 0:
+            # inside a kernel-time session a copy that reaches a device sits between two timing events (`cuda_profile`)
+            mark = _profile.SESSION.begin(0) if _profile.SESSION is not None and kind in _profile.COPY_ROWS else None
             _rc = _rt.device_memory().memcpy(dst, src, nbytes, kind)
+            if mark is not None:
+                mark[0].end(mark, _profile.COPY_ROWS[kind])
             if _rc not in (None, 0):
                 raise RuntimeError(
                     f"cudaMemcpy failed rc={_rc} (kind={kind}, "
@@ -1802,10 +1810,13 @@ class DeviceAllocator:
             # Fallback to synchronous memcpy if async is unsupported.
             DeviceAllocator.memcpy(dst, src, nbytes, kind)
             return
+        mark = _profile.SESSION.begin(stream) if _profile.SESSION is not None and kind in _profile.COPY_ROWS else None
         getattr(rt, fn_name)(
             ctypes.c_void_p(dst), ctypes.c_void_p(src),
             ctypes.c_size_t(nbytes), ctypes.c_int(kind),
             ctypes.c_void_p(stream))
+        if mark is not None:
+            mark[0].end(mark, _profile.COPY_ROWS[kind])
 
     @staticmethod
     def event_synchronize(event: int):

@@ -25,6 +25,8 @@ import contextlib
 import ctypes
 import os
 
+from nbxtensor.backend import cuda_profile as _profile
+
 import numpy as np
 import struct
 from typing import Any, Dict, List, NamedTuple, Optional, Tuple
@@ -573,6 +575,7 @@ class CudaDriver(ModuleDriver):
         function = ctypes.c_void_p()
         self._check(self.lib.cuModuleGetFunction(ctypes.byref(function), module, name.encode()), f"cuModuleGetFunction({name})")
         self._param_counts[int(function.value)] = _cubin_param_count(binary, name)
+        _profile.NAMES[int(function.value)] = name          # the launch's row in a kernel-time session
         if shared > 48 * 1024:
             # A compiled kernel asking more shared memory than the device grants a block is a config this device
             # cannot run: Triton's own CUDA launcher raises OutOfResources here, which the autotuner scores `inf`
@@ -604,7 +607,11 @@ class CudaDriver(ModuleDriver):
         storage, arr = self._arg_buffers[cache_key]
         for cell, (_kind, v) in zip(storage, params):
             cell.value = v
+        # inside a kernel-time session the launch sits between two timing events on its stream (`cuda_profile`)
+        mark = None if _profile.SESSION is None else _profile.SESSION.begin(stream)
         rc = self.lib.cuLaunchKernel(function, *launch_dims, shared, stream, arr, None)
+        if mark is not None:
+            mark[0].end(mark, _profile.NAMES[int(function.value)])
         if rc != 0:
             self._check(rc, "cuLaunchKernel")
 

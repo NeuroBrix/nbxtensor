@@ -16,6 +16,7 @@ import os
 import traceback
 from typing import Dict, List, Optional, Tuple
 
+from nbxtensor.backend import cuda_profile as _profile
 from nbxtensor.memory.allocator import DeviceAllocator
 from nbxtensor.memory.slab import SlabAllocator, SlabInterceptor
 from nbxtensor.tensor import NBXTensor
@@ -400,7 +401,8 @@ class FrozenPlan:
         # token (Qwen3-30B-A3B on 4 V100, 2026-10-28: ~60 ms of a 184 ms token for a few ms of kernels).
         _segmented = self.crosses_cards() or self.scan_slots is not None     # a segment of a step: graphs too
         from nbxtensor.backend.replay_graph import capable as _graph_capable
-        if _graph_capable() and not self.graph_disabled:
+        # inside a kernel-time session the actions run directly: a graph is one launch, its kernels not told apart
+        if _graph_capable() and not self.graph_disabled and _profile.SESSION is None:
             self._replay_graph(_segmented)
         else:
             self._direct_actions()
