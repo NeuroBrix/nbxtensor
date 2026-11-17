@@ -98,8 +98,8 @@ def gated_delta_rule_chunk_prepare_kernel(
     BK: tl.constexpr,
     BV: tl.constexpr,
 ):
-    i_t = tl.program_id(0)
-    i_bh = tl.program_id(1)
+    i_t = tl.program_id(0).to(tl.int64)
+    i_bh = tl.program_id(1).to(tl.int64)
     b = (i_bh // HV).to(tl.int64)
     h = (i_bh % HV).to(tl.int64)
     kh = h // GROUPS
@@ -273,8 +273,8 @@ def gated_delta_rule_chunk_state_kernel(
     BLOCK_K: tl.constexpr,                    # DK rounded up to a power of two: the whole key axis in one tile
     BV: tl.constexpr,
 ):
-    i_v = tl.program_id(0)
-    i_bh = tl.program_id(1)
+    i_v = tl.program_id(0).to(tl.int64)
+    i_bh = tl.program_id(1).to(tl.int64)
     b = (i_bh // HV).to(tl.int64)
     h = (i_bh % HV).to(tl.int64)
     kh = h // GROUPS
@@ -329,9 +329,9 @@ def gated_delta_rule_chunk_output_kernel(
     BK: tl.constexpr,
     BV: tl.constexpr,
 ):
-    i_v = tl.program_id(0)
-    i_t = tl.program_id(1)
-    i_bh = tl.program_id(2)
+    i_v = tl.program_id(0).to(tl.int64)
+    i_t = tl.program_id(1).to(tl.int64)
+    i_bh = tl.program_id(2).to(tl.int64)
     b = (i_bh // HV).to(tl.int64)
     h = (i_bh % HV).to(tl.int64)
     kh = h // GROUPS

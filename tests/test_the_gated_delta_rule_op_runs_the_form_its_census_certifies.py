@@ -30,11 +30,11 @@ def census(tmp_path, monkeypatch):
     after)."""
     path = tmp_path / "gated_delta_rule_census.json"
 
-    def write(cells, fmt=G.GATED_DELTA_RULE_CENSUS_FORMAT):
+    def write(cells, fmt=G._GATED_DELTA_RULE_CENSUS_FORMAT):
         path.write_text(json.dumps({"format": fmt, "cells": cells}))
         G.gated_delta_rule_census.cache_clear()
 
-    monkeypatch.setattr(G, "GATED_DELTA_RULE_CENSUS", path)
+    monkeypatch.setattr(G, "_GATED_DELTA_RULE_CENSUS", path)
     G.gated_delta_rule_census.cache_clear()
     yield write
     G.gated_delta_rule_census.cache_clear()
@@ -46,8 +46,8 @@ def _cell(start, dtype="float32", **dims):
 
 def test_the_shipped_census_holds_and_certifies_no_cell_yet():
     G.gated_delta_rule_census.cache_clear()
-    doc = G.gated_delta_rule_census()
-    assert doc["format"] == G.GATED_DELTA_RULE_CENSUS_FORMAT
+    doc = G._gated_delta_rule_census()
+    assert doc["format"] == G._GATED_DELTA_RULE_CENSUS_FORMAT
     dims = {(c["B"], c["Hk"], c["Hv"], c["dk"], c["dv"], c["dtype"]) for c in doc["cells"]}
     assert dims == {(b, 16, 48, 128, 128, dt) for b in (1, 4) for dt in ("float32", "float16", "bfloat16")}
     assert all(c["chunked_from_length"] is None and c["proof"] is None for c in doc["cells"])
@@ -102,7 +102,7 @@ def test_a_census_that_does_not_hold_is_refused_by_name(census, doc, match):
 
 
 def test_an_unreadable_census_is_refused_by_name(tmp_path, monkeypatch):
-    monkeypatch.setattr(G, "GATED_DELTA_RULE_CENSUS", tmp_path / "absent.json")
+    monkeypatch.setattr(G, "_GATED_DELTA_RULE_CENSUS", tmp_path / "absent.json")
     G.gated_delta_rule_census.cache_clear()
     try:
         with pytest.raises(RuntimeError, match="cannot be read.*reinstall the library"):

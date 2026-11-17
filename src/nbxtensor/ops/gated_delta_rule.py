@@ -199,25 +199,25 @@ gated_delta_rule_wrapper.self_manages_dtype = True
 # --- the choice between the serial scan and the chunked form (`ops.gated_delta_rule_chunked`) ------------------------
 
 #: The census of the op's calls, beside this file: its cells are the certification cells of the choice.
-GATED_DELTA_RULE_CENSUS = Path(__file__).with_name("gated_delta_rule_census.json")
-GATED_DELTA_RULE_CENSUS_FORMAT = "nbx-gated-delta-rule-census/1"
+_GATED_DELTA_RULE_CENSUS = Path(__file__).with_name("gated_delta_rule_census.json")
+_GATED_DELTA_RULE_CENSUS_FORMAT = "nbx-gated-delta-rule-census/1"
 #: The forms the op runs, by name.
 GATED_DELTA_RULE_PATHS = ("serial", "chunked")
 _CELL_DIMS = ("B", "Hk", "Hv", "dk", "dv", "dtype")
 
 
 @lru_cache(maxsize=None)
-def gated_delta_rule_census() -> dict:
+def _gated_delta_rule_census() -> dict:
     """The census file read and checked: its format, and every cell's dimensions and `chunked_from_length` (null or a
     length of at least two tokens). A file that does not hold is refused by name, with what is wrong in it."""
     try:
-        doc = json.loads(GATED_DELTA_RULE_CENSUS.read_text())
+        doc = json.loads(_GATED_DELTA_RULE_CENSUS.read_text())
     except (OSError, ValueError) as e:
-        raise RuntimeError(f"gated_delta_rule: the census {GATED_DELTA_RULE_CENSUS.name} cannot be read ({e}); it "
+        raise RuntimeError(f"gated_delta_rule: the census {_GATED_DELTA_RULE_CENSUS.name} cannot be read ({e}); it "
                            f"ships beside ops/gated_delta_rule.py: reinstall the library") from None
-    if doc.get("format") != GATED_DELTA_RULE_CENSUS_FORMAT:
-        raise RuntimeError(f"gated_delta_rule: the census {GATED_DELTA_RULE_CENSUS.name} has format "
-                           f"{doc.get('format')!r}; this release reads {GATED_DELTA_RULE_CENSUS_FORMAT!r}")
+    if doc.get("format") != _GATED_DELTA_RULE_CENSUS_FORMAT:
+        raise RuntimeError(f"gated_delta_rule: the census {_GATED_DELTA_RULE_CENSUS.name} has format "
+                           f"{doc.get('format')!r}; this release reads {_GATED_DELTA_RULE_CENSUS_FORMAT!r}")
     for cell in doc.get("cells", ()):
         missing = [d for d in _CELL_DIMS + ("chunked_from_length",) if d not in cell]
         start = cell.get("chunked_from_length")
@@ -236,12 +236,12 @@ def gated_delta_rule_path(B: int, L: int, Hk: int, Hv: int, dk: int, dv: int, dt
     if L <= GATED_DELTA_RULE_MIN_LENGTH:
         return "serial"
     want = dict(B=int(B), Hk=int(Hk), Hv=int(Hv), dk=int(dk), dv=int(dv), dtype=dtype.name)
-    for cell in gated_delta_rule_census()["cells"]:
+    for cell in _gated_delta_rule_census()["cells"]:
         if all(cell[d] == want[d] for d in _CELL_DIMS):
             start = cell["chunked_from_length"]
             return "chunked" if start is not None and L >= start else "serial"
     raise ValueError(f"gated_delta_rule: no census cell for {want} (a call of {L} tokens); the census "
-                     f"{GATED_DELTA_RULE_CENSUS.name} beside ops/gated_delta_rule.py lists the calls the library and "
+                     f"{_GATED_DELTA_RULE_CENSUS.name} beside ops/gated_delta_rule.py lists the calls the library and "
                      f"its callers make: add the cell, then certify it with "
                      f"tools/measure_the_chunked_gated_delta_rule.py on a card")
 
