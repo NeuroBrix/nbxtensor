@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-11-17
+
 ### Added
 - The gated delta rule over a sequence has a chunked form beside its serial scan
   (`nbxtensor.ops.gated_delta_rule_chunked.gated_delta_rule_chunked_wrapper`, ported from flash-linear-attention, MIT):
