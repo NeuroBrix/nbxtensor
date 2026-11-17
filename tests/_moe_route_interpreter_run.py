@@ -54,6 +54,11 @@ def run(case):
     x[case["zero_rows"]] = 0.0
     hidden = torch.from_numpy(x).to(dt)
     hidden = hidden if B is None else hidden.reshape(B, T, H)
+    if case.get("pad"):       # a view with a batch stride wider than T rows: a slice of a longer buffer
+        buf = torch.zeros(B, T + case["pad"], H, dtype=dt)
+        buf[:, :T] = hidden
+        hidden = buf[:, :T]
+        assert hidden.stride(0) != T * hidden.stride(1)
     wd = torch.from_numpy(w).to(dt)
     bd = None if b is None else torch.from_numpy(b)
     idx, wt = route(hidden, wd, bd, case)

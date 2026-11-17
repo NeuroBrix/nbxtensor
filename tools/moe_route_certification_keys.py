@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Copyright NeuroBrix, Apache-2.0
 """The keys of the routing kernel a card certifies, written from the op's census (`src/nbxtensor/ops/
 moe_route_census.json`, its `cells`) as the certifier's `--keys` file: one '<kernel qualname>::<key repr>' line a

@@ -76,6 +76,9 @@ for _dt in ("float32", "bfloat16"):
                 _zero = (0, (_B or 1) * _T - 1) if _T > 2 else ()      # rows of zeros: an exact tie in every case
                 CASES[f"{_dt}-{_g}-{_s}-{_shape}"] = _case(_dt, _B, _T, _g, _s, _i, 100 + _i, zero_rows=_zero)
                 _i += 1
+    for _g, _s in (("softmax", "topk"), ("sigmoid-bias", "grouped-max-zero")):   # a batch stride wider than T rows
+        CASES[f"{_dt}-{_g}-{_s}-B2T23-padded"] = dict(_case(_dt, 2, 23, _g, _s, _i, 100 + _i, zero_rows=(0, 45)), pad=3)
+        _i += 1
     for _g in ("softmax", "sigmoid-bias"):
         CASES[f"{_dt}-{_g}-k-equals-E-T23"] = _case(_dt, None, 23, _g, "topk", _i, 100 + _i, e=16, top_k=16)
         _i += 1
