@@ -1,5 +1,22 @@
-"""The routing of a mixture of experts: which top_k of E experts a token goes to, and with which float32 weights (the
-router's whole skeleton, from the hidden row to the routing a dispatch takes as precomputed).
+# Copyright NeuroBrix, Apache-2.0
+"""The routing of a mixture of experts: which top_k of E experts each token goes to, and with which float32 weights
+(the router's whole skeleton, from the hidden rows to the routing a dispatch takes as precomputed), for the token step
+and the prefill over T tokens alike, in one call and one launch.
+
+THE PUBLIC SIGNATURE (what a graph matcher reads off the recorded routing and hands over, nothing defaulted):
+
+    moe_route(hidden, router_weight, *, choice_bias, score_fn, top_k, n_group, topk_group, group_score, fill,
+              renorm_eps, scale) -> (indices int64, weights float32)
+
+    hidden        [T, H] or [B, T, H], float16 | bfloat16 | float32: the rows the router linear reads
+    router_weight [E, H], same dtypes: the router linear's weight (E <= MOE_ROUTE_MAX_EXPERTS)
+    choice_bias   [E] float32 or None: the additive bias the graph adds to the scores before the selection
+    score_fn      'sigmoid' | 'softmax': the gate function the graph applies to the router logits
+    n_group, topk_group, group_score ('top2_sum' | 'max'), fill: the grouped selection (n_group 1: plain top-k)
+    top_k         the experts kept per token
+    renorm_eps    None (no normalisation) or the eps the graph adds to the sum it divides by (0.0: a plain sum)
+    scale         the factor the graph multiplies the weights by (1.0: none)
+    outputs       hidden's leading dimensions + [top_k]
 
 Per token row x [H], with the router weight W [E, H]:
 
@@ -14,20 +31,42 @@ Per token row x [H], with the router weight W [E, H]:
     w      = w / (sum(w) + renorm_eps)                    when `renorm_eps` is not None
     w      = w * scale
 
+THE VARIANTS, read from the recorded routings (task 824's proof: a sigmoid gate plus a bias, a grouped top-k over
+[T, n_group, E / n_group], masked_fill of the dropped groups, a second top-k of the masked choice, a gather of the
+UN-biased scores, a renormalisation, a scaling factor; and the softmax routers the engine already fuses).
+SUPPORTED, each a setting of the signature above:
+  - gate: softmax over the E logits, or sigmoid per logit; no bias, or a bias added to the scores before the selection
+    only (the weights are always gathered from the un-biased scores);
+  - selection: plain top-k (n_group 1), or grouped top-k (groups scored by their top-2 sum or their maximum, the best
+    topk_group kept, the others' experts set to `fill`, then top-k among all E): top_k up to the kept experts, k = E
+    included;
+  - normalisation: none (renorm_eps None), over the chosen weights (renorm_eps >= 0), then a scaling factor;
+  - a softmax taken AFTER the top-k over the k logits is score_fn 'softmax' with renorm_eps 0.0: exp(l_i) / sum_k
+    exp(l_j) is the same number, rounded in another order (float32 rounding, not bytes).
+REFUSED, by name (the op raises, or the signature cannot express it and a matcher must leave the routing unfused and
+say so; never a silent softmax):
+  - a gate function other than sigmoid or softmax (score_fn raises);
+  - a bias added to the returned weights as well (the weights are the un-biased scores by contract: inexpressible);
+  - a group score other than top-2 sum or maximum (group_score raises), groups of unequal size (n_group raises);
+  - a normalisation other than a sum plus eps (a softmax over the k chosen, a division by a max: inexpressible);
+  - more than MOE_ROUTE_MAX_EXPERTS experts, a token count of 0, operands at another dtype or rank (shapes raise).
+
 n_group = 1 keeps every expert, so it is exactly the ungrouped routing. The slots come in descending choice order, the
 lower expert id first on an exact tie; the order of the slots is NOT part of the contract (a set per token, weights
-paired by expert id). Outputs: indices [T, top_k] int64, weights [T, top_k] float32.
+paired by expert id).
 
-ONE kernel: one program per token row. The router product runs over H in BLOCK_H tiles into an E-long float32
-accumulator, then the scores, the bias, the group reduction, the two selections, the gather, the renormalisation and
-the scale stay in registers: E <= `MOE_ROUTE_MAX_EXPERTS` experts fit one row per program. BLOCK_H and the warps are
-the certified configuration of the key (E, H, top_k and the operands' dtypes), never tuned at run time. n_group is
-not in the key: the grouped and the ungrouped routing of one geometry share one configuration, so n_group 1 and every
-group kept give the same bytes. Every
-loop bound is 32-bit (the Metal lowering refuses a 64-bit scf.for bound). This release runs the token step
-(`MOE_ROUTE_TOKENS`); the routing over a symbolic number of tokens is the next lot.
+ONE kernel: one program per token row, B * T programs. The router product runs over H in BLOCK_H tiles into an E-long
+float32 accumulator, then the scores, the bias, the group reduction, the two selections, the gather, the
+renormalisation and the scale stay in registers: E <= `MOE_ROUTE_MAX_EXPERTS` experts fit one row per program. A
+row's program runs the same instructions whatever B and T (only its row address changes), so a row routed inside a
+prefill is the row routed alone, indices and weights byte for byte. BLOCK_H and the warps are the certified
+configuration of the key (E, H, top_k and the operands' dtypes), never tuned at run time; B, T and n_group are not in
+the key: the token step and the prefill, the grouped and the ungrouped routing of one geometry share one
+configuration. Every loop bound is 32-bit (the Metal lowering refuses a 64-bit scf.for bound).
 
-Its float64 reference is `nbxtensor.ops.oracles.fp64.moe_route_oracle`; its launch is `launch_keys.moe_route_launches`.
+Its float64 reference is `nbxtensor.ops.oracles.fp64.moe_route_oracle`; its launch is `launch_keys.moe_route_launches`;
+its op census (the primitives it uses per backend, the keys a card certifies, the certification commands) is
+`moe_route_census.json` beside this file.
 """
 from __future__ import annotations
 
@@ -49,8 +88,6 @@ MOE_ROUTE_SCORE_FNS = ("sigmoid", "softmax")
 MOE_ROUTE_GROUP_SCORES = ("top2_sum", "max")
 #: The most experts one program holds in registers (one row per program).
 MOE_ROUTE_MAX_EXPERTS = 256
-#: The token counts this release runs: the token step (the routing over a symbolic count is the next lot).
-MOE_ROUTE_TOKENS = (1,)
 
 # The hidden tile and warps, candidates the certification measures per key; one stage (the loop streams W once).
 _MOE_ROUTE_CONFIGS = [triton.Config({'BLOCK_H': bh}, num_warps=w, num_stages=1)
@@ -60,13 +97,13 @@ _MOE_ROUTE_CONFIGS = [triton.Config({'BLOCK_H': bh}, num_warps=w, num_stages=1)
 @nbx_autotune(configs=_MOE_ROUTE_CONFIGS, key=['E', 'H', 'TOP_K'], cache_results=True)
 @triton.jit
 def moe_route_kernel(
-    x_ptr,                                    # [T, H] at the model's dtype, own strides
+    x_ptr,                                    # [B, T, H] at the model's dtype, own strides (B = 1 for [T, H])
     w_ptr,                                    # [E, H] the router weight, own strides
     bias_ptr,                                 # [E] float32, own stride (read only when HAS_BIAS)
-    idx_ptr,                                  # [T, TOP_K] int64, contiguous
-    wt_ptr,                                   # [T, TOP_K] float32, contiguous
-    E, H, TOP_K, N_GROUP, TOPK_GROUP,
-    sx_t, sx_h, sw_e, sw_h, sb_e,
+    idx_ptr,                                  # [B * T, TOP_K] int64, contiguous
+    wt_ptr,                                   # [B * T, TOP_K] float32, contiguous
+    T, E, H, TOP_K, N_GROUP, TOPK_GROUP,
+    sx_b, sx_t, sx_h, sw_e, sw_h, sb_e,
     fill, renorm_eps, scale,
     SIGMOID: tl.constexpr,
     HAS_BIAS: tl.constexpr,
@@ -79,7 +116,8 @@ def moe_route_kernel(
     BLOCK_H: tl.constexpr,
 ):
     NEG = float("-inf")
-    t = tl.program_id(0).to(tl.int64)
+    r = tl.program_id(0).to(tl.int64)                     # the row: token t of batch b
+    x_row = x_ptr + (r // T) * sx_b + (r % T) * sx_t
     offs_e = tl.arange(0, BLOCK_E)
     mask_e = offs_e < E
 
@@ -87,7 +125,7 @@ def moe_route_kernel(
     for h0 in range(0, H, BLOCK_H):
         offs_h = h0 + tl.arange(0, BLOCK_H)
         mask_h = offs_h < H
-        x = tl.load(x_ptr + t * sx_t + offs_h.to(tl.int64) * sx_h, mask=mask_h, other=0.0).to(tl.float32)
+        x = tl.load(x_row + offs_h.to(tl.int64) * sx_h, mask=mask_h, other=0.0).to(tl.float32)
         w = tl.load(w_ptr + offs_e[:, None].to(tl.int64) * sw_e + offs_h[None, :].to(tl.int64) * sw_h,
                     mask=mask_e[:, None] & mask_h[None, :], other=0.0).to(tl.float32)
         acc += tl.sum(w * x[None, :], 1)
@@ -140,33 +178,35 @@ def moe_route_kernel(
         wk = wk / (tl.sum(wk, 0) + renorm_eps)
     wk = wk * scale
     mask_k = offs_k < TOP_K
-    tl.store(idx_ptr + t * TOP_K + offs_k, idx.to(tl.int64), mask=mask_k)
-    tl.store(wt_ptr + t * TOP_K + offs_k, wk, mask=mask_k)
+    tl.store(idx_ptr + r * TOP_K + offs_k, idx.to(tl.int64), mask=mask_k)
+    tl.store(wt_ptr + r * TOP_K + offs_k, wk, mask=mask_k)
 
 
-def _shape_of(name: str, t, rank: int) -> tuple:
+def _shape_of(name: str, t, ranks: tuple) -> tuple:
     shape = tuple(t.shape)
-    if len(shape) != rank:
-        raise ValueError(f"moe_route: {name} has shape {shape}; it must have {rank} dimension(s)")
+    if len(shape) not in ranks:
+        raise ValueError(f"moe_route: {name} has shape {shape}; it must have {' or '.join(map(str, ranks))} "
+                         f"dimension(s)")
     return shape
 
 
 def moe_route_shapes(hidden, router_weight, choice_bias) -> tuple:
-    """(T, H, E) of the op's operands, each shape checked against the contract; a shape the op does not take, a token
-    count this release does not run or more experts than one program holds are refused by name."""
-    T, H = _shape_of("hidden", hidden, 2)
-    E, Hw = _shape_of("router_weight", router_weight, 2)
+    """(B, T, H, E) of the op's operands (B = 1 for a hidden [T, H]), each shape checked against the contract; a shape
+    the op does not take, no token to route or more experts than one program holds are refused by name."""
+    shape = _shape_of("hidden", hidden, (2, 3))
+    B, T, H = shape if len(shape) == 3 else (1,) + shape
+    E, Hw = _shape_of("router_weight", router_weight, (2,))
     if Hw != H:
-        raise ValueError(f"moe_route: router_weight has shape {(E, Hw)}; hidden {(T, H)} asks [E, {H}]")
+        raise ValueError(f"moe_route: router_weight has shape {(E, Hw)}; hidden {shape} asks [E, {H}]")
     if choice_bias is not None and tuple(choice_bias.shape) != (E,):
         raise ValueError(f"moe_route: choice_bias has shape {tuple(choice_bias.shape)}; router_weight {(E, H)} "
                          f"asks ({E},)")
     if not 1 <= E <= MOE_ROUTE_MAX_EXPERTS:
         raise ValueError(f"moe_route: {E} experts: one program holds 1 to {MOE_ROUTE_MAX_EXPERTS} experts")
-    if T not in MOE_ROUTE_TOKENS:
-        raise ValueError(f"moe_route: {T} tokens: this release routes the token counts {MOE_ROUTE_TOKENS} only (the "
-                         f"token step); the routing over more tokens is not proven yet")
-    return T, H, E
+    if B < 1 or T < 1:
+        raise ValueError(f"moe_route: hidden {shape} holds no token row to route (B {B}, T {T}): the caller routes "
+                         f"at least one token")
+    return B, T, H, E
 
 
 def moe_route_dtypes(hidden, router_weight, choice_bias) -> None:
@@ -214,35 +254,51 @@ def moe_route_attributes(E: int, *, score_fn, top_k, n_group, topk_group, group_
         raise ValueError(f"moe_route: scale {scale} is not a finite number")
 
 
-def moe_route(hidden, router_weight, *, choice_bias, score_fn, top_k, n_group, topk_group, group_score, fill,
-              renorm_eps, scale):
-    """The routing of the token rows `hidden` [T, H] over the experts of `router_weight` [E, H], with `choice_bias`
-    [E] float32 (or None) -> (indices [T, top_k] int64, weights [T, top_k] float32), new tensors on hidden's device.
-
-    `score_fn` ('sigmoid' | 'softmax'), `n_group`, `topk_group`, `group_score` ('top2_sum' | 'max'), `fill` (the
-    value a dropped group's experts take before the final choice), `top_k`, `renorm_eps` (None: no renormalisation)
-    and `scale` are the op's attributes; none has a default. The router product and everything after it are float32
-    by the op's contract. The launch is the certified configuration of the key `launch_keys.moe_route_launches`
-    forms. Refused by name: a shape, a dtype, a token count or an attribute the op does not take.
-    """
-    T, H, E = moe_route_shapes(hidden, router_weight, choice_bias)
-    moe_route_dtypes(hidden, router_weight, choice_bias)
-    moe_route_attributes(E, score_fn=score_fn, top_k=top_k, n_group=n_group, topk_group=topk_group,
-                         group_score=group_score, fill=float(fill), renorm_eps=renorm_eps, scale=float(scale))
-    top_k, n_group = int(top_k), int(n_group)
-    indices = NBXTensor.empty((T, top_k), dtype=NBXDtype.int64, device=hidden.device)
-    weights = NBXTensor.empty((T, top_k), dtype=NBXDtype.float32, device=hidden.device)
-    set_device(hidden)
-    moe_route_kernel[(T,)](
+def _launch(hidden, router_weight, choice_bias, indices, weights, B, T, H, E, *, score_fn, top_k, n_group,
+            topk_group, group_score, fill, renorm_eps, scale) -> None:
+    """The one launch of the routing kernel into `indices` and `weights` [B * T, top_k] (contiguous), the operands and
+    attributes already checked: one program per token row. `moe_route` is its caller; a test runs it on host buffers."""
+    sx = tuple(hidden.stride())
+    sx_b, sx_t, sx_h = sx if len(sx) == 3 else (0,) + sx
+    moe_route_kernel[(B * T,)](
         hidden, router_weight, weights if choice_bias is None else choice_bias, indices, weights,
-        E, H, top_k, n_group, int(topk_group),
-        *hidden.stride(), *router_weight.stride(), 0 if choice_bias is None else choice_bias.stride()[0],
+        T, E, H, top_k, n_group, int(topk_group),
+        sx_b, sx_t, sx_h, *router_weight.stride(), 0 if choice_bias is None else choice_bias.stride()[0],
         float(fill), 0.0 if renorm_eps is None else float(renorm_eps), float(scale),
         SIGMOID=score_fn == "sigmoid", HAS_BIAS=choice_bias is not None, GROUPED=n_group > 1,
         GROUP_TOP2=group_score == "top2_sum", RENORM=renorm_eps is not None,
         BLOCK_E=triton.next_power_of_2(E), BLOCK_G=triton.next_power_of_2(n_group),
         BLOCK_K=triton.next_power_of_2(top_k),
     )
+
+
+def moe_route(hidden, router_weight, *, choice_bias, score_fn, top_k, n_group, topk_group, group_score, fill,
+              renorm_eps, scale):
+    """The routing of the token rows `hidden` [T, H] or [B, T, H] (the token step T = 1 and the prefill over T alike,
+    one launch) over the experts of `router_weight` [E, H], with `choice_bias` [E] float32 (or None) -> (indices
+    [..., top_k] int64, weights [..., top_k] float32) with hidden's leading dimensions, new tensors on hidden's device.
+
+    `score_fn` ('sigmoid' | 'softmax'), `n_group`, `topk_group`, `group_score` ('top2_sum' | 'max'), `fill` (the
+    value a dropped group's experts take before the final choice), `top_k`, `renorm_eps` (None: no renormalisation)
+    and `scale` are the op's attributes; none has a default (the module docstring maps them to a graph's routing, the
+    variants it supports and those it refuses). The router product and everything after it are float32 by the op's
+    contract. Each row is computed by its own program with the same instructions whatever B and T: a row routed inside
+    a prefill is the row routed alone, byte for byte. The launch is the certified configuration of the key
+    `launch_keys.moe_route_launches` forms (B and T are not in it). Refused by name: a shape, a dtype or an attribute
+    the op does not take.
+    """
+    B, T, H, E = moe_route_shapes(hidden, router_weight, choice_bias)
+    moe_route_dtypes(hidden, router_weight, choice_bias)
+    moe_route_attributes(E, score_fn=score_fn, top_k=top_k, n_group=n_group, topk_group=topk_group,
+                         group_score=group_score, fill=float(fill), renorm_eps=renorm_eps, scale=float(scale))
+    top_k, n_group = int(top_k), int(n_group)
+    lead = tuple(hidden.shape)[:-1]
+    indices = NBXTensor.empty(lead + (top_k,), dtype=NBXDtype.int64, device=hidden.device)
+    weights = NBXTensor.empty(lead + (top_k,), dtype=NBXDtype.float32, device=hidden.device)
+    set_device(hidden)
+    _launch(hidden, router_weight, choice_bias, indices, weights, B, T, H, E, score_fn=score_fn, top_k=top_k,
+            n_group=n_group, topk_group=topk_group, group_score=group_score, fill=fill, renorm_eps=renorm_eps,
+            scale=scale)
     return indices, weights
 
 

@@ -795,6 +795,32 @@ def _depthwise(k):
     return run, (F.conv_oracle(x, wt, (sh, sw), (ph, pw), (1, 1), c) if k.values else None), "out_ptr"
 
 
+#: The attributes the routing kernel is certified at: the broadest of its variants (a sigmoid gate, a bias, the
+#: renormalisation, a scale). Its key holds no attribute, so every variant of one geometry is served the configuration
+#: proven here (`moe_route_census.json`).
+_MOE_ROUTE_CERTIFIED_AT = dict(score_fn="sigmoid", n_group=1, topk_group=1, group_score="top2_sum",
+                               fill=float("-inf"), renorm_eps=1e-20, scale=1.0)
+
+
+def _moe_route(k):
+    """One token row [1, H] routed over E experts of [E, H] at the key's dtypes, with a float32 bias, through the op's
+    own wrapper (`ops.moe_route.moe_route`); measured on its float32 weights [1, top_k] against `moe_route_oracle`'s
+    (the slots in the same descending order, the lower id first on a tie)."""
+    E, Hd, top_k = int(k.key[0]), int(k.key[1]), int(k.key[2])
+    x_dt, w_dt = k.d(0, "fp16"), k.d(1, "fp16")
+    k.room.refuse([((1, Hd), x_dt), ((E, Hd), w_dt), ((E,), "fp32"), ((1, top_k), "int64"), ((1, top_k), "fp32")],
+                  k.short)
+    x, w, bias = k.arr((1, Hd), x_dt), k.arr((E, Hd), w_dt), k.arr((E,), "fp32")
+    a = dict(_MOE_ROUTE_CERTIFIED_AT, top_k=top_k)
+
+    def run():
+        from nbxtensor.ops.moe_route import moe_route
+        return moe_route(upload(x), upload(w), choice_bias=upload(bias), **a)[1]
+    oracle = (lambda: F.moe_route_oracle(x, w, bias, **a)()[1]) if k.values else None
+    return run, oracle, "wt_ptr"
+
+
+
 _FAMILIES = {"matmul_kernel": _mm, "addmm_kernel": _mm, "ew_launch_kernel": _ew, "gemv_vec_kernel": _gemv,
              "addmv_kernel": _gemv, "baddbmm_kernel": _bmm, "flash_attention_m8n8k4_kernel": _flash,
              "flash_attention_certified_kernel": _flash, "mean_forward_kernel": _row_reduce,
@@ -806,7 +832,7 @@ _FAMILIES = {"matmul_kernel": _mm, "addmm_kernel": _mm, "ew_launch_kernel": _ew,
              "paged_decode_attn_split_kernel": _paged, "group_norm_forward_kernel": _group_norm,
              "layer_norm_forward_kernel": _row_norm, "rms_norm_forward_kernel": _row_norm,
              "softmax_forward_kernel": _softmax, "softmax_forward_looped_kernel": _softmax,
-             "conv2d_forward_kernel": _conv, "depthwise_conv2d_kernel": _depthwise}
+             "conv2d_forward_kernel": _conv, "depthwise_conv2d_kernel": _depthwise, "moe_route_kernel": _moe_route}
 
 
 def synthesize(qual: str, tuner, key: tuple, rng, room: Optional[Room] = None, values: bool = True,

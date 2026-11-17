@@ -1,0 +1,184 @@
+{
+ "format": "nbx-moe-route-census/1",
+ "what": "The op census of the routing brick (`ops.moe_route.moe_route`, one kernel `moe_route_kernel`): the Triton primitives its kernel uses, the lowering each backend gives them, the callers and the keys a card certifies. A key is (E, H, top_k, the hidden and router weight dtypes, then float32 bias, int64 indices, float32 weights: `launch_keys.moe_route_launches`); B, T, n_group and the gate and selection attributes are not in it (one program per token row: the token step and the prefill, every variant of one geometry, share one configuration). `primitives` and `dtypes` are checked against the kernel's source by a test. A cell is certified only by the certification commands below on a named card: its `proof` then names the card, the commit, the date and the result file.",
+ "kernel": "nbxtensor.ops.moe_route.moe_route_kernel",
+ "primitives": [
+  "arange",
+  "exp",
+  "full",
+  "load",
+  "max",
+  "min",
+  "program_id",
+  "store",
+  "sum",
+  "where",
+  "zeros"
+ ],
+ "dtypes": [
+  "float32",
+  "int32",
+  "int64"
+ ],
+ "control": [
+  "for over range() with 32-bit bounds (H tiles, groups, kept groups, top_k)",
+  "if on constexpr flags (SIGMOID, HAS_BIAS, GROUPED, GROUP_TOP2, RENORM)",
+  "integer // and % on the 64-bit row index (batch and token of the row)",
+  ".to() casts: operands to float32, indices to int64"
+ ],
+ "not_used": "no tl.dot (the router product is a broadcast multiply reduced by tl.sum: no matrix unit on any backend), no atomic, no barrier, no shared-memory staging written by hand",
+ "backends": {
+  "cuda": {
+   "lowering": "Triton's NVIDIA backend (PTX)",
+   "notes": "tl.exp lowers to the fast exp2 path; the reduction order of tl.sum and tl.max follows num_warps",
+   "certification": "NEEDS CARD: the Dell's V100 pool, command `dell` below"
+  },
+  "metal": {
+   "lowering": "triton-ext's AppleGPU backend (the library's Metal Triton)",
+   "notes": "every loop bound is 32-bit (the lowering refuses a 64-bit scf.for bound); bfloat16 runs only where the device has it natively (the device test skips it otherwise)",
+   "certification": "NEEDS CARD: the Mac, command `mac` below"
+  },
+  "cpu": {
+   "lowering": "Triton's interpreter (numpy) on this repository's host test; triton-cpu is not certified",
+   "notes": "the interpreter test runs every gate x selection pair at T 1, 2, 23 and [2, 23], float32 and bfloat16, against the plain reference",
+   "certification": "none: the interpreter has no timer; the host test is a correctness proof, not a configuration"
+  }
+ },
+ "callers": [
+  {
+   "caller": "nbxtensor: any op of the library",
+   "calls": null,
+   "dimensions": "none: the routing stays outside the dispatch (ops/dispatch.py) and reaches fused_moe through its precomputed-routing entry"
+  },
+  {
+   "caller": "neurobrix engine",
+   "calls": null,
+   "dimensions": "none yet: the engine's MoE fusion calls moe_route nowhere (the matcher of the grouped sigmoid router is the engine half of this brick)"
+  },
+  {
+   "caller": "a recorded grouped sigmoid router (task 824's proof: sigmoid + bias, grouped top-k over [T, 1, 64], top-k 4)",
+   "calls": "moe_route once a MoE layer a step: T = 1 for a generated token, T = the prompt for a prefill",
+   "dimensions": {
+    "E": 64,
+    "top_k": 4,
+    "H": "the router weight's, read from the container at the build",
+    "dtype": "bfloat16 (the configuration's)"
+   }
+  }
+ ],
+ "certification": {
+  "keys": "python tools/moe_route_certification_keys.py --out moe_route_keys.txt   (one '<kernel>::<key>' line a cell; --dtypes float32,float16 to leave bfloat16 out)",
+  "dell": "python tools/moe_route_certification_keys.py --out moe_route_keys.txt && neurobrix autotune certify --profile volta --vendor nvidia --keys moe_route_keys.txt && NBX_AUTOTUNE_CERTIFIED_ONLY=1 python -m pytest -q tests/test_one_token_of_the_moe_route_on_a_device_is_its_oracle.py tests/test_a_key_the_card_has_not_certified_is_refused_by_name_never_swept_for_the_moe_route.py",
+  "mac": "python tools/moe_route_certification_keys.py --out moe_route_keys.txt && neurobrix autotune certify --profile apple_m4_pro --vendor apple --keys moe_route_keys.txt && NBX_AUTOTUNE_CERTIFIED_ONLY=1 python -m pytest -q tests/test_one_token_of_the_moe_route_on_a_device_is_its_oracle.py tests/test_a_key_the_card_has_not_certified_is_refused_by_name_never_swept_for_the_moe_route.py"
+ },
+ "cells": [
+  {
+   "E": 64,
+   "H": 2048,
+   "top_k": 4,
+   "hidden": "float32",
+   "router_weight": "float32",
+   "from": "the device test's E64-g1-k4; the recorded grouped sigmoid router's E 64 and top 4",
+   "proof": null
+  },
+  {
+   "E": 64,
+   "H": 2048,
+   "top_k": 4,
+   "hidden": "float16",
+   "router_weight": "float16",
+   "from": "the device test's E64-g1-k4; the recorded grouped sigmoid router's E 64 and top 4",
+   "proof": null
+  },
+  {
+   "E": 64,
+   "H": 2048,
+   "top_k": 4,
+   "hidden": "bfloat16",
+   "router_weight": "bfloat16",
+   "from": "the device test's E64-g1-k4; the recorded grouped sigmoid router's E 64 and top 4",
+   "proof": null
+  },
+  {
+   "E": 256,
+   "H": 7168,
+   "top_k": 8,
+   "hidden": "float32",
+   "router_weight": "float32",
+   "from": "the device test's E256-g8-tg4-k8 cases",
+   "proof": null
+  },
+  {
+   "E": 256,
+   "H": 7168,
+   "top_k": 8,
+   "hidden": "float16",
+   "router_weight": "float16",
+   "from": "the device test's E256-g8-tg4-k8 cases",
+   "proof": null
+  },
+  {
+   "E": 256,
+   "H": 7168,
+   "top_k": 8,
+   "hidden": "bfloat16",
+   "router_weight": "bfloat16",
+   "from": "the device test's E256-g8-tg4-k8 cases",
+   "proof": null
+  },
+  {
+   "E": 160,
+   "H": 5120,
+   "top_k": 6,
+   "hidden": "float32",
+   "router_weight": "float32",
+   "from": "the device test's E160-softmax-max",
+   "proof": null
+  },
+  {
+   "E": 160,
+   "H": 5120,
+   "top_k": 6,
+   "hidden": "float16",
+   "router_weight": "float16",
+   "from": "the device test's E160-softmax-max",
+   "proof": null
+  },
+  {
+   "E": 160,
+   "H": 5120,
+   "top_k": 6,
+   "hidden": "bfloat16",
+   "router_weight": "bfloat16",
+   "from": "the device test's E160-softmax-max",
+   "proof": null
+  },
+  {
+   "E": 64,
+   "H": 1000,
+   "top_k": 8,
+   "hidden": "float32",
+   "router_weight": "float32",
+   "from": "the device test's H1000 cases (no hidden tile divides H)",
+   "proof": null
+  },
+  {
+   "E": 64,
+   "H": 1000,
+   "top_k": 8,
+   "hidden": "float16",
+   "router_weight": "float16",
+   "from": "the device test's H1000 cases (no hidden tile divides H)",
+   "proof": null
+  },
+  {
+   "E": 64,
+   "H": 1000,
+   "top_k": 8,
+   "hidden": "bfloat16",
+   "router_weight": "bfloat16",
+   "from": "the device test's H1000 cases (no hidden tile divides H)",
+   "proof": null
+  }
+ ]
+}

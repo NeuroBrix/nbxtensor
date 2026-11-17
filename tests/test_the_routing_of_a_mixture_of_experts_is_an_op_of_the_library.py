@@ -3,8 +3,8 @@ router_weight, choice_bias) -> (indices int64, weights float32), its one launch 
 every operand or attribute the op does not take refused BY NAME before anything reaches a device.
 
 Before this lot the library had no such op: the import fails (red). What this test does if the code is wrong: a bias
-narrowed below float32 accepted, more experts than one program holds accepted, a token count the release does not run
-accepted, groups that do not cut the experts accepted, a top_k larger than the kept groups hold accepted (a dropped
+narrowed below float32 accepted, more experts than one program holds accepted, a prefill of T tokens or of B x T
+tokens refused or read with the wrong (B, T), no token at all or a hidden of another rank accepted, groups that do not cut the experts accepted, a top_k larger than the kept groups hold accepted (a dropped
 expert would be routed to), a score function or group score the op does not compute accepted, a fill of NaN or +inf
 accepted, an attribute with a silent default, a launch key that is not one key of the routing kernel - red.
 No device needed: the refusals happen on the operands' shapes and dtypes and on the attributes."""
@@ -36,8 +36,15 @@ def _route(ops, **over):
 
 
 def test_its_operands_shapes_name_the_problem():
-    assert R.moe_route_shapes(*_ops()) == (1, 64, 256)
-    assert R.moe_route_shapes(*_ops(E=64, bias=None)) == (1, 64, 64)
+    assert R.moe_route_shapes(*_ops()) == (1, 1, 64, 256)
+    assert R.moe_route_shapes(*_ops(E=64, bias=None)) == (1, 1, 64, 64)
+
+
+@pytest.mark.parametrize("shape,bt", [((2, 64), (1, 2)), ((23, 64), (1, 23)), ((4096, 64), (1, 4096)),
+                                      ((1, 23, 64), (1, 23)), ((3, 7, 64), (3, 7)), ((5, 1, 64), (5, 1))])
+def test_the_token_step_and_the_prefill_are_shapes_of_one_call(shape, bt):
+    hidden, weight, bias = _t(shape), _t((256, 64)), _t((256,), F32)
+    assert R.moe_route_shapes(hidden, weight, bias) == bt + (64, 256)
 
 
 def test_the_launch_is_one_key_of_the_routing_kernel():
@@ -60,7 +67,8 @@ def test_an_operand_at_a_dtype_the_op_does_not_take_is_refused_by_name(kw, match
 
 
 @pytest.mark.parametrize("at,shape,match", [
-    (0, (64,), "hidden has shape \\(64,\\); it must have 2 dimension"),
+    (0, (64,), "hidden has shape \\(64,\\); it must have 2 or 3 dimension"),
+    (0, (1, 1, 1, 64), "hidden has shape \\(1, 1, 1, 64\\); it must have 2 or 3 dimension"),
     (1, (256, 32), "router_weight has shape \\(256, 32\\); hidden \\(1, 64\\) asks \\[E, 64\\]"),
     (2, (255,), "choice_bias has shape \\(255,\\); router_weight \\(256, 64\\) asks \\(256,\\)"),
 ])
@@ -76,10 +84,17 @@ def test_more_experts_than_one_program_holds_are_refused_by_name():
         _route(_ops(E=512))
 
 
-@pytest.mark.parametrize("T", [0, 2, 17])
-def test_a_token_count_this_release_does_not_run_is_refused_by_name(T):
-    with pytest.raises(ValueError, match=f"{T} tokens: this release routes the token counts \\(1,\\) only"):
-        _route(_ops(T=T))
+@pytest.mark.parametrize("shape,bt", [((0, 64), "B 1, T 0"), ((0, 5, 64), "B 0, T 5"), ((2, 0, 64), "B 2, T 0")])
+def test_no_token_to_route_is_refused_by_name(shape, bt):
+    hidden, weight, bias = _t(shape), _t((256, 64)), _t((256,), F32)
+    with pytest.raises(ValueError, match=f"holds no token row to route \\({bt}\\)"):
+        R.moe_route(hidden, weight, choice_bias=bias, **ATTRS)
+
+
+@pytest.mark.parametrize("score_fn", ["sqrt_softplus", "softmax_after_topk", "relu", None])
+def test_a_gate_other_than_sigmoid_or_softmax_is_refused_never_a_silent_softmax(score_fn):
+    with pytest.raises(ValueError, match=f"score_fn {score_fn!r} is not one of \\('sigmoid', 'softmax'\\)"):
+        _route(_ops(T=23), score_fn=score_fn)
 
 
 @pytest.mark.parametrize("over,match", [

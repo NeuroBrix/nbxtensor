@@ -91,3 +91,19 @@ def test_one_group_equals_every_group_kept_and_a_plain_top_k(seed):
     plain = 2.5 * plain / (plain.sum(-1, keepdims=True) + 1e-20)
     assert np.allclose(np.take_along_axis(w1, np.argsort(i1, -1), -1),
                        np.take_along_axis(plain, np.argsort(top, -1), -1), rtol=1e-15, atol=0)
+
+
+def test_a_softmax_taken_after_the_top_k_is_the_softmax_gate_renormalised_with_eps_0():
+    """The module docstring's mapping: a graph that takes the top-k of the logits, then a softmax over the k, routes
+    as score_fn 'softmax' with renorm_eps 0.0 (the same set, the same weights up to rounding)."""
+    x, w, _ = draw(16, 32, 64, 7)
+    a = dict(score_fn="softmax", top_k=4, n_group=1, topk_group=1, group_score="max", fill=-math.inf, renorm_eps=0.0,
+             scale=1.0)
+    idx, wt, _, _ = O.moe_route_oracle(x, w, None, **a)()
+    logits = x.astype(np.float64) @ w.astype(np.float64).T
+    top = np.argsort(-logits, axis=-1, kind="stable")[:, :4]
+    l = np.take_along_axis(logits, top, -1)
+    after = np.exp(l - l.max(-1, keepdims=True))
+    after /= after.sum(-1, keepdims=True)
+    assert np.array_equal(idx, top)
+    assert np.allclose(wt, after, rtol=1e-12, atol=0)
