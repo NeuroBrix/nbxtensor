@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nbxtensor"
-version = "0.1.10"
+version = "0.1.11"
 description = "Run AI models without PyTorch: tensors, Triton kernels, planned memory and certified tuning, wherever Triton runs — NVIDIA, AMD, Intel and Apple GPUs."
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -17,10 +17,12 @@ maintainers = [{ name = "Hocine Benkelaya", email = "contact@neurobrix.org" }]
 # On Linux the CUDA runtime library its CUDA backend opens (libcudart.so.12), which the NVIDIA driver does not ship: a clean
 # machine with only the driver found no GPU runtime and the engine read the card as CPU-only (the stable's install test,
 # 2026-11-05). On a machine without an NVIDIA card it is a library nothing opens.
-# Triton on every platform PyPI publishes it for; macOS has none (the Metal Triton is built from source, with triton-ext's
-# AppleGPU backend — the README's install), so a plain "triton" made the library uninstallable on a Mac (2026-11-06).
-# On a Mac the Metal device is opened through pyobjc's Metal framework; Triton for Metal comes from `install-metal`.
-dependencies = ["numpy", "triton; platform_system != 'Darwin'", "pyyaml", "nvidia-cuda-runtime-cu12; platform_system == 'Linux'",
+# Triton only where PyPI publishes it: its wheels are manylinux x86_64 and aarch64 alone (triton 3.9.0 and every release
+# before it, no sdist), so a triton asked for on Windows or a Mac has no solution and the library did not install there
+# (macOS 2026-11-06, native Windows 2026-11-18). The Metal Triton is built from source, with triton-ext's AppleGPU
+# backend (the README's install, `install-metal`); on a Mac the Metal device is opened through pyobjc's Metal framework.
+dependencies = ["numpy", "triton; sys_platform == 'linux' and (platform_machine == 'x86_64' or platform_machine == 'aarch64')",
+                "pyyaml", "nvidia-cuda-runtime-cu12; platform_system == 'Linux'",
                 "pyobjc-framework-Metal; platform_system == 'Darwin'"]
 
 [project.urls]

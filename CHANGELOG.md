@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-11-18
+
+### Fixed
+- nbxtensor installs on native Windows: triton is asked for only where PyPI publishes it,
+  `triton; sys_platform == 'linux' and (platform_machine == 'x86_64' or platform_machine == 'aarch64')` (PyPI's
+  triton files are manylinux x86_64 and aarch64 wheels alone); `triton; platform_system != 'Darwin'` had no solution
+  on win_amd64. macOS keeps its Metal Triton built from source, as before.
+
+### Added
+- Per-kernel GPU time on CUDA: `kernel_times` puts every launch and every copy or set that reaches a device between two
+  timing events on its stream (`nbxtensor.backend.cuda_profile`), the host never waiting, so the run keeps its cadence;
+  the table adds the GPU time between kernels, the session's own host time, the most its figures overstate the kernels
+  and the wall time no interval holds. Another backend than Metal and CUDA is refused by name; the output bytes do not
+  change.
+- `nbxtensor.ops.moe_route.moe_route` routes the token step and the prefill alike, over `[T, H]` or `[B, T, H]` in one
+  launch (one program per token row: a row routed inside a prefill is the row routed alone, byte for byte), with its op
+  census (`ops/moe_route_census.json`), its certification keys (`tools/moe_route_certification_keys.py`, from
+  `launch_keys.moe_route_launches`) and its synthesis in the certification harness.
+- The routing reads its hidden rows at any batch stride (a view of a longer buffer), proven by a padded-stride case on
+  the interpreter; `ops/moe_route.py` and `tools/moe_route_certification_keys.py` are listed in the kernels' provenance
+  table (written here, class A).
+
+### Changed
+- A flash launch with fewer query rows than keys whose own key the directory does not hold is served the certified
+  square key of its key length (`launch_keys.square_default_key`), at the launch site and when a warm replay cache is
+  seeded; a confirmation run refuses by name only when the square is not certified either.
+
 ## [0.1.10] - 2026-11-17
 
 ### Fixed
