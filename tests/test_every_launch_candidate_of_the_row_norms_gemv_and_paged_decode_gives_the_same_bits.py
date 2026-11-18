@@ -4,15 +4,18 @@ for a key with no certificate, and a user's certification proves. The certified 
 card different settings for one key (on a V100, 2026-11-18: the gemv chunk width and the paged decode tile differed,
 and each alone turned a served conversation's fifth answer), and a run-time sweep picks by timing.
 
-The GEMV sums K in fixed sub-chunks whatever its chunk width; the paged decode steps its online softmax by a fixed
-sub-tile whatever its tile; every sum inside is pairwise (`ops.fixed_order`).
+The GEMV sums K in fixed sub-chunks whatever its chunk width; the paged decode steps its online softmax by one fixed
+tile whatever BLOCK_N a certificate names (its run-time list is the warps only; every tile the certificates name is
+launched here); every sum inside is pairwise (`ops.fixed_order`).
 
 A card test: on a host with no device it skips by name.
 
 A pairwise sum of products is not enough by itself: the compiler fuses a multiply into the add it feeds, on the
 side the launch's layout chooses, so the products' rounding still follows the warps (measured 2026-11-18: gemv rows
 per program and RMS norm warps changed bits with the pairwise sum alone). `ops.fixed_order.row_dot_fixed_order`
-writes the first level as one explicit fused multiply-add per pair.
+writes the first level as one explicit fused multiply-add per pair. Likewise `/` lowers to a reciprocal and a
+multiply that the compiler fused into the next add on some launches (a layer norm's [3, 33] row on 2 rows x 8 warps):
+the norms divide with `tl.div_rn`.
 
 What it catches: a reduction in these kernels whose order depends on any launch setting - red."""
 import itertools
@@ -123,7 +126,9 @@ def test_paged_decode_every_candidate_gives_the_same_bits(hq, hkv, d, pt, t):
     lp = NBXTensor.from_numpy(np.zeros((hq, split), np.float32)).to(device="cuda:0")
     kernel = P.paged_decode_attn_split_kernel.fn
     outs = {}
-    for cfg in P._PAGED_DECODE_CONFIGS:
+    from nbxtensor.ops.tiling_sizes import PAGED_DECODE_TILE_CANDIDATES
+    # the run-time list (warps) AND every tile a certificate in the directory may name
+    for cfg in [triton.Config({'BLOCK_N': bn}, num_warps=w) for bn in PAGED_DECODE_TILE_CANDIDATES for w in (2, 4, 8)]:
         bn = cfg.kwargs["BLOCK_N"]
         if pt % bn:
             continue

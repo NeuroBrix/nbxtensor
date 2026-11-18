@@ -71,8 +71,10 @@ def paged_kv_append_kernel(
 
 
 #: the position tiles the paged read is certified over (each dividing the page, `_tiles_in_the_page`), and the warps
-_PAGED_DECODE_CONFIGS = [triton.Config({'BLOCK_N': bn}, num_warps=w, num_stages=1)
-                         for bn in PAGED_DECODE_TILE_CANDIDATES for w in (2, 4, 8)]
+#: the warps only: the tile is SPLIT_ALIGN whatever BLOCK_N says (see the kernel's loop); BLOCK_N stays a parameter
+#: so the certificates that name it are still read, and every one of them is served the same bits
+_PAGED_DECODE_CONFIGS = [triton.Config({'BLOCK_N': max(PAGED_DECODE_TILE_CANDIDATES)}, num_warps=w, num_stages=1)
+                         for w in (2, 4, 8)]
 #: a split's positions are a whole number of the LARGEST tile, so every candidate tile cuts the splits the same way:
 #: the partials, and the oracle a certification proves them against, are the split's, not the tile's
 PAGED_DECODE_SPLIT_ALIGN = max(PAGED_DECODE_TILE_CANDIDATES)
@@ -115,7 +117,6 @@ def paged_decode_attn_split_kernel(
     Q_TO: tl.constexpr = None,        # a dtype: Q is rounded to it on load (the cache's), as the contiguous read does
     Q_SATURATE: tl.constexpr = False,
     BLOCK_N: tl.constexpr = 32,
-    N_SUB: tl.constexpr = 16,         # the fixed sub-tile the online softmax steps by, whatever BLOCK_N: the smallest candidate
 ):
     pid_q = tl.program_id(0).to(tl.int64)        # b * H_q + h_q
     pid_s = tl.program_id(1).to(tl.int64)        # split index
@@ -145,39 +146,38 @@ def paged_decode_attn_split_kernel(
     l_i = 0.0
     acc = tl.zeros((BLOCK_D,), dtype=tl.float32)
 
-    # ONE order whatever the setting: the online softmax steps through the split in sub-tiles of N_SUB positions, in
-    # position order, each sub-tile's sums taken pairwise (`ops.fixed_order`). BLOCK_N only sets how many sub-tiles one
-    # iteration handles; a sub-tile past the split's end changes nothing (its scores are -inf: the max holds, the
-    # correction is exactly 1, the added sums are exact zeros). (Stepped by BLOCK_N, the tile chosen per memory class
-    # by the certified directory moved the running max's rescale points, and a 32 GB and a 16 GB V100 gave a served
-    # conversation's fifth answer differently, 2026-11-18.)
-    for n0 in range(seg_start, seg_end, BLOCK_N):
-        # the tile's page: n0 is a multiple of BLOCK_N and BLOCK_N divides page_tokens, so the tile is in one page
+    # ONE order whatever the setting: the online softmax steps through the split in tiles of SPLIT_ALIGN positions (a
+    # split is a whole number of them), each tile's sums taken pairwise (`ops.fixed_order`). BLOCK_N no longer moves
+    # anything: a certificate that names another tile is served the same bits. (Stepped by BLOCK_N, the tile chosen per
+    # memory class by the certified directory moved the running max's rescale points, and a 32 GB and a 16 GB V100
+    # gave a served conversation's fifth answer differently, 2026-11-18. A sub-tile stepped inside a free BLOCK_N kept
+    # the order but doubled the time; the largest tile is the one every measured sweep chose.)
+    for n0 in range(seg_start, seg_end, SPLIT_ALIGN):
+        # the tile's page: n0 is a multiple of SPLIT_ALIGN, which divides page_tokens, so the tile is in one page
         page = tl.load(block_table_ptr + b * stride_bt + n0 // page_tokens).to(tl.int64)
-        for j in tl.static_range(BLOCK_N // N_SUB):
-            in_page = (n0 % page_tokens) + j * N_SUB + tl.arange(0, N_SUB)
-            mask_n = (n0 + j * N_SUB + tl.arange(0, N_SUB)) < seg_end
+        in_page = (n0 % page_tokens) + tl.arange(0, SPLIT_ALIGN)
+        mask_n = (n0 + tl.arange(0, SPLIT_ALIGN)) < seg_end
 
-            k_tile = tl.load(k_pool_ptr + page * stride_kp + h_kv * stride_kh
-                             + in_page[:, None] * stride_ks + offs_d[None, :],
-                             mask=mask_n[:, None] & mask_d[None, :], other=0.0)
-            s = row_dot_fixed_order(tl.broadcast_to(q[None, :], (N_SUB, BLOCK_D)), k_tile.to(tl.float32),
-                                    N_SUB, BLOCK_D) * sm_scale
-            s = tl.where(mask_n, s, float("-inf"))
+        k_tile = tl.load(k_pool_ptr + page * stride_kp + h_kv * stride_kh
+                         + in_page[:, None] * stride_ks + offs_d[None, :],
+                         mask=mask_n[:, None] & mask_d[None, :], other=0.0)
+        s = row_dot_fixed_order(tl.broadcast_to(q[None, :], (SPLIT_ALIGN, BLOCK_D)), k_tile.to(tl.float32),
+                                SPLIT_ALIGN, BLOCK_D) * sm_scale
+        s = tl.where(mask_n, s, float("-inf"))
 
-            m_new = tl.maximum(m_i, tl.max(s, 0))
-            m_safe = tl.where(m_new == float("-inf"), 0.0, m_new)
-            corr = tl.exp(tl.where(m_i == float("-inf"), float("-inf"), m_i - m_safe))
-            p = tl.exp(s - m_safe)
-            p = tl.where(mask_n, p, 0.0)
+        m_new = tl.maximum(m_i, tl.max(s, 0))
+        m_safe = tl.where(m_new == float("-inf"), 0.0, m_new)
+        corr = tl.exp(tl.where(m_i == float("-inf"), float("-inf"), m_i - m_safe))
+        p = tl.exp(s - m_safe)
+        p = tl.where(mask_n, p, 0.0)
 
-            v_tile = tl.load(v_pool_ptr + page * stride_vp + h_kv * stride_vh
-                             + in_page[:, None] * stride_vs + offs_d[None, :],
-                             mask=mask_n[:, None] & mask_dv[None, :], other=0.0)
-            acc = tl.fma(acc, corr, col_dot_fixed_order(tl.broadcast_to(p[:, None], (N_SUB, BLOCK_D)),
-                                                        v_tile.to(tl.float32), N_SUB, BLOCK_D))
-            l_i = tl.fma(l_i, corr, tl.sum(row_sum_fixed_order(tl.reshape(p, (1, N_SUB)), 1, N_SUB), 0))
-            m_i = m_new
+        v_tile = tl.load(v_pool_ptr + page * stride_vp + h_kv * stride_vh
+                         + in_page[:, None] * stride_vs + offs_d[None, :],
+                         mask=mask_n[:, None] & mask_dv[None, :], other=0.0)
+        acc = tl.fma(acc, corr, col_dot_fixed_order(tl.broadcast_to(p[:, None], (SPLIT_ALIGN, BLOCK_D)),
+                                                    v_tile.to(tl.float32), SPLIT_ALIGN, BLOCK_D))
+        l_i = tl.fma(l_i, corr, tl.sum(row_sum_fixed_order(tl.reshape(p, (1, SPLIT_ALIGN)), 1, SPLIT_ALIGN), 0))
+        m_i = m_new
 
     tl.store(opart_ptr + pid_q * stride_oh + pid_s * stride_os + offs_d, acc, mask=mask_dv)
     tl.store(mpart_ptr + pid_q * stride_mh + pid_s, m_i)
