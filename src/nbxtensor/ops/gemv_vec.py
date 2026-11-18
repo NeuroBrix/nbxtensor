@@ -40,6 +40,7 @@ import triton
 import triton.language as tl
 
 from nbxtensor.ops._configs import nbx_autotune, gemv_vec_configs, prune_gemv_vec
+from nbxtensor.ops.fixed_order import row_dot_fixed_order
 
 
 # rows per program, K chunk, warps, stages: the certified configuration of the key (workstream 1, small-M GEMM), the
@@ -76,7 +77,7 @@ def gemv_vec_kernel(
         a = tl.load(a_ptrs, mask=mask_n[:, None] & mask_k[None, :],
                     other=0.0).to(tl.float32)
         b = tl.load(b_ptrs, mask=mask_k, other=0.0).to(tl.float32)
-        acc += tl.sum(a * b[None, :], 1)
+        acc += row_dot_fixed_order(a, tl.broadcast_to(b[None, :], (BLOCK_N, BLOCK_K)), BLOCK_N, BLOCK_K)   # one order inside a chunk, whatever the warps
         a_ptrs += BLOCK_K * stride_am
         b_ptrs += BLOCK_K * stride_bm
 

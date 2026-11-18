@@ -27,6 +27,7 @@ from nbxtensor.ops.decode_attn_vec import _round_q
 # its paged cache with them in an environment without triton).
 from nbxtensor.ops.tiling_sizes import PAGED_DECODE_TILE_CANDIDATES  # noqa: F401
 from nbxtensor.ops._configs import nbx_autotune
+from nbxtensor.ops.fixed_order import row_sum_fixed_order, row_dot_fixed_order, col_dot_fixed_order
 
 # The split shape: positions per split and the most splits one launch makes — the vector decode kernel's judged config
 # (its locked protocol of 2026-08-23, the defaults of `_decode_attn_vec`'s NBX_DV_SEG and its 64-split cap), so the
@@ -152,7 +153,8 @@ def paged_decode_attn_split_kernel(
         k_tile = tl.load(k_pool_ptr + page * stride_kp + h_kv * stride_kh
                          + in_page[:, None] * stride_ks + offs_d[None, :],
                          mask=mask_n[:, None] & mask_d[None, :], other=0.0)
-        s = tl.sum(q[None, :] * k_tile.to(tl.float32), 1) * sm_scale
+        # the three sums of a tile in one fixed order, whatever the warps (`ops.fixed_order`)
+        s = row_dot_fixed_order(tl.broadcast_to(q[None, :], (BLOCK_N, BLOCK_D)), k_tile.to(tl.float32), BLOCK_N, BLOCK_D) * sm_scale
         s = tl.where(mask_n, s, float("-inf"))
 
         m_new = tl.maximum(m_i, tl.max(s, 0))
@@ -164,8 +166,8 @@ def paged_decode_attn_split_kernel(
         v_tile = tl.load(v_pool_ptr + page * stride_vp + h_kv * stride_vh
                          + in_page[:, None] * stride_vs + offs_d[None, :],
                          mask=mask_n[:, None] & mask_dv[None, :], other=0.0)
-        acc = acc * corr + tl.sum(p[:, None] * v_tile.to(tl.float32), 0)
-        l_i = l_i * corr + tl.sum(p, 0)
+        acc = acc * corr + col_dot_fixed_order(tl.broadcast_to(p[:, None], (BLOCK_N, BLOCK_D)), v_tile.to(tl.float32), BLOCK_N, BLOCK_D)
+        l_i = l_i * corr + tl.sum(row_sum_fixed_order(tl.reshape(p, (1, BLOCK_N)), 1, BLOCK_N), 0)
         m_i = m_new
 
     tl.store(opart_ptr + pid_q * stride_oh + pid_s * stride_os + offs_d, acc, mask=mask_dv)

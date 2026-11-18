@@ -8,13 +8,14 @@ import triton.language as tl
 from triton import next_power_of_2
 
 from nbxtensor.ops._configs import nbx_autotune
+from nbxtensor.ops.fixed_order import row_sum_fixed_order
 
 
 def _softmax_configs():
     """The candidates the certifier proves (certified per key since 2026-10-19 instead of a hand table): rows per program x warps. The
     one the kernel ran before certification is among them (1 row, 4 warps for a row of 64 or more; up to 128 rows for
     a short row). No candidate changes a bit: a row's sum is taken in one fixed pairwise order
-    (`_row_sum_fixed_order`), so the choice a run-time sweep makes for a key the directory does not certify cannot
+    (`ops.fixed_order.row_sum_fixed_order`), so the choice a run-time sweep makes for a key the directory does not certify cannot
     change an answer from one run to the next."""
     return [triton.Config({'BLOCK_SIZE_BATCH': rows}, num_warps=warps)
             for rows in (1, 2, 4, 8, 16, 32, 64, 128) for warps in (1, 2, 4, 8)]
@@ -36,19 +37,6 @@ def _prune_softmax(configs, named_args, **kwargs):
             if c.kwargs['BLOCK_SIZE_BATCH'] * feat <= max(budget, feat) and c.kwargs['BLOCK_SIZE_BATCH'] <= max(1, rows)
             and fits_thread_registers(c.kwargs['BLOCK_SIZE_BATCH'] * feat, c.num_warps)]
     return keep or [max(configs, key=lambda c: c.num_warps)]
-
-
-@triton.jit
-def _row_sum_fixed_order(x, ROWS: tl.constexpr, WIDTH: tl.constexpr):
-    """Each row of x [ROWS, WIDTH] (WIDTH a power of two) summed in ONE order whatever the launch: adjacent pairs, then
-    adjacent pairs of those, down to one value. Every step adds exactly two numbers, and a + b is b + a bit for bit,
-    so the threads and warps a launch spreads the row over cannot change the result. (`tl.sum` over the whole row
-    reduces in the order of the launch's layout: on a V100, of 24 candidates of a [320, 512] softmax 13 gave other
-    bits than 1 row x 4 warps, and a served conversation's fifth answer changed with the warps a fresh sweep chose,
-    2026-11-18.)"""
-    for i in tl.static_range(WIDTH.bit_length() - 1):
-        x = tl.sum(tl.reshape(x, (ROWS, WIDTH >> (i + 1), 2)), axis=2)
-    return tl.reshape(x, (ROWS,))
 
 
 @nbx_autotune(configs=_softmax_configs(), key=['BATCH_BUCKET', 'FEAT_BUCKET', 'log'],
@@ -91,7 +79,7 @@ def softmax_forward_kernel(
     # Numerical stability: subtract max
     inp -= tl.max(inp, axis=1)[:, None]
     numerator = tl.exp(inp)
-    denominator = _row_sum_fixed_order(numerator, BLOCK_SIZE_BATCH, BLOCK_SIZE_FEAT)[:, None]
+    denominator = row_sum_fixed_order(numerator, BLOCK_SIZE_BATCH, BLOCK_SIZE_FEAT)[:, None]
 
     if log:
         output = inp - tl.log(denominator)
