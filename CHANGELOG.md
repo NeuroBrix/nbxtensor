@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- On Apple GPUs, a timing event now comes after the kernels launched before it: the benchmark (`launcher.do_bench`)
+  and the certification timer measure the kernel. Before, every matmul read about 0.1 ms whatever its size (a 2048^3
+  fp16 matmul: 0.08 ms against 3.0 ms by the wall clock), so autotuning and certification on Metal ranked their
+  configurations on a number that did not depend on them. Ordering events (expert slots, weight block uploads) now
+  also come after the work encoded before them.
+
 ## [0.1.11] - 2026-11-18
 
 ### Fixed
