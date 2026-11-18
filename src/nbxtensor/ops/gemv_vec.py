@@ -57,28 +57,32 @@ def gemv_vec_kernel(
     stride_bm,
     stride_cn,
     BLOCK_N: tl.constexpr,   # output rows per program (small: 8-16)
-    BLOCK_K: tl.constexpr,   # K-chunk width (wide: 128-512)
+    BLOCK_K: tl.constexpr,   # K-chunk width (wide: 128-512): the K loaded per iteration, NOT the order K is summed in
+    K_SUB: tl.constexpr = 128,   # the fixed sub-chunk K is summed by, whatever BLOCK_K: the smallest BLOCK_K candidate
 ):
     pid = tl.program_id(0).to(tl.int64)
     offs_n = pid * BLOCK_N + tl.arange(0, BLOCK_N)
     mask_n = offs_n < N
 
     acc = tl.zeros((BLOCK_N,), dtype=tl.float32)
-    offs_k = tl.arange(0, BLOCK_K)
+    offs_s = tl.arange(0, K_SUB)
     # The weight rows are K-contiguous (stride_am == 1 on the
     # pre-transposed layout): tell the compiler so the loads vectorize
     # to 128-bit transactions.
-    offs_k = tl.max_contiguous(tl.multiple_of(offs_k, BLOCK_K), BLOCK_K)
+    offs_s = tl.max_contiguous(tl.multiple_of(offs_s, K_SUB), K_SUB)
 
-    a_ptrs = A_ptr + offs_n[:, None] * stride_an + offs_k[None, :] * stride_am
-    b_ptrs = B_ptr + offs_k * stride_bm
+    # ONE summation order whatever the setting: K in sub-chunks of K_SUB, in K order, each summed pairwise
+    # (`ops.fixed_order`) and added to the running sum. BLOCK_K only sets how many sub-chunks one iteration loads;
+    # a sub-chunk past K adds an exact zero. (Summed as BLOCK_K-wide chunks, the chunk width chosen per memory class
+    # by the certified directory gave a 32 GB and a 16 GB V100 different bits, and a served conversation's fifth
+    # answer, 2026-11-18.)
     for k0 in range(0, K, BLOCK_K):
-        mask_k = k0 + offs_k < K
-        a = tl.load(a_ptrs, mask=mask_n[:, None] & mask_k[None, :],
-                    other=0.0).to(tl.float32)
-        b = tl.load(b_ptrs, mask=mask_k, other=0.0).to(tl.float32)
-        acc += row_dot_fixed_order(a, tl.broadcast_to(b[None, :], (BLOCK_N, BLOCK_K)), BLOCK_N, BLOCK_K)   # one order inside a chunk, whatever the warps
-        a_ptrs += BLOCK_K * stride_am
-        b_ptrs += BLOCK_K * stride_bm
+        for j in tl.static_range(BLOCK_K // K_SUB):
+            offs_k = k0 + j * K_SUB + offs_s
+            mask_k = offs_k < K
+            a = tl.load(A_ptr + offs_n[:, None] * stride_an + offs_k[None, :] * stride_am,
+                        mask=mask_n[:, None] & mask_k[None, :], other=0.0).to(tl.float32)
+            b = tl.load(B_ptr + offs_k * stride_bm, mask=mask_k, other=0.0).to(tl.float32)
+            acc += row_dot_fixed_order(a, tl.broadcast_to(b[None, :], (BLOCK_N, K_SUB)), BLOCK_N, K_SUB)
 
     tl.store(C_ptr + offs_n * stride_cn, acc, mask=mask_n)

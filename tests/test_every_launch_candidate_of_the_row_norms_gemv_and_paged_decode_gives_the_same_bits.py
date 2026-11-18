@@ -1,15 +1,20 @@
-"""RMS norm, the vector GEMV and the paged decode attention give the same bits under every launch candidate that
-differs only in settings that do not change WHICH partial sums are formed: the warps (and stages, and rows per
-program). The certified directory gives a 16 GB and a 32 GB card different settings for one key (on a V100,
-2026-11-18: 256 of 316 differing RMS norm keys differ in warps), and a sum reduced in the order of the launch's
-layout then gives the two classes different bits.
+"""RMS norm, layer norm, the vector GEMV and the paged decode attention give the same bits under EVERY launch
+candidate in the kernel's own run-time list (its configs through its own prune): the list a user's autotune sweeps
+for a key with no certificate, and a user's certification proves. The certified directory gives a 16 GB and a 32 GB
+card different settings for one key (on a V100, 2026-11-18: the gemv chunk width and the paged decode tile differed,
+and each alone turned a served conversation's fifth answer), and a run-time sweep picks by timing.
 
-A K chunk width (gemv) and an attention tile length (paged decode) change the association across chunks; they are
-held fixed within a compared group here, and are not what this test proves.
+The GEMV sums K in fixed sub-chunks whatever its chunk width; the paged decode steps its online softmax by a fixed
+sub-tile whatever its tile; every sum inside is pairwise (`ops.fixed_order`).
 
 A card test: on a host with no device it skips by name.
 
-What it catches: a reduction in these kernels whose order depends on the warps - red."""
+A pairwise sum of products is not enough by itself: the compiler fuses a multiply into the add it feeds, on the
+side the launch's layout chooses, so the products' rounding still follows the warps (measured 2026-11-18: gemv rows
+per program and RMS norm warps changed bits with the pairwise sum alone). `ops.fixed_order.row_dot_fixed_order`
+writes the first level as one explicit fused multiply-add per pair.
+
+What it catches: a reduction in these kernels whose order depends on any launch setting - red."""
 import itertools
 import numpy as np
 import pytest
@@ -73,7 +78,7 @@ GEMV_SHAPES = [(1024, 2048), (2880, 2880), (512, 4096)]
 
 
 @pytest.mark.parametrize("n,k", GEMV_SHAPES, ids=[f"{n}x{k}" for n, k in GEMV_SHAPES])
-def test_gemv_vec_every_warps_choice_gives_the_same_bits(n, k):
+def test_gemv_vec_every_candidate_gives_the_same_bits(n, k):
     from nbxtensor.ops import gemv_vec as G
     from nbxtensor.ops._configs import gemv_vec_configs, prune_gemv_vec
     from nbxtensor.ops.launch_keys import bucket_of
@@ -91,7 +96,7 @@ def test_gemv_vec_every_warps_choice_gives_the_same_bits(n, k):
                                       a.stride(0), a.stride(1), b.stride(0), c.stride(0),
                                       BLOCK_N=bn, BLOCK_K=bk, num_warps=cfg.num_warps, num_stages=cfg.num_stages)
         outs[(bn, bk, cfg.num_warps, cfg.num_stages)] = c.numpy().copy()
-    _same_within_groups(outs, lambda cfg: f"BLOCK_K={cfg[1]}", f"gemv_vec {n}x{k}")
+    _same_within_groups(outs, lambda cfg: "all", f"gemv_vec {n}x{k}")
     ref = A.astype(np.float64) @ B.astype(np.float64)
     assert float(np.abs(next(iter(outs.values())) - ref).max()) <= 1e-4 * max(1.0, float(np.abs(ref).max()))
 
@@ -100,7 +105,7 @@ PAGED = [(4, 1, 128, 64, 300), (8, 2, 64, 64, 1000)]   # heads, kv heads, head d
 
 
 @pytest.mark.parametrize("hq,hkv,d,pt,t", PAGED, ids=[f"h{p[0]}k{p[1]}d{p[2]}p{p[3]}t{p[4]}" for p in PAGED])
-def test_paged_decode_every_warps_choice_gives_the_same_bits(hq, hkv, d, pt, t):
+def test_paged_decode_every_candidate_gives_the_same_bits(hq, hkv, d, pt, t):
     from nbxtensor.ops import paged_decode_attn as P
     from nbxtensor.tensor import NBXTensor
     rng = np.random.default_rng(hq * 101 + t)
@@ -129,4 +134,35 @@ def test_paged_decode_every_warps_choice_gives_the_same_bits(hq, hkv, d, pt, t):
                             GQA_GROUPS=hq // hkv, BLOCK_D=triton.next_power_of_2(d), D=d, D_V=d,
                             SPLIT_ALIGN=P.PAGED_DECODE_SPLIT_ALIGN, BLOCK_N=bn, num_warps=cfg.num_warps, num_stages=1)
         outs[(bn, cfg.num_warps)] = np.concatenate([op.numpy().ravel(), mp.numpy().ravel(), lp.numpy().ravel()])
-    _same_within_groups(outs, lambda cfg: f"BLOCK_N={cfg[0]}", f"paged decode h{hq} d{d} t{t}")
+    _same_within_groups(outs, lambda cfg: "all", f"paged decode h{hq} d{d} t{t}")
+
+
+@pytest.mark.parametrize("rows,feat", RMS_SHAPES, ids=[f"{r}x{f}" for r, f in RMS_SHAPES])
+def test_layer_norm_every_candidate_gives_the_same_bits(rows, feat):
+    from nbxtensor.ops import layernorm as L
+    from nbxtensor.ops._configs import row_program_configs, prune_row_programs
+    from nbxtensor.ops.launch_keys import bucket_of, softmax_feat_bucket
+    from nbxtensor.tensor import NBXTensor
+    rng = np.random.default_rng(rows * 37 + feat)
+    a = (rng.standard_normal((rows, feat)) * 4.0 + 1.5).astype(np.float32)
+    w = rng.standard_normal(feat).astype(np.float32)
+    bb = rng.standard_normal(feat).astype(np.float32)
+    x, wt, bt = _dev(a), _dev(w), _dev(bb)
+    y = NBXTensor.empty_like(x)
+    # as the one launch in the library (`norm_wrappers`) makes it: the stats saved. Measured 2026-11-18: with
+    # save_stats=False a [3, 33] row on 1 warp gave other bits in the OUTPUT (the stats equal), a path nothing launches.
+    st = NBXTensor.from_numpy(np.zeros(rows, np.float32)).to(device="cuda:0")
+    st2 = NBXTensor.from_numpy(np.zeros(rows, np.float32)).to(device="cuda:0")
+    kernel = L.layer_norm_forward_kernel.fn
+    outs = {}
+    for c in prune_row_programs(row_program_configs(), {"feat_dim": feat, "batch_dim": rows}):
+        b, nw = c.kwargs["BLOCK_SIZE_BATCH"], c.num_warps
+        kernel[(triton.cdiv(rows, b),)](x, wt, bt, st, st2, y, rows, feat, bucket_of("M", rows), softmax_feat_bucket(feat),
+                                        x.stride(0), x.stride(1), y.stride(0), y.stride(1), 1e-5,
+                                        scale_by_weight=True, add_bias=True, save_stats=True, BLOCK_SIZE_BATCH=b,
+                                        BLOCK_SIZE_FEAT=triton.next_power_of_2(feat), num_warps=nw)
+        outs[(b, nw)] = np.concatenate([y.numpy().ravel(), st.numpy(), st2.numpy()])
+    _same_within_groups(outs, lambda cfg: "all", f"layer_norm {rows}x{feat}")
+    d = a.astype(np.float64)
+    ref = (d - d.mean(axis=1, keepdims=True)) / np.sqrt(d.var(axis=1, keepdims=True) + 1e-5) * w + bb
+    assert float(np.abs(next(iter(outs.values()))[:rows * feat].reshape(rows, feat) - ref).max()) <= 1e-4

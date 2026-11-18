@@ -8,6 +8,7 @@ import triton.language as tl
 from triton import next_power_of_2
 
 from nbxtensor.ops._configs import nbx_autotune, row_program_configs, prune_row_programs
+from nbxtensor.ops.fixed_order import row_sum_fixed_order, row_dot_fixed_order
 
 
 # rows per program and warps: the certified configuration of the key (workstream 1), the key the derived census forms
@@ -54,9 +55,13 @@ def layer_norm_forward_kernel(
 
     inp = tl.load(input_ptr,
                   mask=batch_mask[:, None] & feat_mask[None, :]).to(tl.float32)
-    mean = tl.sum(inp, axis=1) / feat_dim
+    # the row's two sums in one fixed order: the warps a certified or swept setting picks cannot change them
+    # divisions correctly rounded (`tl.div_rn`): `/` lowers to a reciprocal and a multiply, which the compiler then
+    # fused into the subtraction or the add after it on some launches and not others (a [3, 33] row on 2 rows x
+    # 8 warps gave other output bits with the saved stats equal, 2026-11-18)
+    mean = tl.div_rn(row_sum_fixed_order(inp, BLOCK_SIZE_BATCH, BLOCK_SIZE_FEAT), feat_dim.to(tl.float32))
     diff = tl.where(feat_mask[None, :], inp - mean[:, None], 0)
-    inv_std = tl.rsqrt(tl.sum(diff * diff, axis=1) / feat_dim + eps)
+    inv_std = tl.rsqrt(tl.div_rn(row_dot_fixed_order(diff, diff, BLOCK_SIZE_BATCH, BLOCK_SIZE_FEAT), feat_dim.to(tl.float32)) + eps)
 
     if save_stats:
         tl.store(mean_ptr + batch_offset, mean, mask=batch_mask)
@@ -65,10 +70,13 @@ def layer_norm_forward_kernel(
     output = diff * inv_std[:, None]
     if scale_by_weight:
         weight = tl.load(weight_ptr + feat_offset, mask=feat_mask)
-        output *= weight
         if add_bias:
+            # one explicit fused multiply-add: written as a multiply then an add, the compiler fused them on some
+            # launches and not others (a [3, 33] row: 2 rows x 8 warps gave other bits, 2026-11-18)
             bias = tl.load(bias_ptr + feat_offset, mask=feat_mask)
-            output += bias
+            output = tl.fma(output, weight, bias)
+        else:
+            output *= weight
 
     tl.store(output_ptr, output,
              mask=batch_mask[:, None] & feat_mask[None, :])
