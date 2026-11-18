@@ -12,7 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the certification timer measure the kernel. Before, every matmul read about 0.1 ms whatever its size (a 2048^3
   fp16 matmul: 0.08 ms against 3.0 ms by the wall clock), so autotuning and certification on Metal ranked their
   configurations on a number that did not depend on them. Ordering events (expert slots, weight block uploads) now
-  also come after the work encoded before them.
+  also come after the work encoded before them. The same timer serves the run-time autotune of a key with no
+  certificate on the user's own machine, and a test now proves that path ranks on times that follow the work.
 
 ## [0.1.11] - 2026-11-18
 

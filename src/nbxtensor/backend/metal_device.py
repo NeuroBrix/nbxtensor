@@ -1013,9 +1013,7 @@ class MetalRuntime:
             return _ERR_UNKNOWN_POINTER
         # The launches encoded before the event are still in the stream's open buffer, not committed. Committed
         # first, they run before the event's buffer on the same queue, so the event is reached only after them, as a
-        # CUDA event is. Measured 2026-11-18 without it: both events of a timing retired before the kernel ran and
-        # every matmul read 0.08-0.10 ms whatever its size (2048^3 fp16: 3.0 ms by the wall clock), which is what
-        # every Apple certification ranked its configurations on.
+        # CUDA event is: the time between two events is the GPU time of the work encoded between them.
         self.close_stream(_as_int(stream))
         command_buffer = queue.commandBuffer()
         if command_buffer is None:                      # pragma: no cover
