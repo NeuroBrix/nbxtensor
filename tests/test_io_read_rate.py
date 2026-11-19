@@ -83,3 +83,12 @@ def test_two_steady_draws_that_disagree_are_decided_by_a_third(tmp_path, monkeyp
                   {"steady": True, "workers": 16}])
     monkeypatch.setattr(M, "measure", lambda *a: next(draws))
     assert M.workers_for(tmp_path, max_workers=16, pattern="x")["workers"] == 16   # 16, 8, 16 -> the median
+
+
+@pytest.mark.parametrize("name", ["mount_of", "can_bypass_the_cache", "choose", "measure", "workers_for"])
+def test_the_deprecated_trial_api_warns_when_called(name):
+    """qa on 1196: the functions the weight reader replaced say so at run time until they go (red if one is silent)."""
+    assert getattr(getattr(M, name), "__wrapped__", None) is not None, f"read_rate.{name} gives no DeprecationWarning"
+    if name == "choose":
+        with pytest.deprecated_call():
+            M.choose({1: 1.0, 2: 1.0}, 0.05)

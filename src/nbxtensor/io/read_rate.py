@@ -11,6 +11,19 @@ import time
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional, Sequence
+import functools
+import warnings
+
+
+def _deprecated(fn):
+    """The trial API a load no longer needs (the weight reader measures itself on the load it serves): it warns when
+    called, until the next library release removes it."""
+    @functools.wraps(fn)
+    def warned(*args, **kwargs):
+        warnings.warn(f"nbxtensor.io.read_rate.{fn.__name__} is deprecated and goes in the next library release: a load "
+                      f"measures its own reads (nbxtensor.io.reader.Reader)", DeprecationWarning, stacklevel=2)
+        return fn(*args, **kwargs)
+    return warned
 
 __all__ = ["PIECE", "WITNESS_BYTES", "START_BYTES", "mount_of", "pieces", "trial", "choose", "measure", "workers_for",
            "can_bypass_the_cache", "evict", "cold_read_gbps"]
@@ -87,6 +100,7 @@ def pieces(files, max_bytes: int):
     return out, total
 
 
+@_deprecated
 def can_bypass_the_cache() -> bool:
     """Whether this system lets a measure read past its page cache (macOS F_NOCACHE + msync, Linux posix_fadvise);
     Windows offers neither through Python, and a rate read from the cache is not the storage's."""
@@ -123,6 +137,7 @@ def trial(pieces, workers: int) -> float:
     return total / dt
 
 
+@_deprecated
 def choose(rates, within: float) -> int:
     """The smallest worker count whose rate is within `within` of the best: a worker past it holds a shard in host
     memory for nothing."""
@@ -130,6 +145,7 @@ def choose(rates, within: float) -> int:
     return min(c for c, r in rates.items() if r >= (1 - within) * best)
 
 
+@_deprecated
 def measure(files: Sequence[str], max_bytes: int, max_workers: int, within: float = 0.05) -> Dict[str, object]:
     """Rates (bytes/s) at 1, 2, 4, ... `max_workers` parallel reads of `files` (at most `max_bytes` per trial), the
     worker count `choose` takes, and whether the storage was steady: the one-worker trial is run first and last, and a
@@ -157,6 +173,7 @@ WITNESS_BYTES = 1 << 30                # the witness file written when the stora
 START_BYTES = 2 << 30                  # the first trial: one shard's read, at most this
 
 
+@_deprecated
 def mount_of(path) -> str:
     """The mount point the file `path` lives on: the storage a read of it goes through."""
     p = os.path.realpath(path)
@@ -165,6 +182,7 @@ def mount_of(path) -> str:
     return p
 
 
+@_deprecated
 def workers_for(directory, witness_dir=None, max_workers: Optional[int] = None,
                 pattern: str = "*/components/*/weights/*.safetensors") -> Dict[str, object]:
     """The parallel reads to keep in flight on the storage a weight cache is read from, MEASURED there:
