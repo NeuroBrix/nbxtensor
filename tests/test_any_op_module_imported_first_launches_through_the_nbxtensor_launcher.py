@@ -1,10 +1,11 @@
 """Whatever kernel module a process imports first, its kernels launch through nbxtensor's launcher, not upstream Triton's.
 
-The seam (`nbxtensor.backend.launcher.install`) used to be installed only by `ops.wrappers`, `ops.token_bitmask` and
-`memory.kv_host_pages`. A process whose first launch came from any other module ran upstream Triton's launch path,
-which on Apple refuses an NBXTensor argument: the chunked gated delta rule imported alone failed its first tuning with
-"TypeError: Arg 0: expected an MPS tensor, a SharedBuffer or the packed scalar bytes" (Mac M4 Pro, 2026-11-19), and
-passed when an earlier import had pulled `ops.wrappers`. Each kernel module now imports `ops._launch_seam`.
+The seam (`nbxtensor.backend.launcher.install`) used to be installed only by `ops.wrappers`, the twelve
+`ops.*_wrappers` modules, `ops.token_bitmask` and `memory.kv_host_pages`. A process whose first launch came from any
+other module ran upstream Triton's launch path, which on Apple refuses an NBXTensor argument: the chunked gated delta
+rule imported alone failed its first tuning with "TypeError: Arg 0: expected an MPS tensor, a SharedBuffer or the
+packed scalar bytes" (Mac M4 Pro, 2026-11-19), and passed when an earlier import had pulled `ops.wrappers`. Each
+kernel module now imports `ops._launch_seam` (or calls the install itself).
 
 What this test would do if the code were wrong: a kernel module without the import is named; a child process that
 imports one kernel module, and nothing else of the package, finds the seam not installed. It needs no device."""
@@ -33,10 +34,25 @@ def _imports_the_seam(tree):
                for n in ast.walk(tree))
 
 
-def test_every_kernel_module_of_the_ops_package_imports_the_launch_seam():
-    missing = [p.name for p in sorted((SRC / "ops").glob("*.py"))
-               if _defines_a_kernel(t := ast.parse(p.read_text())) and not _imports_the_seam(t)
-               and p.name not in ("wrappers.py", "token_bitmask.py")]       # these two install it themselves
+def _installs_the_launcher(tree):
+    """A module's own call of the launcher's install (`launcher.install()`, or `install()` imported from it)."""
+    installs = {a.asname or a.name for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)
+                and (n.module or "").endswith("backend.launcher") for a in n.names if a.name == "install"}
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Call):
+            f = ast.unparse(n.func)
+            if f.endswith("launcher.install") or f in installs:
+                return True
+    return False
+
+
+def test_every_kernel_module_of_the_library_installs_the_launcher():
+    """Every module of the package that defines a kernel, at any depth, imports the seam or calls the install itself:
+    no module is exempted by name (a module under memory/ with its seam line removed stayed green when only ops/*.py
+    was read, qa on the launch-seam hand-in, 2026-11-19)."""
+    missing = [str(p.relative_to(SRC)) for p in sorted(SRC.rglob("*.py"))
+               if _defines_a_kernel(t := ast.parse(p.read_text()))
+               and not (_imports_the_seam(t) or _installs_the_launcher(t))]
     assert missing == [], f"kernel modules that would launch through upstream Triton when imported first: {missing}"
 
 
