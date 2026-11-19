@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are read with parallel reads that start at one and double while the rate measured on those same reads rises, then
   settle on the best width. Nothing is measured ahead of the load and nothing is kept; the caller sets the most reads
   it allows (no default), and `measured()` returns the width reached, the rate at each width, the bytes and seconds.
+  A width an earlier load settled on can be handed back (`Reader(ceiling, start=)`): the reader starts there instead
+  of at one and keeps measuring it, and `measured()` gives every reading per width and the spread at the width
+  reached, so the application can keep the figure with its spread. The library itself keeps nothing.
 - `backend.runtime.one_device_env(device)`: the environment of a child process that sees one device only, through the
   variable the backend's runtime reads to hide devices.
 
