@@ -13,7 +13,8 @@ Two shapes of load use it:
   judged on one round (as many pieces completed as the width), its rate the bytes they hold over the round's seconds.
 * `read_bytes(fd, offset, n)` and `io`: one tensor's bytes split into page-aligned spans across `width` threads
   (`safetensors.read_bytes`), and the same split for the host conversions (`safetensors.cast`...); a width is judged
-  on a read it split that many ways (a tensor too small to split says nothing about the width and only counts).
+  on a round of as many reads as the width, each large enough for the split at the ceiling (a smaller tensor is its
+  latency, not the width's rate, and only counts).
 
 The width never passes `ceiling`, which the caller decides (the reads a plan prices host memory for): the reader holds
 no default. `measured()` says what the load measured — the width reached, the rate at each width, bytes, seconds — for
@@ -69,6 +70,7 @@ class Reader:
         self._growth = Growth(ceiling)
         self._pool = ThreadPoolExecutor(max_workers=ceiling, thread_name_prefix="nbx-read")
         self._lock = threading.Lock()
+        self._round = [1, 0, 0, 0.0]          # read_bytes' round: [width, reads, bytes, seconds]
         self.bytes = 0
         self.seconds = 0.0
 
@@ -94,14 +96,30 @@ class Reader:
                 self._growth.note(width, nbytes, seconds)
 
     def read_bytes(self, fd: int, offset: int, nbytes: int):
-        """`nbytes` of the file at `offset`, read across the current width (`safetensors.read_bytes`), timed; a read
-        split as many ways as the width is that width's measure."""
+        """`nbytes` of the file at `offset`, read across the current width (`safetensors.read_bytes`), timed. A width
+        is judged on a round of reads, as `map` judges it: as many reads as the width, each one the library's split
+        would cut at the ceiling (`safetensors.spans`: at least a page per read at the most this reader may use) — a
+        smaller read is its latency, not the width's rate, and only counts (the first smoke on Kokoro-82M judged
+        width 1 on a 4 KB norm at 0.001 GB/s, 2026-11-19)."""
         from nbxtensor.io import safetensors as _sf
         width = self._growth.width
         t0 = time.perf_counter()
         buf = _sf.read_bytes(fd, offset, nbytes, (width, self._pool))
         dt = time.perf_counter() - t0
-        self._note(width, nbytes, dt, len(_sf.spans(nbytes, 1, _sf.PAGE, width)) == width)
+        eligible = len(_sf.spans(nbytes, 1, _sf.PAGE, self.ceiling)) == self.ceiling or self.ceiling == 1
+        with self._lock:
+            self.bytes += nbytes
+            self.seconds += dt
+            if not eligible:
+                return buf
+            if self._round[0] != width:
+                self._round = [width, 0, 0, 0.0]
+            self._round[1] += 1
+            self._round[2] += nbytes
+            self._round[3] += dt
+            if self._round[1] >= width:
+                self._growth.note(width, self._round[2], self._round[3])
+                self._round = [self._growth.width, 0, 0, 0.0]
         return buf
 
     def map(self, fn: Callable[[T], R], items: Iterable[T], nbytes: Callable[[T], int]) -> Iterator[R]:
