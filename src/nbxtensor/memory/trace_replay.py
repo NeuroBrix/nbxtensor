@@ -175,7 +175,9 @@ def chunk_by_replay(device: int, granularity: int, ks: Sequence[int], reps: int,
     of them lie on one side of OFF's bound (`decided`: the median is then settled), and with an odd `reps` each replay
     stops at the bound itself (`replay_trace(stop_after=)`: a replay past it counts as past it whatever it would have
     reached) — the decision is the full sweep's, replay for replay (a 2 MiB replay ran 75-85 s on the rack against a
-    bound near 3 s, 2026-11-19). A replay stopped at the bound keeps the seconds it had reached."""
+    bound near 3 s, 2026-11-19). A replay stopped at the bound keeps the seconds it had reached.
+    The seconds returned for a candidate are the replays it ran before its stop: a candidate decided early returns
+    fewer than `reps` of them (the decision is still its median's)."""
     child = _child if child is None else child
     trace = _the_trace(trace)
     _give_back(device)
