@@ -14,6 +14,15 @@ memory:
   # thread block: 227 KB" (with explicit opt-in; the page states 1 KB = 1024 bytes). 227 x 1024 = 232448.
   # (Per SM: 228 KB.)
   max_shared_memory_per_block: 232448
+  # EVERY documented minor of this major is listed here, its figures written even where they equal the base's: a
+  # minor the list does not name is REFUSED by name (`_configs._profiles_for`), never handed this file's figures.
+  # SOURCE: https://docs.nvidia.com/cuda/cuda-programming-guide/05-appendices/compute-capabilities.html, read 2026-11-19, Table 34 "Memory Information per Compute Capability", "Maximum amount of
+  # shared memory per thread block": column 10.3 227 KB, column 10.7 327 KB (327 x 1024 = 334848); 64 K registers per
+  # block in both. Column "10.x" of the 12.9 guide (https://docs.nvidia.com/cuda/archive/12.9.0/cuda-c-programming-guide/index.html) for 10.1: 227 KB, 64 K.
+  by_capability:
+    "10.1": {max_shared_memory_per_block: 232448, max_registers_per_block: 65536}
+    "10.3": {max_shared_memory_per_block: 232448, max_registers_per_block: 65536}
+    "10.7": {max_shared_memory_per_block: 334848, max_registers_per_block: 65536}
   # SOURCE: same table, "Maximum number of 32-bit registers per thread block: 64 K" (1 K = 1024).
   max_registers_per_block: 65536
   # SOURCE: same table, "Maximum number of 32-bit registers per thread: 255".

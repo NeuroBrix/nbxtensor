@@ -380,6 +380,7 @@ def _profiles_for(wanted: str):
     from nbxtensor.backend import device_files      # the library's device files, merged with the application's
 
     exact, same_family, major_base = None, None, None
+    _UNDOCUMENTED.pop(wanted, None)
     for vendor, name, path in device_files.names():
         try:
             cfg = device_files.merged(vendor, name)      # a key written in both halves is refused, never skipped
@@ -400,8 +401,13 @@ def _profiles_for(wanted: str):
             # Several files may share a major (volta 7.0 and turing 7.5, ampere 8.0 and ada 8.9): the one that
             # stands for the major is its base, the lowest minor declared (x.0 where it exists), as the engine's
             # detector maps a major to its base architecture. Chosen by that rule, never by the order the files
-            # are read in. A capability whose own figures differ from its base's is written in the base's
-            # `memory.by_capability` (`_for_capability`), so it reads its own numbers.
+            # are read in. A minor reads a file of its major ONLY where that file documents it, in
+            # `memory.by_capability` with its own figures (`_for_capability`); a minor no file of its major
+            # documents is REFUSED by name (`fits_shared_memory`), never handed the base's figures (Table 34 has
+            # 10.7 at 327 KB per block where 10.0 holds 227).
+            if wanted not in ((cfg.get("memory") or {}).get("by_capability") or {}):
+                _UNDOCUMENTED.setdefault(wanted, []).append(f"{path.name} ({declared})")
+                continue
             rank = int(declared.split(".")[1]) if declared.split(".")[1].isdigit() else 99
             if major_base is not None and rank >= major_base[0]:
                 continue
@@ -429,7 +435,14 @@ def _profiles_for(wanted: str):
             same_family = int(budget)
     if exact is None and same_family is not None:
         _announce_family_fallback(wanted)
+    if exact is not None or same_family is not None:
+        _UNDOCUMENTED.pop(wanted, None)
     return exact if exact is not None else same_family
+
+
+#: {capability: [the files of its major that do not document it]} — the reason a budget resolved to None, named by
+#: `fits_shared_memory`'s refusal
+_UNDOCUMENTED: dict = {}
 
 
 def vendor_profile_for_arch(arch) -> dict:
@@ -452,8 +465,10 @@ def fits_shared_memory(nbytes: int) -> bool:
     declares no budget is refused by name."""
     budget = arch_smem_budget()
     if budget is None:
+        why = "; ".join(f"capability {c} is documented by no file of its major ({', '.join(f)}: not in their "
+                        f"memory.by_capability)" for c, f in _UNDOCUMENTED.items())
         raise RuntimeError("ZERO FALLBACK: a config space is pruned by memory.max_shared_memory_per_block, which the "
-                           "hardware profile in force does not declare")
+                           "hardware profile in force does not declare" + (f" ({why})" if why else ""))
     return int(nbytes) <= int(budget)
 
 

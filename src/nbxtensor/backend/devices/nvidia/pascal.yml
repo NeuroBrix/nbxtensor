@@ -18,8 +18,11 @@ memory:
   warp_size: 32
   # The minor of this major whose figures differ (read by `_configs._for_capability`). SOURCE: same table,
   # column 6.2: "Maximum number of 32-bit registers per thread block: 32 K" (1 K = 1024): 32768 (Jetson TX2).
+  # EVERY documented minor of this major is listed here, its figures written even where they equal the base's: a
+  # minor the list does not name is REFUSED by name (`_configs._profiles_for`), never handed this file's figures.
   by_capability:
-    "6.2": {max_registers_per_block: 32768}
+    "6.1": {max_shared_memory_per_block: 49152, max_registers_per_block: 65536}   # column 6.1: 48 KB, 64 K (https://docs.nvidia.com/cuda/archive/12.9.0/cuda-c-programming-guide/index.html, read 2026-11-19)
+    "6.2": {max_shared_memory_per_block: 49152, max_registers_per_block: 32768}
 precision:
   # Not card values (as in every NVIDIA file): kernels_carry_fp64 is a CAPABILITY of each branch's own kernels (ATen
   # carries float64 wherever the device does; Triton lowers double on the CUDA backend); attention_operands is a

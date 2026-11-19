@@ -8,8 +8,12 @@ The oracle is NVIDIA's documentation, quoted in DOCUMENTED with its source. The 
 Triton ships can compile for (read from its own `--help`), so a toolchain that gains a target fails here until the
 library describes it.
 
+A minor reads a file of its major only where that file documents it (`memory.by_capability`); a minor no file
+documents is refused by name, never handed its major's figures.
+
 What it catches: a capability with no device file or a wrong figure (Pascal and Blackwell had none until 2026-11-19;
-sm_86 read sm_80's 164 KB) - red."""
+sm_86 read sm_80's 164 KB; sm_107 read sm_100's 227 KB where NVIDIA documents 327) - red; an undocumented minor given
+its major's figures without a word - red."""
 import re
 import subprocess
 from pathlib import Path
@@ -31,7 +35,7 @@ DOCUMENTED = {
     "7.0": (96 * KB, 64 * K), "7.2": (96 * KB, 64 * K), "7.5": (64 * KB, 64 * K),
     "8.0": (163 * KB, 64 * K), "8.6": (99 * KB, 64 * K), "8.7": (163 * KB, 64 * K), "8.9": (99 * KB, 64 * K),
     "9.0": (227 * KB, 64 * K),
-    "10.0": (227 * KB, 64 * K), "10.1": (227 * KB, 64 * K), "10.3": (227 * KB, 64 * K),
+    "10.0": (227 * KB, 64 * K), "10.1": (227 * KB, 64 * K), "10.3": (227 * KB, 64 * K), "10.7": (327 * KB, 64 * K),
     "12.0": (99 * KB, 64 * K), "12.1": (99 * KB, 64 * K),
 }
 
@@ -73,3 +77,26 @@ def test_every_target_of_the_shipped_ptxas_is_documented_here():
     caps = [f"{t[:-1]}.{t[-1]}" for t in targets]
     missing = [c for c in caps if c not in DOCUMENTED]
     assert not missing, f"ptxas compiles for {missing}, which no documented figure here covers: describe them"
+
+
+# A minor of every major that has a file, documented by none of NVIDIA's columns: refused by name.
+UNDOCUMENTED = ["5.9", "6.9", "7.7", "8.8", "9.1", "10.9", "12.5"]
+
+
+@pytest.mark.parametrize("cc", UNDOCUMENTED)
+def test_a_minor_no_file_of_its_major_documents_is_refused_by_name(cc):
+    budget, profile = _resolve(cc)
+    assert budget is None and not profile, f"sm_{cc.replace('.', '')} was handed {budget} ({profile.get('_profile')})"
+    assert _configs._UNDOCUMENTED.get(cc), f"no file of major {cc.split('.')[0]} named in the refusal of {cc}"
+
+
+def test_every_minor_a_file_lists_is_one_nvidia_documents_with_those_figures():
+    from nbxtensor.backend import device_files
+    for vendor, name, path in device_files.names():
+        if vendor != "nvidia":
+            continue
+        listed = ((device_files.merged(vendor, name).get("memory") or {}).get("by_capability") or {})
+        for cc in listed:
+            assert cc in DOCUMENTED, f"{path.name} lists {cc}, which no NVIDIA column documents here"
+            budget, profile = _resolve(cc)
+            assert profile.get("_profile") == path.stem, f"{cc} resolved to {profile.get('_profile')}, listed by {path.stem}"

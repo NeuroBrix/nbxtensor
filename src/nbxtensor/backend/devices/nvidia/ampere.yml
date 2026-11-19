@@ -76,8 +76,11 @@ memory:
   # only, no such card on our machines). SOURCE: https://docs.nvidia.com/cuda/cuda-programming-guide/05-appendices/compute-capabilities.html, read 2026-11-19, Table 34 "Memory Information per Compute Capability":
   # column 8.6 "Maximum amount of shared memory per thread block: 99 KB" (A10, A40, RTX 30), 99 x 1024 = 101376;
   # column 8.7 "163 KB" (Jetson Orin), as 8.0. Registers and warp size: as 8.0 in both columns.
+  # EVERY documented minor of this major is listed here, its figures written even where they equal the base's: a
+  # minor the list does not name is REFUSED by name (`_configs._profiles_for`), never handed this file's figures.
   by_capability:
-    "8.6": {max_shared_memory_per_block: 101376}
+    "8.6": {max_shared_memory_per_block: 101376, max_registers_per_block: 65536}
+    "8.7": {max_shared_memory_per_block: 166912, max_registers_per_block: 65536}
   # SDPA deterministic-routing budget (R10 schema parity with
   # volta.yml). 0 = DISABLED BY DESIGN: the flash-attention Triton
   # non-determinism is a Volta-SIMT issue (pre-Ampere MMA path);

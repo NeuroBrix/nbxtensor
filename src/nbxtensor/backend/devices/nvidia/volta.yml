@@ -282,6 +282,12 @@ autotune:
 
 memory:
   max_shared_memory_per_block: 98304    # 96 KB (Volta opt-in)
+  # EVERY documented minor of this major is listed here, its figures written even where they equal the base's: a
+  # minor the list does not name is REFUSED by name (`_configs._profiles_for`), never handed this file's figures.
+  # SOURCE: https://docs.nvidia.com/cuda/archive/12.9.0/cuda-c-programming-guide/index.html, read 2026-11-19, "Technical Specifications per Compute Capability", column 7.2 (Jetson AGX
+  # Xavier): 96 KB of shared memory per block, 64 K registers per block, as 7.0.
+  by_capability:
+    "7.2": {max_shared_memory_per_block: 98304, max_registers_per_block: 65536}
   max_registers_per_block: 65536
   # NVIDIA CUDA C++ Programming Guide, Technical Specifications per Compute Capability: "Maximum number of 32-bit
   # registers per thread: 255" (7.x, 8.x, 9.x). Bounds a program's elements per thread (the row programs' prune).
