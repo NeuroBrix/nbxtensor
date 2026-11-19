@@ -92,6 +92,13 @@ def conv2d_forward_kernel(
     BLOCK_SIZE_OUTF: tl.constexpr = 64,
     WIDE_OFFSETS: tl.constexpr = True,
     SPATIAL_FAST: tl.constexpr = False,
+    # The input features are stepped by ONE fixed chunk whatever BLOCK_SIZE_INF (the smallest candidate, 16), each
+    # chunk's product going into the one accumulator in input-feature order (`tl.dot(a, b, accum)`): every candidate
+    # runs the same reduction, so none changes the bits. BLOCK_SIZE_INF is kept so a certificate naming it still
+    # launches; it no longer changes the program. Metal, 2026-11-19: a 3x3 conv split its bits by BLOCK_SIZE_INF,
+    # 16 against 32 and 64, and still did when a 32 or 64 block was cut into 16-wide dots inside one step (the
+    # backend's compiler orders the sums of one step its own way); the V100 already agreed, and its bits are main's.
+    CONV_INF_SUB: tl.constexpr = 16,
 ):
     # 64-bit offsets only where an operand's extent needs them (`WIDE_OFFSETS`, chosen by the wrapper from the
     # tensors' extents): 32-bit offsets are exact below 2^31 and the 64-bit ones cost 17 % on Apple's ALUs once the
@@ -137,13 +144,13 @@ def conv2d_forward_kernel(
                 spatial_ok = ((batch_offset < batch_dim) &
                               (ih_offset >= 0) & (ih_offset < in_height) &
                               (iw_offset >= 0) & (iw_offset < in_width))
-                for c in range(0, in_group_dim, BLOCK_SIZE_INF):
+                for c in range(0, in_group_dim, CONV_INF_SUB):
                     # 64-bit like every offset above it when the extents need it: `input_in_feat_stride *
                     # inf_offset` is a product of the channel plane (36 000 000 elements at 6000x6000) and the
                     # channel index, and past channel 59 it exceeds 2^31 — the 8x upscaler's last conv (64 -> 3, a
                     # 6344x6344 tile) faulted with an illegal address, four of four, 2026-09-20 (register 58's
                     # class; the output being small, the band-streaming that saves the 64 -> 64 convs never engaged).
-                    inf_offset = c + tl.arange(0, BLOCK_SIZE_INF)
+                    inf_offset = c + tl.arange(0, CONV_INF_SUB)
                     if WIDE_OFFSETS:
                         inf_offset = inf_offset.to(tl.int64)
 
@@ -166,7 +173,7 @@ def conv2d_forward_kernel(
                         inp_block = inp_block.to(tl.float16)
                         wt_block = wt_block.to(tl.float16)
 
-                    accum += tl.dot(wt_block, inp_block)
+                    accum = tl.dot(wt_block, inp_block, accum)
 
         out_ptr = (output_pointer +
                    (output_batch_stride * batch_offset)[None, :] +
@@ -197,7 +204,7 @@ def conv2d_forward_kernel(
 
         for h in range(kernel_height):
             for w in range(kernel_width):
-                for c in range(0, in_group_dim, BLOCK_SIZE_INF):
+                for c in range(0, in_group_dim, CONV_INF_SUB):
                     # 64-bit like every offset above it: `input_in_feat_stride *
                     # inf_offset` is a product of the channel plane (36 000 000
                     # elements at 6000x6000) and the channel index, and past channel
@@ -205,7 +212,7 @@ def conv2d_forward_kernel(
                     # 6344x6344 tile) faulted with an illegal address, four of four,
                     # 2026-09-20 (register 58's class; the output being small, the
                     # band-streaming that saves the 64 -> 64 convs never engaged).
-                    inf_offset = c + tl.arange(0, BLOCK_SIZE_INF)
+                    inf_offset = c + tl.arange(0, CONV_INF_SUB)
                     if WIDE_OFFSETS:
                         inf_offset = inf_offset.to(tl.int64)
                     ih_offset = h * dilation_height - padding_height + stride_height * oh_offset
@@ -236,7 +243,7 @@ def conv2d_forward_kernel(
                         inp_block = inp_block.to(tl.float16)
                         wt_block = wt_block.to(tl.float16)
 
-                    accum += tl.dot(inp_block, wt_block)
+                    accum = tl.dot(inp_block, wt_block, accum)
 
         out_ptr = (output_pointer +
                    (output_batch_stride * batch_offset)[:, None] +
