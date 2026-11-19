@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- A weight reader that measures itself on the load it serves (`nbxtensor.io.reader.Reader`): the model's weight files
+  are read with parallel reads that start at one and double while the rate measured on those same reads rises, then
+  settle on the best width. Nothing is measured ahead of the load and nothing is kept; the caller sets the most reads
+  it allows (no default), and `measured()` returns the width reached, the rate at each width, the bytes and seconds.
+- `backend.runtime.one_device_env(device)`: the environment of a child process that sees one device only, through the
+  variable the backend's runtime reads to hide devices.
+
+### Changed
+- The expandable pool's chunk probe runs each replay on its own card alone, and stops a candidate once more than half
+  of its replays lie on one side of the bound the driver segments set (with an odd count, a replay also stops at that
+  bound). It picks the same chunk as the full sweep on every draw; on the recorded seconds of a 4-card V100 rack it runs
+  17 replays of 24 and about a tenth of their replay time. The replay still runs under the card size the trace was
+  recorded on: under the trace's own live peak the same events are refused and map more, not fewer.
+  `pool.simulate` now returns the chunks it maps and unmaps.
+
+### Deprecated
+- The read-rate trial API of `nbxtensor.io.read_rate` (`workers_for`, `measure`, `choose`, `mount_of`,
+  `can_bypass_the_cache`, `WITNESS_BYTES`, `START_BYTES` and the private `_median_of_three`) has no caller once the
+  engine reads through `io.reader`; it is removed in the next library release. `read_seconds`, `trial`, `pieces`,
+  `PIECE`, `evict` and `cold_read_gbps` stay.
+
 ### Fixed
 - A kernel's tuning keyword that the installed Triton does not take is refused by name when the kernel is defined.
   Before, it was dropped with a warning, so a Triton lacking `restore_value` or `reset_to_zero` would have tuned an
