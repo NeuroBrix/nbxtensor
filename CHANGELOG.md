@@ -26,7 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   installs, 18 on each memory class, where the library before it gave it on 17 of 24. Cost on a V100: the paged decode
   kernel is 3 to 10 % slower, a served chat within run-to-run noise (8000-token context: 101 against 103 tokens/s);
   the norms and the GEMV are within noise. Tests launch every candidate of these kernels, and of matmul, addmm and
-  baddbmm, and require one set of bits.
+  baddbmm, and require one set of bits. A norm over a feature width of 1 computes (the single product), and a GEMV
+  candidate whose K chunk is not a whole number of sub-chunks is refused when it is compiled instead of storing a
+  partial sum.
 
 ## [0.1.11] - 2026-11-18
 
