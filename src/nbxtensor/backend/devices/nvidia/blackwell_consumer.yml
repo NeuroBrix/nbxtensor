@@ -1,0 +1,33 @@
+# nvidia/blackwell_consumer.yml: the library's description of compute capability 12.0 (Blackwell RTX: RTX 50, RTX PRO; 12.1 (GB10) reads it as its major's base). The library's own file: the
+# engine describes this device in no file of its own; a key the engine needs would go in its half
+# (src/neurobrix/config/vendors/nvidia/blackwell_consumer.yml), never here.
+# Every figure below is DOCUMENTATION ONLY (no such card on our machines), each with its source above it.
+
+architecture: blackwell_consumer
+compute_capability: "12.0"
+
+memory:
+  # SOURCE: https://docs.nvidia.com/cuda/cuda-programming-guide/05-appendices/compute-capabilities.html, read 2026-11-19, Table 34 "Memory Information per Compute Capability", column 12.x: "Maximum amount of shared memory per thread block: 99 KB" (1 KB = 1024 bytes).
+  # 99 x 1024 = 101376.
+  max_shared_memory_per_block: 101376
+  # SOURCE: same table, "Maximum number of 32-bit registers per thread block: 64 K" (1 K = 1024).
+  max_registers_per_block: 65536
+  # SOURCE: same table, "Maximum number of 32-bit registers per thread: 255".
+  max_registers_per_thread: 255
+  # SOURCE: same table, "Warp size: 32".
+  warp_size: 32
+precision:
+  # Not card values (as in every NVIDIA file): kernels_carry_fp64 is a CAPABILITY of each branch's own kernels (ATen
+  # carries float64 wherever the device does; Triton lowers double on the CUDA backend); attention_operands is a
+  # POLICY (the narrowest operand dtype).
+  kernels_carry_fp64:
+    compiled: true
+    triton: true
+  attention_operands: narrowest
+
+# NOT MEASURED on this architecture: the values that say so. The flash kernel at a power-of-two head dim >= 128
+# keeps its zero-pad detour; convolution weights stay in the container's own order (KCRS).
+flash:
+  pow2_head_dim_correct: false
+conv:
+  weight_layout: KCRS

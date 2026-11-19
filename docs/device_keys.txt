@@ -46,6 +46,7 @@ matrix_unit.operand_dtype
 matrix_unit.shape
 memory
 memory.alloc_pool_parked_cap_fraction
+memory.by_capability
 memory.max_registers_per_block
 memory.max_registers_per_thread
 memory.max_shared_memory_per_block

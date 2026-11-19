@@ -379,7 +379,7 @@ def _profiles_for(wanted: str):
 
     from nbxtensor.backend import device_files      # the library's device files, merged with the application's
 
-    exact, same_family = None, None
+    exact, same_family, major_base = None, None, None
     for vendor, name, path in device_files.names():
         try:
             cfg = device_files.merged(vendor, name)      # a key written in both halves is refused, never skipped
@@ -388,6 +388,7 @@ def _profiles_for(wanted: str):
         declared = str(cfg.get("compute_capability", "")).strip().lower()
         if not declared:
             continue
+        cfg = _for_capability(cfg, wanted)
         budget = (cfg.get("memory") or {}).get("max_shared_memory_per_block")
         if not budget:
             continue
@@ -396,21 +397,20 @@ def _profiles_for(wanted: str):
             exact = int(budget)
         elif (declared.split(".")[0] == wanted.split(".")[0]
                 and "." in declared and "." in wanted):
-            # Same NVIDIA capability MAJOR. Only three NVIDIA profiles exist
-            # — 7.0, 8.0, 9.0 — so an exact match covers V100, A100 and H100
-            # and nothing else: a T4 (7.5), an A10 or 3090 (8.6) and an L4 or
-            # 4090 (8.9) would resolve to no profile and get no filtering at
-            # all. Falling back to the major mirrors what Prism's runtime
-            # detection already does (`_NVIDIA_ARCH_MAP`: "8" -> ampere), and
-            # the two MUST agree — a card whose runtime profile is ampere
-            # while its autotune space was chosen as if no profile existed is
-            # a disagreement inside the engine about its own hardware.
-            #
-            # That map is not imported here on purpose: `autodetect` pulls
-            # torch, and this module is imported by every Triton kernel (R33).
-            # Matching majors reads the same fact out of the profiles instead
-            # of copying the table.
+            # Several files may share a major (volta 7.0 and turing 7.5, ampere 8.0 and ada 8.9): the one that
+            # stands for the major is its base, the lowest minor declared (x.0 where it exists), as the engine's
+            # detector maps a major to its base architecture. Chosen by that rule, never by the order the files
+            # are read in. A capability whose own figures differ from its base's is written in the base's
+            # `memory.by_capability` (`_for_capability`), so it reads its own numbers.
+            rank = int(declared.split(".")[1]) if declared.split(".")[1].isdigit() else 99
+            if major_base is not None and rank >= major_base[0]:
+                continue
+            major_base = (rank, cfg, path)
+            # Falling back to the major mirrors Prism's runtime detection (`_NVIDIA_ARCH_MAP`: "8" -> ampere);
+            # that map is not imported here on purpose: `autodetect` pulls torch, and this module is imported by
+            # every Triton kernel (R33). The profiles carry the same fact.
             same_family = int(budget)
+            _remember_major_base(cfg, path)
         elif any(wanted.startswith(prefix) for prefix in
                  (str(m).strip().lower()
                   for m in (cfg.get("compute_capability_matches") or []))):
@@ -566,12 +566,35 @@ def _remember_profile(declared: str, wanted: str, cfg: dict, path=None) -> None:
     elif not _ACTIVE_PROFILE.get("_exact"):
         matches = [str(m).strip().lower()
                    for m in (cfg.get("compute_capability_matches") or [])]
-        same_major = (declared.split(".")[0] == wanted.split(".")[0]
-                      and "." in declared and "." in wanted)
-        if same_major or any(wanted.startswith(m) for m in matches):
+        if any(wanted.startswith(m) for m in matches):   # a same-major file is remembered by `_remember_major_base`
             _ACTIVE_PROFILE.clear()
             _ACTIVE_PROFILE.update(cfg)
             _ACTIVE_PROFILE.update(names)
+
+
+def _remember_major_base(cfg: dict, path=None) -> None:
+    """Record the base file of the wanted capability's major (`_profiles_for` chose it), unless an exact match
+    is already recorded."""
+    if _ACTIVE_PROFILE.get("_exact"):
+        return
+    _ACTIVE_PROFILE.clear()
+    _ACTIVE_PROFILE.update(cfg)
+    if path is not None:
+        _ACTIVE_PROFILE.update({"_vendor": path.parent.name, "_profile": path.stem})
+
+
+def _for_capability(cfg: dict, wanted: str) -> dict:
+    """The device file as the capability `wanted` reads it: the figures its `memory.by_capability[wanted]`
+    writes replace the file's own. A file stands for every minor of its major, and some minors hold less
+    (sm_86 99 KB of shared memory per block where sm_80 holds 163; a Tegra sm_53 32 K registers per block
+    where sm_50 holds 64 K): each such figure is written once, with its source, beside the base's. A
+    capability the block does not name reads the file unchanged."""
+    over = ((cfg.get("memory") or {}).get("by_capability") or {}).get(wanted)
+    if not over:
+        return cfg
+    out = dict(cfg)
+    out["memory"] = {**cfg["memory"], **over}
+    return out
 
 
 def active_vendor_profile() -> dict:

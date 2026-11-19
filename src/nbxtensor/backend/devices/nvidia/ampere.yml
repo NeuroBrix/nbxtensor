@@ -63,12 +63,21 @@ sdpa_thresholds:
     num_warps: 4
 
 memory:
-  max_shared_memory_per_block: 167936   # 164 KB (A100 SXM4/PCIe)
+  # SOURCE: https://docs.nvidia.com/cuda/cuda-programming-guide/05-appendices/compute-capabilities.html, read 2026-11-19, Table 34 "Memory Information per Compute Capability", column 8.0: "Maximum amount of shared memory per thread block: 163 KB" (with explicit
+  # opt-in; 1 KB = 1024 bytes): 163 x 1024 = 166912. The value written here before, 167936, was the 164 KB the SAME
+  # table gives per SM, not per block (corrected 2026-11-19, documentation only: no A100 on our machines).
+  max_shared_memory_per_block: 166912
   max_registers_per_block: 65536
   # NVIDIA CUDA C++ Programming Guide, Technical Specifications per Compute Capability: "Maximum number of 32-bit
   # registers per thread: 255" (7.x, 8.x, 9.x). Bounds a program's elements per thread (the row programs' prune).
   max_registers_per_thread: 255
   warp_size: 32
+  # The minors of this major whose figures differ from 8.0's (read by `_configs._for_capability`; documentation
+  # only, no such card on our machines). SOURCE: https://docs.nvidia.com/cuda/cuda-programming-guide/05-appendices/compute-capabilities.html, read 2026-11-19, Table 34 "Memory Information per Compute Capability":
+  # column 8.6 "Maximum amount of shared memory per thread block: 99 KB" (A10, A40, RTX 30), 99 x 1024 = 101376;
+  # column 8.7 "163 KB" (Jetson Orin), as 8.0. Registers and warp size: as 8.0 in both columns.
+  by_capability:
+    "8.6": {max_shared_memory_per_block: 101376}
   # SDPA deterministic-routing budget (R10 schema parity with
   # volta.yml). 0 = DISABLED BY DESIGN: the flash-attention Triton
   # non-determinism is a Volta-SIMT issue (pre-Ampere MMA path);

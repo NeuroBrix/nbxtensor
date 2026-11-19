@@ -1,0 +1,37 @@
+# nvidia/pascal.yml: the library's description of compute capability 6.0 (Pascal: P100, GTX 10, P40, Jetson TX2; 6.1 and 6.2 read it as their major's base). The library's own file: the
+# engine describes this device in no file of its own; a key the engine needs would go in its half
+# (src/neurobrix/config/vendors/nvidia/pascal.yml), never here.
+# Every figure below is DOCUMENTATION ONLY (no such card on our machines), each with its source above it.
+
+architecture: pascal
+compute_capability: "6.0"
+
+memory:
+  # SOURCE: https://docs.nvidia.com/cuda/archive/12.9.0/cuda-c-programming-guide/index.html, read 2026-11-19, table "Technical Specifications per Compute Capability", column 6.0, 6.1, 6.2: "Maximum amount of shared memory per thread block: 48 KB" (1 KB = 1024 bytes).
+  # 48 x 1024 = 49152.
+  max_shared_memory_per_block: 49152
+  # SOURCE: same table, "Maximum number of 32-bit registers per thread block: 64 K" (1 K = 1024).
+  max_registers_per_block: 65536
+  # SOURCE: same table, "Maximum number of 32-bit registers per thread: 255".
+  max_registers_per_thread: 255
+  # SOURCE: same table, "Warp size: 32".
+  warp_size: 32
+  # The minor of this major whose figures differ (read by `_configs._for_capability`). SOURCE: same table,
+  # column 6.2: "Maximum number of 32-bit registers per thread block: 32 K" (1 K = 1024): 32768 (Jetson TX2).
+  by_capability:
+    "6.2": {max_registers_per_block: 32768}
+precision:
+  # Not card values (as in every NVIDIA file): kernels_carry_fp64 is a CAPABILITY of each branch's own kernels (ATen
+  # carries float64 wherever the device does; Triton lowers double on the CUDA backend); attention_operands is a
+  # POLICY (the narrowest operand dtype).
+  kernels_carry_fp64:
+    compiled: true
+    triton: true
+  attention_operands: narrowest
+
+# NOT MEASURED on this architecture: the values that say so. The flash kernel at a power-of-two head dim >= 128
+# keeps its zero-pad detour; convolution weights stay in the container's own order (KCRS).
+flash:
+  pow2_head_dim_correct: false
+conv:
+  weight_layout: KCRS
