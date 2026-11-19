@@ -138,3 +138,65 @@ def test_a_split_read_is_judged_on_rounds_of_reads_the_split_cuts(monkeypatch):
         r.read_bytes(0, 0, 8 << 20)
     m = r.measured()
     assert m["settled"] and m["workers"] == 4, m
+
+
+class _Store:
+    """A store read through an event clock (deterministic: no thread runs a read): a read submitted while the reader
+    is at width w takes base(item) * w / min(w, saturation) seconds FROM ITS SUBMISSION, and reads complete in order of
+    their finish; the clock moves to each finish."""
+
+    def __init__(self, saturation, base):
+        self.t, self.saturation, self.base, self.n = 0.0, saturation, base, 0
+
+    def __call__(self):
+        return self.t
+
+
+class _Done:
+    def __init__(self, value, finish, seq):
+        self.value, self.finish, self.seq = value, finish, seq
+
+    def result(self):
+        return self.value
+
+    def cancel(self):
+        pass
+
+
+def test_a_round_counts_only_the_reads_started_in_it(monkeypatch):
+    """qa on 1196: a read started at the narrower width and still in flight when the width moved counted its whole
+    bytes in the wider width's shorter round, overrating the wider width. With reads of unequal length on a store that
+    gives no more past four readers, that grew the reader to eight; counted on its own reads, the round settles at four
+    (red before: 8)."""
+    import nbxtensor.io.reader as RD
+    store = _Store(4, lambda i: 1.0 if i % 2 else 3.0)
+    r = Reader(32)
+
+    class Pool:
+        def __init__(self, **kw):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def submit(self, fn, item):
+            w = r.width
+            store.n += 1
+            return _Done(fn(item), store.t + store.base(item) * w / min(w, store.saturation), store.n)
+
+    def wait(fs, return_when=None):
+        f = min(fs, key=lambda f: (f.finish, f.seq))
+        store.t = max(store.t, f.finish)
+        return {f}, set(fs) - {f}
+    monkeypatch.setattr(RD, "ThreadPoolExecutor", Pool)
+    monkeypatch.setattr(RD, "wait", wait)
+    monkeypatch.setattr(RD.time, "perf_counter", store)
+    out = list(r.map(lambda i: i, range(64), lambda i: 1 << 20))
+    assert sorted(out) == list(range(64))
+    m = r.measured()
+    assert m["workers"] == 4, m
+    assert m["bytes"] == 64 << 20, "a carried read's bytes still count in the load's total"
+

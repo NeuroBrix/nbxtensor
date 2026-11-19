@@ -136,7 +136,12 @@ class Reader:
     def map(self, fn: Callable[[T], R], items: Iterable[T], nbytes: Callable[[T], int]) -> Iterator[R]:
         """`fn(item)` for every item, `width` of them in flight, the results as they complete. A round is as many
         completions as the width it started at; its rate (the bytes `nbytes` gives the items completed in it, over its
-        seconds) judges that width, and the next round runs at the width the rule gives. `fn` reads by its own means
+        seconds) judges that width, and the next round runs at the width the rule gives. A round counts only the
+        pieces SUBMITTED in it: a piece started in the round before and still in flight when the width moved spent
+        part of its time in that round, so its full bytes over the new round's shorter window would inflate the new
+        width's rate and bias the growth upward (qa on 1196, 2026-11-19); its bytes go to the load's total alone. A round has its width
+        of its OWN pieces in flight from its start (the carried ones do not hold its places; never past `ceiling`
+        in all): a round started short of its width would read it slower than it reads and settle low. `fn` reads by its own means
         and must not use this reader's `io` (its threads are this call's own)."""
         todo = list(items)
         if not todo:
@@ -145,24 +150,30 @@ class Reader:
         pending: Dict = {}
         with ThreadPoolExecutor(max_workers=self.ceiling, thread_name_prefix="nbx-read-map") as pool:
             def fill():
-                while len(pending) < self._growth.width:
+                while (sum(1 for _, of in pending.values() if of == rnd) < self._growth.width
+                       and len(pending) < self.ceiling):
                     item = next(it, _END)
                     if item is _END:
                         return
-                    pending[pool.submit(fn, item)] = item
+                    pending[pool.submit(fn, item)] = (item, rnd)
+            rnd = 0
             width, started, done, got = self._growth.width, time.perf_counter(), 0, 0
             fill()
             try:
                 while pending:
                     finished, _ = wait(list(pending), return_when=FIRST_COMPLETED)
                     for f in finished:
-                        item = pending.pop(f)
+                        item, of = pending.pop(f)
                         result = f.result()
-                        got += int(nbytes(item))
-                        done += 1
+                        if of == rnd:
+                            got += int(nbytes(item))
+                            done += 1
+                        else:
+                            self._note(width, int(nbytes(item)), 0.0, False)
                         yield result
                     if done >= width:
                         self._note(width, got, time.perf_counter() - started, True)
+                        rnd += 1
                         width, started, done, got = self._growth.width, time.perf_counter(), 0, 0
                     fill()
                 if done:
