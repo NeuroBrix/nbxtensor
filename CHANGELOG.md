@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- The chunked gated delta rule gives the right result on its first, untuned call: tuning now restores the buffer its
+  state kernel overwrites. Before, the first call of a run with no tuning cache returned a wrong output and state.
 - Conv2d and the mixture-of-experts kernels no longer refuse an NVIDIA card for want of its shared-memory figure, on
   any card the bundled compiler targets. They size their tiles by the card's shared memory per block and refuse by
   name when no device file states it; the library described

@@ -134,3 +134,19 @@ def test_the_chunked_form_allocates_the_workspace_its_helper_names(monkeypatch):
     _chunked(_operands(q, k, v, g, beta, s, NBXDtype.float16))
     assert seen == [{n: (sh, F32) for n, sh in CH.gated_delta_rule_chunked_workspace(2, 65, 6, 128, 64).items()}]
     assert seen[0]["states"][0] == (2, 2, 6, 128, 64)          # ceil(65 / 64) chunk states
+
+
+def test_tuning_the_state_kernel_leaves_the_result_the_oracle(monkeypatch):
+    """The state kernel writes V' over U, its own input. Tuning benchmarks every config on the same buffers, so without
+    U restored each config after the first reads a V' as its U and the call returns another sum (Mac M4 Pro,
+    2026-11-19: the first, cold, cell of this file at 2.96e+02 against a bound of 4e-06, every later cell and every warm
+    run exact). The tuner's chosen-config caches are emptied, so this call benchmarks the configs as a cold run does."""
+    from nbxtensor.ops import gated_delta_rule_chunked as CH
+    tuner = CH.gated_delta_rule_chunk_state_kernel
+    monkeypatch.setattr(tuner, "cache", {})
+    monkeypatch.setattr(tuner, "cache_results", False)
+    q, k, v, g, beta, s = draw(1, 1, 4, 4, 128, 128, 601, True, decay_max=0.1)
+    out, state = _chunked(_operands(q, k, v, g, beta, s, F32))
+    ref_o, ref_s = O.delta_rule_oracle(q, k, v, g, beta, s, **ATTRS)()
+    dev_o, dev_s = O.oracle_deviation(_host(out), ref_o), O.oracle_deviation(_host(state), ref_s)
+    assert dev_o <= OUT_F32 and dev_s <= STATE, (dev_o, dev_s)

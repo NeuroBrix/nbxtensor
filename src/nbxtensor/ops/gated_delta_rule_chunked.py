@@ -255,7 +255,10 @@ def gated_delta_rule_chunk_prepare_kernel(
                  _ieee(i30, x0) + _ieee(i31, x1) + _ieee(i32, x2) + _ieee(i33, x3), mask=m3[:, None] & mk[None, :])
 
 
-@nbx_autotune(configs=_STATE_CONFIGS, key=['DK', 'DV'], cache_results=True)
+# The state kernel writes V' over U, its own input: tuning benchmarks every config on the same buffers, so U is restored
+# before each one (without it every config after the first read a V' as its U, and the cold first call returned another
+# sum: 2.96e+02 against a 4e-06 bound, Mac M4 Pro 2026-11-19).
+@nbx_autotune(configs=_STATE_CONFIGS, key=['DK', 'DV'], cache_results=True, restore_value=['u_ptr'])
 @triton.jit
 def gated_delta_rule_chunk_state_kernel(
     k_ptr,                                    # [B, T, Hk, DK]: own strides
