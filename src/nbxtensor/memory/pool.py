@@ -397,6 +397,10 @@ class Simulation:
     parked_bytes: int
     #: requests the card of `cap` bytes refused even after the reclaim (0 without a cap)
     refusals: int = 0
+    #: chunks mapped and unmapped in the expandable range (`vmm_chunk`; 0 without one): the driver calls the replay
+    #: of the same events makes (`memory.trace_replay`)
+    maps: int = 0
+    unmaps: int = 0
 
 
 def simulate(events: Iterable[Tuple[str, object, int]], parked_cap: int = 0, align: int = POOL_ALIGN,
@@ -415,12 +419,12 @@ def simulate(events: Iterable[Tuple[str, object, int]], parked_cap: int = 0, ali
     maps them, and a refusal (`cap`: the card's bytes; None: never) unmaps every mapped chunk lying whole inside a free
     block before it is retried — the reclaim the allocator makes, after one synchronisation."""
     pool = SegmentPool(align, split_min)
-    held = live = peak = peak_live = parked = refusals = 0
+    held = live = peak = peak_live = parked = refusals = maps = unmaps = 0
     rng = range_add(pool, 0, 1 << 44, 1 << 46, int(vmm_chunk)) if (pooled and vmm_chunk) else None
 
     def map_chunks(pairs) -> bool:
         """Map the (range, chunk) pairs, reclaiming once when the card would refuse; False when it still refuses."""
-        nonlocal held
+        nonlocal held, maps, unmaps
         need = len(pairs) * rng.chunk
         if cap is not None and held + need > cap:
             # the allocator's reclaim: whole free chunks, the highest addresses first, until the mapping fits; then
@@ -429,6 +433,7 @@ def simulate(events: Iterable[Tuple[str, object, int]], parked_cap: int = 0, ali
                 if held + need <= cap:
                     break
                 r.mapped.discard(i)
+                unmaps += 1
                 held -= r.chunk
             if held + need > cap:
                 pool.flush([0], to_driver)
@@ -436,6 +441,7 @@ def simulate(events: Iterable[Tuple[str, object, int]], parked_cap: int = 0, ali
                 return False
         for r, i in pairs:
             r.mapped.add(i)
+        maps += len(pairs)
         held += need
         return True
     next_ptr = 1 << 40
@@ -492,6 +498,7 @@ def simulate(events: Iterable[Tuple[str, object, int]], parked_cap: int = 0, ali
                     if rng is not None:
                         for r, i in range_reclaimable(pool, 0):
                             r.mapped.discard(i)
+                            unmaps += 1
                             held -= r.chunk
                 if cap is not None and held + grown > cap:
                     refusals += 1
@@ -527,4 +534,4 @@ def simulate(events: Iterable[Tuple[str, object, int]], parked_cap: int = 0, ali
                 held -= seg_bytes.pop(ptr)
         else:
             raise ValueError(f"simulate: an event is ('alloc' | 'free', key, nbytes), not {kind!r}")
-    return Simulation(peak, peak_live, parked, refusals)
+    return Simulation(peak, peak_live, parked, refusals, maps, unmaps)
