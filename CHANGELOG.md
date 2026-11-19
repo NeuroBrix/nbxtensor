@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Conv2d gives the same bits whichever launch candidate the run-time autotune picks. Its input features are summed in
+  one fixed 16-wide chunk order whatever the candidate, and on a GPU whose threadgroup memory cannot hold a
+  candidate's float32 accumulator tile that candidate is no longer offered: Metal lowers such a tile in passes and
+  adds in another order (on an Apple M4 Pro every 64 KB tile gave other bits than the 32 KB ones). The limit is read
+  from the device profile: Apple GPUs keep 34 of the 36 candidates, a V100 all 36. A test launches every candidate
+  conv2d may choose and requires one set of bits.
 - On Apple GPUs, a timing event now comes after the kernels launched before it: the benchmark (`launcher.do_bench`)
   and the certification timer measure the kernel. Before, every matmul read about 0.1 ms whatever its size (a 2048^3
   fp16 matmul: 0.08 ms against 3.0 ms by the wall clock), so autotuning and certification on Metal ranked their

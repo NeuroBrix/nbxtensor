@@ -6,6 +6,11 @@ conv2d sums its input features in fixed 16-wide sub-chunks into one accumulator 
 
 A card test: on a host with no device it skips by name.
 
+The candidates are those the tuner may choose ON THIS DEVICE (`conv2d.conv2d_candidates`): a tile whose float32
+accumulator is past the device's threadgroup pool is lowered in passes on Metal and sums in another order, so the
+list leaves it out by the profile's pool (Mac, 2026-11-19: 16 and 32 KB tiles gave the reference bits, 64 and 128 KB
+tiles other bits; 34 of 36 candidates kept on Apple, 36 of 36 on a V100).
+
 What it catches: a candidate whose sum over the input features is taken in another order - red."""
 import numpy as np
 import pytest
@@ -52,6 +57,7 @@ def _empty_like_dtype(shape, a):
     from nbxtensor.tensor import NBXTensor
     return NBXTensor.empty(shape, device="cuda:0", dtype=a.nbx_dtype)
 
+
 CONV_SHAPES = [(1, 64, 32, 32, 64, np.float16), (2, 32, 16, 16, 48, np.float16), (1, 32, 16, 16, 32, np.float32)]
 
 
@@ -71,7 +77,7 @@ def test_conv2d_3x3(N_, C, H, W, O, dt):
                                           padding_height=1, padding_width=1, dilation_height=1, dilation_width=1,
                                           groups=1, fp16=dt == np.float16, WIDE_OFFSETS=False, **kw,
                                           num_warps=nw, num_stages=ns)
-    out = _every_candidate(CV._CONV2D_AUTOTUNE, launch, lambda: y.numpy())
+    out = _every_candidate(CV.conv2d_candidates(CV._CONV2D_AUTOTUNE), launch, lambda: y.numpy())
     xp = np.pad(xn.astype(np.float64), ((0, 0), (0, 0), (1, 1), (1, 1)))
     ref = np.zeros((N_, O, H, W))
     for i in range(3):

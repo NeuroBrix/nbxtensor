@@ -18,7 +18,7 @@ CLAUDE.md "Autotune policy" for the doctrinal exception scope.
 
 import triton
 
-from nbxtensor.ops._configs import nbx_autotune
+from nbxtensor.ops._configs import fits_shared_memory, nbx_autotune
 import triton.language as tl
 
 from nbxtensor.ops._autotune_policy import maybe_pin_single, is_conv2d_pinned
@@ -62,8 +62,30 @@ _CONV2D_AUTOTUNE = _CONV2D_AUTOTUNE_VOLTA + [
 ]
 
 
+def conv2d_candidates(configs, named_args=None, **kwargs):
+    """The candidates the tuner may choose on this device: those whose float32 accumulator tile
+    (BLOCK_SIZE_BHW x BLOCK_SIZE_OUTF x 4 bytes) fits the device's `memory.max_shared_memory_per_block`.
+
+    An accumulator tile past that pool is lowered in passes on Metal: the compiled kernel zeroes its matrix
+    accumulators inside the input-feature loop and adds each 16-wide chunk's partial to the running sum one value at
+    a time, where a tile that fits carries the whole sum in the matrix accumulators. Same values, another order of
+    float32 additions, other bits (Mac M4 Pro, 2026-11-19, three cells: every tile of 16 or 32 KB gave the reference
+    bits and every tile of 64 or 128 KB other bits, in both orientations; the compiled source zeroes inside the loop
+    exactly for the tiles over the pool). A run-time sweep picks by timing, so such a tile beside the others would
+    let two installs round differently. The pool is the device profile's fact, never a tile or a device named here:
+    a V100 (96 KB) keeps every candidate. A profile that declares no pool is refused by name (`fits_shared_memory`),
+    and a list with nothing left is refused rather than replaced."""
+    kept = [c for c in configs if fits_shared_memory(c.kwargs["BLOCK_SIZE_BHW"] * c.kwargs["BLOCK_SIZE_OUTF"] * 4)]
+    if not kept:
+        raise RuntimeError("conv2d: no launch candidate's float32 accumulator tile fits this device's "
+                           "memory.max_shared_memory_per_block; the candidate list (or its pin) offers none it can run "
+                           "in one order")
+    return kept
+
+
 @nbx_autotune(
     configs=maybe_pin_single(_CONV2D_AUTOTUNE, is_conv2d_pinned),
+    prune_configs_by={'early_config_prune': conv2d_candidates},
     key=['batch_dim', 'in_feat_dim', 'in_height', 'in_width_key',
          'out_feat_dim', 'out_height', 'out_width_key',
          'kernel_height', 'kernel_width',
