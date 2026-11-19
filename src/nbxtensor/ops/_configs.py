@@ -379,7 +379,7 @@ def _profiles_for(wanted: str):
 
     from nbxtensor.backend import device_files      # the library's device files, merged with the application's
 
-    exact, same_family, major_base = None, None, None
+    exact, same_family, major_base, via = None, None, None, None
     _UNDOCUMENTED.pop(wanted, None)
     for vendor, name, path in device_files.names():
         try:
@@ -415,7 +415,7 @@ def _profiles_for(wanted: str):
             # Falling back to the major mirrors Prism's runtime detection (`_NVIDIA_ARCH_MAP`: "8" -> ampere);
             # that map is not imported here on purpose: `autodetect` pulls torch, and this module is imported by
             # every Triton kernel (R33). The profiles carry the same fact.
-            same_family = int(budget)
+            same_family, via = int(budget), "documented"
             _remember_major_base(cfg, path)
         elif any(wanted.startswith(prefix) for prefix in
                  (str(m).strip().lower()
@@ -432,17 +432,20 @@ def _profiles_for(wanted: str):
             # than a branch here. Profiles that declare none are unaffected,
             # which is every NVIDIA and AMD profile — their exact and
             # major-family matches are reached before this and are unchanged.
-            same_family = int(budget)
+            same_family, via = int(budget), "prefix"
     if exact is None and same_family is not None:
-        _announce_family_fallback(wanted)
+        _announce_family_fallback(wanted, via)
     if exact is not None or same_family is not None:
         _UNDOCUMENTED.pop(wanted, None)
     return exact if exact is not None else same_family
 
 
-#: {capability: [the files of its major that do not document it]} — the reason a budget resolved to None, named by
-#: `fits_shared_memory`'s refusal
+#: {capability: [the files of its major that do not document it]} — the reason a budget resolved to None. Kept per
+#: capability: `fits_shared_memory`'s refusal names only the capability in force (`_IN_FORCE`), never another one a
+#: process resolved earlier.
 _UNDOCUMENTED: dict = {}
+#: the capability `arch_smem_budget` last resolved: the executing device's
+_IN_FORCE: dict = {}
 
 
 def vendor_profile_for_arch(arch) -> dict:
@@ -465,8 +468,10 @@ def fits_shared_memory(nbytes: int) -> bool:
     declares no budget is refused by name."""
     budget = arch_smem_budget()
     if budget is None:
-        why = "; ".join(f"capability {c} is documented by no file of its major ({', '.join(f)}: not in their "
-                        f"memory.by_capability)" for c, f in _UNDOCUMENTED.items())
+        c = _IN_FORCE.get("capability")
+        files = _UNDOCUMENTED.get(c)
+        why = (f"capability {c} is documented by no file of its major ({', '.join(files)}: not in their "
+               f"memory.by_capability)") if files else ""
         raise RuntimeError("ZERO FALLBACK: a config space is pruned by memory.max_shared_memory_per_block, which the "
                            "hardware profile in force does not declare" + (f" ({why})" if why else ""))
     return int(nbytes) <= int(budget)
@@ -501,6 +506,7 @@ def arch_smem_budget() -> Optional[int]:
     except ImportError:                                   # pragma: no cover
         return None
 
+    _IN_FORCE.pop("capability", None)                     # set again below once the device's arch is read
     try:
         from nbxtensor.backend.launcher import arch_name as _nbx_arch  # engine data, no driver probe (R33)
         arch = _nbx_arch()
@@ -531,6 +537,7 @@ def arch_smem_budget() -> Optional[int]:
 
     wanted = (f"{arch // 10}.{arch % 10}" if isinstance(arch, int)
               else str(arch).strip().lower())
+    _IN_FORCE["capability"] = wanted
     return _profiles_for(wanted)
 
 
@@ -539,8 +546,12 @@ def arch_smem_budget() -> Optional[int]:
 _FALLBACK_ANNOUNCED: set = set()
 
 
-def _announce_family_fallback(wanted: str) -> None:
-    """Say, out loud and once, that this chip has no profile of its own.
+def _announce_family_fallback(wanted: str, via: str = "prefix") -> None:
+    """Say, out loud and once, which profile a chip without a file of its own reads, and how.
+
+    `via` "documented": the file of its major lists the capability in `memory.by_capability` with its own figures
+    (an A10's 8.6 in ampere.yml) — the chip reads its own documented numbers, said once at info level, no fallback.
+    `via` "prefix": the profile declares a prefix that covers the chip — what follows.
 
     An unknown chip must RUN — correctly if not optimally — because refusing
     would contradict a cascade that never refuses. But running on a family
@@ -554,6 +565,10 @@ def _announce_family_fallback(wanted: str) -> None:
     if profile is None or key in _FALLBACK_ANNOUNCED:
         return
     _FALLBACK_ANNOUNCED.add(key)
+    if via == "documented":
+        _log.info(f"[PROFILE] {wanted!r} reads {profile!r}, which documents it in memory.by_capability: its own "
+                  f"figures, not its major's.")
+        return
     _log.warning(f"[PROFILE] {wanted!r} has no profile of its own; falling back to "
                  f"{profile!r}, which declares a prefix that covers it. The engine "
                  f"will run correctly, not optimally — a per-variant profile is what "

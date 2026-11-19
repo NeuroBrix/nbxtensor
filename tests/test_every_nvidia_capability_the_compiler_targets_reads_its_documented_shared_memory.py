@@ -100,3 +100,29 @@ def test_every_minor_a_file_lists_is_one_nvidia_documents_with_those_figures():
             assert cc in DOCUMENTED, f"{path.name} lists {cc}, which no NVIDIA column documents here"
             budget, profile = _resolve(cc)
             assert profile.get("_profile") == path.stem, f"{cc} resolved to {profile.get('_profile')}, listed by {path.stem}"
+
+
+def test_the_refusal_names_the_capability_in_force_only(monkeypatch):
+    """Two refused capabilities in one process: the second refusal speaks of the second alone, never of one the
+    process resolved before (the reasons are kept per capability)."""
+    from nbxtensor.backend import launcher
+    monkeypatch.setattr(_configs, "_UNDOCUMENTED", {})
+    said = {}
+    for arch in (81, 109):
+        monkeypatch.setattr(launcher, "arch_name", lambda a=arch: a)
+        _configs._ACTIVE_PROFILE.clear()
+        with pytest.raises(RuntimeError) as e:
+            _configs.fits_shared_memory(1024)
+        said[arch] = str(e.value)
+    assert "capability 8.1" in said[81] and "ampere.yml" in said[81]
+    assert "capability 10.9" in said[109] and "blackwell.yml" in said[109] and "8.1" not in said[109], said[109]
+
+
+def test_a_documented_minor_is_told_it_reads_its_own_figures_not_a_fallback(caplog):
+    import logging
+    _configs._FALLBACK_ANNOUNCED.clear()
+    with caplog.at_level(logging.INFO):
+        budget, _profile = _resolve("8.6")
+    assert budget == 99 * KB
+    said = " ".join(r.getMessage() for r in caplog.records if "[PROFILE]" in r.getMessage())
+    assert "documents it" in said and "falling back" not in said and "not optimally" not in said, said
