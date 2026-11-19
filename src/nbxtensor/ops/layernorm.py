@@ -59,9 +59,9 @@ def layer_norm_forward_kernel(
     # divisions correctly rounded (`tl.div_rn`): `/` lowers to a reciprocal and a multiply, which the compiler then
     # fused into the subtraction or the add after it on some launches and not others (a [3, 33] row on 2 rows x
     # 8 warps gave other output bits with the saved stats equal, 2026-11-18)
-    mean = tl.div_rn(row_sum_fixed_order(inp, BLOCK_SIZE_BATCH, BLOCK_SIZE_FEAT), feat_dim.to(tl.float32))
+    mean = tl.div_rn(row_sum_fixed_order(inp, BLOCK_SIZE_BATCH, BLOCK_SIZE_FEAT), tl.cast(feat_dim, tl.float32))
     diff = tl.where(feat_mask[None, :], inp - mean[:, None], 0)
-    inv_std = tl.rsqrt(tl.div_rn(row_dot_fixed_order(diff, diff, BLOCK_SIZE_BATCH, BLOCK_SIZE_FEAT), feat_dim.to(tl.float32)) + eps)
+    inv_std = tl.rsqrt(tl.div_rn(row_dot_fixed_order(diff, diff, BLOCK_SIZE_BATCH, BLOCK_SIZE_FEAT), tl.cast(feat_dim, tl.float32)) + eps)
 
     if save_stats:
         tl.store(mean_ptr + batch_offset, mean, mask=batch_mask)

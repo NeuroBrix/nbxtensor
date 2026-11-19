@@ -53,8 +53,9 @@ def rms_norm_forward_kernel(
     inp = tl.load(input_ptr,
                   mask=batch_mask[:, None] & feat_mask[None, :]).to(tl.float32)
     # the row's sum of squares in one fixed order: the warps a certified or swept setting picks cannot change it
+    # (`tl.cast`, not `.to`: a width of 1 reaches the kernel as a plain int, the compiler specializes the value 1)
     # the division correctly rounded (`tl.div_rn`): `/` is a reciprocal and a multiply the compiler may fuse into the add
-    inv_rms = tl.rsqrt(tl.div_rn(row_dot_fixed_order(inp, inp, BLOCK_SIZE_BATCH, BLOCK_SIZE_FEAT), feat_dim.to(tl.float32)) + eps)
+    inv_rms = tl.rsqrt(tl.div_rn(row_dot_fixed_order(inp, inp, BLOCK_SIZE_BATCH, BLOCK_SIZE_FEAT), tl.cast(feat_dim, tl.float32)) + eps)
     output = inp * inv_rms[:, None]
 
     if scale_by_weight:

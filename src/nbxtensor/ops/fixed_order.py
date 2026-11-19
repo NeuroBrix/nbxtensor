@@ -40,10 +40,14 @@ def row_dot_fixed_order(a, b, ROWS: tl.constexpr, WIDTH: tl.constexpr):
     multiply-add, and which of the two products of a pair it fuses follows the layout (measured on a V100,
     2026-11-18: a gemv's rows per program and an RMS norm's warps still changed bits with the pairwise sum alone).
     Here the first level is written as one explicit fused multiply-add per pair, fma(a0, b0, a1 * b1), and every
-    level after adds two rounded values, which nothing can contract."""
-    a0, a1 = tl.split(tl.reshape(a, (ROWS, WIDTH // 2, 2)))
-    b0, b1 = tl.split(tl.reshape(b, (ROWS, WIDTH // 2, 2)))
-    return row_sum_fixed_order(tl.fma(a0, b0, a1 * b1), ROWS, WIDTH // 2)
+    level after adds two rounded values, which nothing can contract. A width of 1 is the single product, rounded
+    once: no pair to form, so no order to fix."""
+    if WIDTH == 1:
+        return tl.reshape(a * b, (ROWS,))
+    else:
+        a0, a1 = tl.split(tl.reshape(a, (ROWS, WIDTH // 2, 2)))
+        b0, b1 = tl.split(tl.reshape(b, (ROWS, WIDTH // 2, 2)))
+        return row_sum_fixed_order(tl.fma(a0, b0, a1 * b1), ROWS, WIDTH // 2)
 
 
 @triton.jit

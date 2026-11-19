@@ -60,6 +60,9 @@ def gemv_vec_kernel(
     BLOCK_K: tl.constexpr,   # K-chunk width (wide: 128-512): the K loaded per iteration, NOT the order K is summed in
     K_SUB: tl.constexpr = 128,   # the fixed sub-chunk K is summed by, whatever BLOCK_K: the smallest BLOCK_K candidate
 ):
+    # A chunk narrower than K_SUB, or not a whole number of sub-chunks, would run fewer sub-chunks than it loads
+    # (none at all below K_SUB) and store a partial sum without a word: refused when the candidate is compiled.
+    tl.static_assert(BLOCK_K >= K_SUB and BLOCK_K % K_SUB == 0, "gemv_vec: BLOCK_K must be a whole multiple of K_SUB")
     pid = tl.program_id(0).to(tl.int64)
     offs_n = pid * BLOCK_N + tl.arange(0, BLOCK_N)
     mask_n = offs_n < N

@@ -49,7 +49,7 @@ def _same_within_groups(outs, group_of, what):
     assert compared > 0, f"{what}: no two candidates in one group, nothing compared"
 
 
-RMS_SHAPES = [(64, 4096), (7, 2880), (320, 512), (3, 33)]
+RMS_SHAPES = [(64, 4096), (7, 2880), (320, 512), (3, 33), (5, 1)]   # a feature width of 1: the single product
 
 
 @pytest.mark.parametrize("rows,feat", RMS_SHAPES, ids=[f"{r}x{f}" for r, f in RMS_SHAPES])
@@ -102,6 +102,24 @@ def test_gemv_vec_every_candidate_gives_the_same_bits(n, k):
     _same_within_groups(outs, lambda cfg: "all", f"gemv_vec {n}x{k}")
     ref = A.astype(np.float64) @ B.astype(np.float64)
     assert float(np.abs(next(iter(outs.values())) - ref).max()) <= 1e-4 * max(1.0, float(np.abs(ref).max()))
+
+
+@pytest.mark.parametrize("bk", [64, 192], ids=["below-K_SUB", "not-a-multiple"])
+def test_gemv_vec_refuses_a_chunk_that_is_not_whole_sub_chunks(bk):
+    """A chunk narrower than the fixed sub-chunk ran zero sub-chunks and stored 0 for every row, without a word; a
+    chunk of 1.5 sub-chunks dropped the half. Such a candidate must be refused when it is compiled."""
+    from triton.compiler.errors import CompilationError
+    from nbxtensor.ops import gemv_vec as G
+    from nbxtensor.ops.launch_keys import bucket_of
+    from nbxtensor.tensor import NBXTensor
+    n, k = 64, 512
+    a = _dev(np.ones((n, k), np.float16))
+    b = _dev(np.ones(k, np.float32))
+    c = NBXTensor.from_numpy(np.full(n, -1.0, np.float32)).to(device="cuda:0")
+    with pytest.raises(CompilationError, match="whole multiple of K_SUB"):
+        G.gemv_vec_kernel.fn[(triton.cdiv(n, 8),)](a, b, c, n, k, bucket_of("N", n), bucket_of("K", k),
+                                                   a.stride(0), a.stride(1), b.stride(0), c.stride(0),
+                                                   BLOCK_N=8, BLOCK_K=bk, num_warps=4, num_stages=1)
 
 
 PAGED = [(4, 1, 128, 64, 300), (8, 2, 64, 64, 1000)]   # heads, kv heads, head dim, page tokens, positions
