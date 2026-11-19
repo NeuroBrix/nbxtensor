@@ -478,7 +478,7 @@ class NBXTensor:
         # call in the hot loops.
         self._contig = is_contiguous(self._shape, self._strides)
 
-    def __del__(self):
+    def __del__(self, _finalizing=sys.is_finalizing):
         # Targeted lifecycle trace: NBX_TRACE_DEL_BIG_MB=N (default off)
         # logs every __del__ on owns=True NBXTensors >= N MB. Lets us
         # tell whether a leaked NBXTensor is actually freed and when.
@@ -514,10 +514,13 @@ class NBXTensor:
             return
 
         if owns and ptr:
-            # Interpreter teardown clears the allocator's module before this one (it was imported while this module
-            # was importing, and modules are cleared in reverse order of import): its globals are None, a free would
-            # raise inside it. The process is exiting and hands every device buffer back to the driver as it does.
-            if getattr(_alloc, "DeviceAllocator", None) is None:
+            # While the interpreter finalizes, any module a free goes through may already be cleared: the allocator's
+            # (imported while this one was importing; modules are cleared in reverse order of import), or the slab
+            # interceptor's, whose `ACTIVE_SLABS` is then None (Mac M4 Pro, 2026-11-19: "TypeError: 'NoneType' object
+            # is not iterable" after the library suite). The process is exiting and hands every device buffer back to
+            # the driver as it does, so nothing is freed then. `_finalizing` is bound at definition, so this check does
+            # not depend on this module's globals still being there.
+            if _finalizing() or getattr(_alloc, "DeviceAllocator", None) is None:
                 return
             if self._device == 'cuda':
                 DeviceAllocator.free_cuda(ptr)
