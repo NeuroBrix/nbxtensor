@@ -28,19 +28,22 @@ def _defines_a_kernel(tree):
     return False
 
 
+# Only the module's own top-level statements count: they are what runs at import. A seam import or an install call
+# inside a function body runs only if that function is called (qa on 1195, 2026-11-19: kv_host_pages' install moved
+# into a function stayed green while importing the module alone left the launcher not installed).
 def _imports_the_seam(tree):
     return any(isinstance(n, ast.Import) and any(a.name == "nbxtensor.ops._launch_seam" for a in n.names)
                or isinstance(n, ast.ImportFrom) and (n.module or "").endswith("_launch_seam")
-               for n in ast.walk(tree))
+               for n in tree.body)
 
 
 def _installs_the_launcher(tree):
-    """A module's own call of the launcher's install (`launcher.install()`, or `install()` imported from it)."""
-    installs = {a.asname or a.name for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)
+    """A module's own top-level call of the launcher's install (`launcher.install()`, or `install()` imported from it)."""
+    installs = {a.asname or a.name for n in tree.body if isinstance(n, ast.ImportFrom)
                 and (n.module or "").endswith("backend.launcher") for a in n.names if a.name == "install"}
-    for n in ast.walk(tree):
-        if isinstance(n, ast.Call):
-            f = ast.unparse(n.func)
+    for n in tree.body:
+        if isinstance(n, ast.Expr) and isinstance(n.value, ast.Call):
+            f = ast.unparse(n.value.func)
             if f.endswith("launcher.install") or f in installs:
                 return True
     return False
