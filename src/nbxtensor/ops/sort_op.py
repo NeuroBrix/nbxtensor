@@ -12,6 +12,7 @@ done in the wrapper since it requires memory allocation.
 """
 
 import triton
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
 

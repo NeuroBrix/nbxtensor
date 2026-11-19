@@ -9,6 +9,7 @@ log2, rsqrt, sin, sqrt, sqrt_rn, umulhi), so the function is built here.
 """
 
 import triton
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
 # Triton only lets a @jit kernel read a global that is a constexpr.

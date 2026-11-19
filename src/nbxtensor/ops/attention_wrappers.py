@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import triton
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 from nbxtensor.ops.autotune_bucket import bucket_of as _bucket_of
 from nbxtensor.ops import launch_keys as _lk
 from nbxtensor.tensor import NBXTensor

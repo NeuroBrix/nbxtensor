@@ -17,6 +17,7 @@ kernels). Every launch is the same at every token — pointers to persistent tab
 """
 
 import triton
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
 

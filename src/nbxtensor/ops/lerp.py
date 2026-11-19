@@ -11,6 +11,7 @@ Scalar variant (tail): result = b - (b-a)*(1-w)
 """
 
 import triton
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
 @triton.jit

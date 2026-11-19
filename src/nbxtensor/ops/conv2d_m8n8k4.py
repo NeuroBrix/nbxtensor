@@ -25,6 +25,7 @@ holding 4 consecutive k — one 8-byte store into the [k-step x rows, 4] staging
 import functools
 
 from triton.experimental import gluon
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 from triton.experimental.gluon import language as gl
 
 from .mma_m8n8k4 import acc_rows_cols, mma_k4, stage_k_inner

@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Every kernel launches through nbxtensor's launcher whatever module a program imports first: each kernel module
+  installs it. Before, a program whose first kernel came from a module other than the element-wise wrappers (the
+  chunked gated delta rule imported alone) failed on Apple with "Arg 0: expected an MPS tensor".
 - The chunked gated delta rule gives the right result on its first, untuned call: tuning now restores the buffer its
   state kernel overwrites. Before, the first call of a run with no tuning cache returned a wrong output and state.
 - Conv2d and the mixture-of-experts kernels no longer refuse an NVIDIA card for want of its shared-memory figure, on

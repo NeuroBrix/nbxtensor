@@ -20,6 +20,7 @@ the reshape/permute to the broadcast shape is a relabelling, which `convert_layo
 """
 
 from triton.experimental import gluon
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 from triton.experimental.gluon import language as gl
 
 #: What the instruction below takes, as a hardware profile's `matrix_unit` names it (checked by

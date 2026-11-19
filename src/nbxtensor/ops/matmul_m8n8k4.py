@@ -30,6 +30,7 @@ product) is not formed (Ootomo & Yokota 2022, arXiv 2203.03341, eq. 24). Every p
 import functools
 
 from triton.experimental import gluon
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 from triton.experimental.gluon import language as gl
 
 from .mma_m8n8k4 import (acc_layout, acc_rows_cols, bcast_rows, frag_a_layout, frag_b_layout, mma_k4,

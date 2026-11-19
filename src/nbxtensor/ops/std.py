@@ -8,6 +8,7 @@ Global reduction via map-reduce (sum + sum_sq) and dim-specific two-pass
 """
 
 import triton
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
 

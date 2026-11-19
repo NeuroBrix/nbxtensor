@@ -14,6 +14,7 @@ maximum in (t, h, w) window scan order (strict `>` update, same as the
 """
 
 import triton
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
 

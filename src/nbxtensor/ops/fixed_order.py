@@ -14,6 +14,7 @@ width these kernels use is one: `next_power_of_2` or a power-of-two candidate); 
 What these do NOT fix: a setting that changes WHICH partial sums are formed (a K chunk width, an attention tile
 length) changes the association of the sum across chunks, whatever order each chunk is summed in."""
 import triton
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
 

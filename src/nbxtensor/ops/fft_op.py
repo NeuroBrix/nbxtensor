@@ -16,6 +16,7 @@ For non-power-of-2: caller must zero-pad to next power of 2.
 import math
 
 import triton
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
 

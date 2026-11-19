@@ -7,6 +7,7 @@ Both use Triton's built-in PRNG which implements Philox counter-based RNG.
 """
 
 import triton
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
 @triton.jit

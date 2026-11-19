@@ -17,6 +17,7 @@ CLAUDE.md "Autotune policy" for the doctrinal exception scope.
 """
 
 import triton
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 
 from nbxtensor.ops._configs import fits_shared_memory, nbx_autotune
 import triton.language as tl

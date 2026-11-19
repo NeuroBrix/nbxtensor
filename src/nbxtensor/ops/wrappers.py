@@ -11,6 +11,7 @@ Dependencies: triton, NBXTensor. Used exclusively by dispatch.py.
 
 import os
 import triton
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 # The bucket of a request-dependent key dimension (kernels/autotune_bucket.py): the key
 # carries the bucket's top, the kernel runs the true size (the owner's decision, 2026-09-21).
 from nbxtensor.ops.autotune_bucket import bucket_of as _bucket_of

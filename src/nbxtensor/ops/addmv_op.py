@@ -9,6 +9,7 @@ where mat is [N, M], vec is [M], self is broadcastable to [N].
 """
 
 import triton
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
 from nbxtensor.ops._configs import nbx_autotune, addmv_configs, prune_addmv

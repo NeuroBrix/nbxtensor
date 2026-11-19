@@ -13,6 +13,7 @@ OW = (IW + 2*pad_w - dilation_w*(KW-1) - 1) // stride_w + 1
 """
 
 import triton
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
 

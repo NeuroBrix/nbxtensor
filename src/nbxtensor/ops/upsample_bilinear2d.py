@@ -8,6 +8,7 @@ Supports align_corners=True (maps corner-to-corner) and align_corners=False
 """
 
 import triton
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
 

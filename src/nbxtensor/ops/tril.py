@@ -10,6 +10,7 @@ The only difference from triu: condition is >= (keep below diagonal) vs <= (keep
 """
 
 import triton
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
 

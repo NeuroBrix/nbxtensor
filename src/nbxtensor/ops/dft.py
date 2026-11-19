@@ -11,6 +11,7 @@ n in [0, N). The matrices are [N_bins, N], applied as `frames @ mat.T`.
 """
 
 import triton
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
 

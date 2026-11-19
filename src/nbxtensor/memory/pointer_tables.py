@@ -10,6 +10,7 @@ from collections import defaultdict, OrderedDict
 import numpy as np
 
 import triton
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
 from nbxtensor.tensor import NBXTensor

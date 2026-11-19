@@ -5,6 +5,7 @@ Adapted from our upsample_nearest2d.py by adding the depth dimension.
 """
 
 import triton
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
 

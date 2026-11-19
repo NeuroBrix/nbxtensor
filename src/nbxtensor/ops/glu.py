@@ -8,6 +8,7 @@ SwiGLU = GLU with SiLU activation.
 """
 
 import triton
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
 from ._common import sigmoid

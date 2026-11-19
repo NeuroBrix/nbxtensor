@@ -21,6 +21,7 @@ Handles mm (2D) + addmm (with bias). bmm handled in wrappers via batch loop.
 """
 
 import triton
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 
 from nbxtensor.ops._configs import arch_smem_budget, configs_within_smem_budget, nbx_autotune
 import triton.language as tl

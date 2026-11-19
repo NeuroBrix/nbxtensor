@@ -27,6 +27,7 @@ as BLOCK_C-wide strided loads (mirrors the CUDA kernel's channel loop).
 """
 
 import triton
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
 

@@ -20,6 +20,7 @@ under Triton's 2^20 numel ceiling on every architecture.
 """
 
 import triton
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 from triton import next_power_of_2
 

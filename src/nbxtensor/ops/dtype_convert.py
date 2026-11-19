@@ -5,6 +5,7 @@ Raw bf16 bytes are H2D copied as uint16, then converted on GPU.
 """
 
 import triton
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
 

@@ -11,6 +11,7 @@ Pure @triton.jit (R33).
 """
 
 import triton
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
 #: the chunk a program walks its group by — fixed, so the statistics' summation order is

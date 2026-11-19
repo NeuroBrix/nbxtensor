@@ -4,6 +4,7 @@ aten::clamp_min(x, min_val) = max(x, min_val). Separate file per ATen op convent
 """
 
 import triton
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
 @triton.jit

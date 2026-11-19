@@ -30,6 +30,7 @@ import functools
 from nbxtensor.ops._configs import nbx_autotune
 
 from triton.experimental import gluon
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 from triton.experimental.gluon import language as gl
 
 from nbxtensor.ops.matmul_m8n8k4 import _bcast_cols, _bcast_rows, _pow2, hi_lo, split_exponent

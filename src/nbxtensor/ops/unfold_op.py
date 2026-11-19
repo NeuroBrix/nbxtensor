@@ -11,6 +11,7 @@ For output position i: out[i] = Σ_{f} grad[f, j] where j = i - f*step and
 """
 
 import triton
+import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
 
