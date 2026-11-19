@@ -11,11 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Conv2d and the mixture-of-experts kernels no longer refuse an NVIDIA card for want of its shared-memory figure, on
   any card the bundled compiler targets. They size their tiles by the card's shared memory per block and refuse by
   name when no device file states it; the library described
-  only compute capabilities 7.0, 8.0 and 9.0, so a Pascal, Maxwell or Blackwell card (and, with the library alone, a
-  Turing or Ada card) got a refusal instead of a run. The library now describes 5.x, 6.x, 7.5, 8.9, 10.x and 12.x in
-  its own device files (Turing, Ada and Blackwell moved from the engine's files, where the library's keys had stayed),
-  each figure with its NVIDIA source; a capability without a file of its own reads its major's base file (x.0), chosen
-  by rule and no longer by the order the files are read in. Sm_86 (A10, A40, RTX 30) now reads its own 99 KB where it
+  only compute capabilities 7.0, 8.0 and 9.0, so a Pascal, Maxwell or Blackwell card got a refusal instead of a run,
+  and, with the library alone, a Turing card read Volta's 96 KB and an Ada card Ampere's 164 KB, figures above the
+  card's own 64 KB and 99 KB: tiles offered that the card cannot hold. The library now describes 5.x, 6.x, 7.5, 8.9,
+  10.x and 12.x in its own device files (Turing, Ada and Blackwell moved from the engine's files, where the library's
+  keys had stayed), each figure with its NVIDIA source. A minor without a file of its own reads a file of its major
+  only where that file lists it with its own figures, every documented minor listed (10.7 holds 327 KB per block where
+  10.0 holds 227); a minor no file documents is refused by name, never handed its major's figures. Sm_86 (A10, A40, RTX 30) now reads its own 99 KB where it
   read sm_80's figure, and sm_80 reads 163 KB, the documented figure per block, where 164 KB (the figure per SM) was
   written. A test checks every target of the shipped ptxas against NVIDIA's documented figures.
 - Conv2d gives the same bits whichever launch candidate the run-time autotune picks. Its input features are summed in
