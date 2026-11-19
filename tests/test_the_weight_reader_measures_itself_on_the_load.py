@@ -6,7 +6,6 @@ the caller decides. What each test would do if the code were wrong: a store that
 bytes read wrong through the split (red); a default ceiling taken when none is given (red)."""
 import os
 import threading
-import time
 
 import numpy as np
 import pytest
@@ -42,37 +41,54 @@ def test_no_ceiling_no_reader(bad):
         Growth(bad)
 
 
-class _Store:
-    """A store that serves `per_reader` units/s to each reader up to `total` units/s shared."""
+class _Clock:
+    """A clock the reads advance (deterministic: no sleep, no scheduler): a read of `units` at width w takes
+    units / min(w, saturation) — a store that gives no more past `saturation` readers."""
 
-    def __init__(self, per_reader, total, unit_s):
-        self.per_reader, self.total, self.unit_s = per_reader, total, unit_s
-        self.inflight, self.lock, self.seen = 0, threading.Lock(), []
+    def __init__(self, saturation):
+        self.t, self.saturation, self.lock = 0.0, saturation, threading.Lock()
 
-    def read(self, item):
+    def __call__(self):
+        return self.t
+
+    def take(self, units, width):
         with self.lock:
-            self.inflight += 1
-            n = self.inflight
-        time.sleep(self.unit_s / min(self.per_reader, self.total / n))
-        with self.lock:
-            self.inflight -= 1
-        self.seen.append(item)
-        return item
+            self.t += units / min(width, self.saturation)
 
 
-def test_a_store_that_saturates_at_four_readers_is_read_four_wide():
-    """Past four the store gives no more: the reader reaches four and is never left short of it (a width past the
-    saturation reads as fast within the timer's noise and may be taken; the first that does not read faster ends the
-    growth)."""
-    store = _Store(per_reader=1.0, total=4.0, unit_s=0.02)
+def test_a_store_that_saturates_at_four_readers_is_read_four_wide(monkeypatch):
+    import nbxtensor.io.reader as RD
+    clock = _Clock(4)
+    monkeypatch.setattr(RD.time, "perf_counter", clock)
     r = Reader(32)
     items = list(range(60))
-    out = list(r.map(store.read, items, lambda i: 1 << 20))
-    assert sorted(out) == items and sorted(store.seen) == items
+
+    def read(i):
+        clock.take(1.0, r.width)
+        return i
+    out = list(r.map(read, items, lambda i: 1 << 20))
+    assert sorted(out) == items
     m = r.measured()
-    assert m["settled"] and m["workers"] >= 4, m
-    assert m["rates"][4] > 1.8 * m["rates"][2] > 3.2 * m["rates"][1], m
-    assert m["bytes"] == 60 << 20
+    assert m["settled"] and m["workers"] == 4 and sorted(m["rates"]) == [1, 2, 4, 8], m
+    assert m["bytes"] == 60 << 20 and m["spread"] is not None
+
+
+def test_a_width_kept_by_an_earlier_load_starts_there_and_gives_its_spread(monkeypatch):
+    """The next launch starts from the kept figure, never from one again; its rounds measure the figure's spread."""
+    import nbxtensor.io.reader as RD
+    clock = _Clock(4)
+    monkeypatch.setattr(RD.time, "perf_counter", clock)
+    r = Reader(32, start=4)
+
+    def read(i):
+        clock.take(1.0 + (i % 3) / 10, r.width)
+        return i
+    list(r.map(read, range(24), lambda i: 1 << 20))
+    m = r.measured()
+    assert m["start"] == 4 and m["workers"] == 4 and m["settled"] and list(m["draws"]) == [4]
+    lo, hi = m["spread"]
+    assert 0 < lo < hi and "started at 4" in r.said() and "round(s) at that width" in r.said()
+    assert Reader(6, start=16).width == 6                      # never past the ceiling
 
 
 def test_a_failing_piece_fails_the_load():
@@ -104,11 +120,13 @@ def test_a_split_read_is_judged_on_rounds_of_reads_the_split_cuts(monkeypatch):
     """A tensor too small for the split at the ceiling is latency, not a width's rate: thousands of 4 KB norms never
     move the width; the large reads, a round of as many as the width, grow it until the store gives no more. (The first
     smoke on a real model judged width 1 on a 4 KB read at 0.001 GB/s.)"""
+    import nbxtensor.io.reader as RD
     from nbxtensor.io import safetensors as SF
+    clock = _Clock(4)
+    monkeypatch.setattr(RD.time, "perf_counter", clock)
 
     def fake_read(fd, offset, n, io):
-        width = io[0]
-        time.sleep(0.0002 + n / (min(width, 4) * 2e9))     # latency, then a store that saturates at four readers
+        clock.take(2e-4 * io[0] + n / 2e9, io[0])          # latency, then a store that saturates at four readers
         return np.empty(n, dtype=np.uint8)
     monkeypatch.setattr(SF, "read_bytes", fake_read)
     r = Reader(16)
@@ -119,6 +137,4 @@ def test_a_split_read_is_judged_on_rounds_of_reads_the_split_cuts(monkeypatch):
         r.read_bytes(0, 0, 4096)
         r.read_bytes(0, 0, 8 << 20)
     m = r.measured()
-    # never left short of the saturation; on its plateau a width that reads as fast within the timer's noise may be
-    # taken (more threads, the same rate): the growth stops at the first that does not read faster, or the ceiling
-    assert m["settled"] and m["workers"] >= 4 and m["rates"][4] > 1.8 * m["rates"][2], m
+    assert m["settled"] and m["workers"] == 4, m

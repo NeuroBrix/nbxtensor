@@ -24,7 +24,7 @@ from __future__ import annotations
 import threading
 import time
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
-from typing import Callable, Dict, Iterable, Iterator, Optional, Sequence, TypeVar
+from typing import Callable, Dict, Iterable, Iterator, List, Optional, Sequence, TypeVar
 
 __all__ = ["Growth", "Reader"]
 
@@ -38,19 +38,27 @@ class Growth:
     while that measure is the best so far; else settled on the best width measured. A measure of a width other than
     the current one (a piece started before the width moved) is not a measure of it and is ignored."""
 
-    def __init__(self, ceiling: int):
+    def __init__(self, ceiling: int, start: Optional[int] = None):
         if not isinstance(ceiling, int) or ceiling < 1:
             raise ValueError(f"ZERO FALLBACK: a reader's ceiling is a count of reads >= 1 the caller decides, not "
                              f"{ceiling!r}")
+        if start is not None and (not isinstance(start, int) or start < 1):
+            raise ValueError(f"a reader's start is a width >= 1 an earlier load measured, not {start!r}")
         self.ceiling = ceiling
-        self.width = 1
+        self.start = None if start is None else min(start, ceiling)
+        self.width = self.start or 1
         self.rates: Dict[int, float] = {}
-        self.settled = False
+        #: every measure of every width (bytes/s), the settled width's included: its spread
+        self.draws: Dict[int, List[float]] = {}
+        self.settled = start is not None          # a width an earlier load settled on is not searched again
 
     def note(self, width: int, nbytes: int, seconds: float) -> None:
-        if self.settled or width != self.width or seconds <= 0 or nbytes <= 0:
+        if width != self.width or seconds <= 0 or nbytes <= 0:
             return
         rate = nbytes / seconds
+        self.draws.setdefault(width, []).append(rate)
+        if self.settled:
+            return
         best_before = max((r for w, r in self.rates.items() if w != width), default=None)
         self.rates[width] = rate
         if best_before is not None and rate <= best_before:
@@ -64,10 +72,13 @@ class Growth:
 class Reader:
     """Parallel reads of one process's weight loads, their width grown by their own measure (`Growth`) up to
     `ceiling`. One reader serves every load of a process: what it settled on holds for the process's later loads (a
-    streamed plan's reloads), and is never written anywhere."""
+    streamed plan's reloads). `start`: the width an earlier load settled on, as the CALLER kept it (the library keeps
+    nothing): the reader starts there, settled, and goes on measuring it — its draws give the figure's spread.
+    Storing and reusing is the engine's decision (the supervisor, row 167: a measured fact is kept and never paid
+    twice; the measuring primitive is the library's)."""
 
-    def __init__(self, ceiling: int):
-        self._growth = Growth(ceiling)
+    def __init__(self, ceiling: int, start: Optional[int] = None):
+        self._growth = Growth(ceiling, start)
         self._pool = ThreadPoolExecutor(max_workers=ceiling, thread_name_prefix="nbx-read")
         self._lock = threading.Lock()
         self._round = [1, 0, 0, 0.0]          # read_bytes' round: [width, reads, bytes, seconds]
@@ -164,14 +175,20 @@ class Reader:
         """What the loads measured: the width reached and whether it settled, the rate at each width (bytes/s), the
         bytes read and their seconds, the ceiling."""
         g = self._growth
+        at = g.draws.get(g.width) or []
         return {"workers": g.width, "settled": g.settled, "rates": dict(g.rates), "bytes": self.bytes,
-                "seconds": self.seconds, "ceiling": g.ceiling}
+                "seconds": self.seconds, "ceiling": g.ceiling, "start": g.start,
+                "draws": {w: list(v) for w, v in g.draws.items()},
+                "spread": (min(at), max(at)) if at else None}
 
     def said(self) -> str:
         """The launch line's words for `measured()`."""
         m = self.measured()
         gbps = (m["bytes"] / m["seconds"] / 1e9) if m["seconds"] else 0.0
         steps = ", ".join(f"{w}: {r / 1e9:.2f}" for w, r in sorted(m["rates"].items()))
+        spread = (f", {m['spread'][0] / 1e9:.2f}-{m['spread'][1] / 1e9:.2f} GB/s over {len(m['draws'][m['workers']])} "
+                  f"round(s) at that width") if m["spread"] else ""
+        began = f", started at {m['start']} (an earlier load's)" if m["start"] else ""
         return (f"read {m['bytes'] / 1e9:.2f} GB in {m['seconds']:.1f} s ({gbps:.2f} GB/s), {m['workers']} parallel "
-                f"read(s){'' if m['settled'] else ' (still growing)'} of at most {m['ceiling']}"
+                f"read(s){'' if m['settled'] else ' (still growing)'} of at most {m['ceiling']}{began}{spread}"
                 + (f"; GB/s by width {steps}" if steps else ""))
