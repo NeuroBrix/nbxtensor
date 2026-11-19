@@ -77,14 +77,18 @@ def replay_trace(events: Sequence[Tuple[str, int, int]], device: int, chunk: int
 
 
 def _child(trace: str, device: int, chunk: int) -> Dict[str, float]:
-    """One replay in a fresh process (no allocator state carried between candidates)."""
+    """One replay in a fresh process (no allocator state carried between candidates), shown `device` ALONE (the
+    backend's `visible_env`, `backend.runtime.one_device_env`): it replays on its device 0 and never initialises a
+    runtime on another card — on a 4-card rack every child saw the four (the 2026-11-19 first launch)."""
+    from nbxtensor.backend.runtime import one_device_env
     code = ("import json, sys; from nbxtensor.memory import trace_replay as T; "
             "m, ev = T.load_trace(sys.argv[1]); "
             "print('" + _MARK + "' + json.dumps(T.replay_trace(ev, int(sys.argv[2]), int(sys.argv[3]), "
             "int(m['card_mb']) << 20)))")
     # the replay measures the allocator, never its diagnostics: the parent's run-level switches stay out of it
-    env = {k: v for k, v in os.environ.items() if not k.startswith(("NBX_ALLOC_STATS", "NBX_MALLOC_TRACE"))}
-    r = subprocess.run([sys.executable, "-c", code, trace, str(device), str(chunk)], capture_output=True, text=True,
+    env = {k: v for k, v in one_device_env(device).items()
+           if not k.startswith(("NBX_ALLOC_STATS", "NBX_MALLOC_TRACE"))}
+    r = subprocess.run([sys.executable, "-c", code, trace, "0", str(chunk)], capture_output=True, text=True,
                        env=env)
     line = next((l for l in r.stdout.splitlines() if l.startswith(_MARK)), None)
     if r.returncode != 0 or line is None:
