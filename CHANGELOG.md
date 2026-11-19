@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- A device block taken while the memory pool was on and freed while it is off goes back to the pool, and its segment
+  goes to the driver once wholly free. Before, the free handed that one block to the driver alone: the driver refused
+  a block inside a segment, and released the whole segment for its first block while the segment's other blocks were
+  still in use, so the next write to one of them crashed the process.
 - A tensor zeroes in place with `zero_()`, so a kernel that declares `reset_to_zero` tunes through Triton's own tuning.
   Before, that tuning failed with "object has no attribute 'zero_'". Zeroing a strided view with `fill_(0)` now
   zeroes that view's elements only; before, it cleared a contiguous span from the view's first element.

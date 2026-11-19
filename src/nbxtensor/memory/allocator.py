@@ -1169,7 +1169,14 @@ class DeviceAllocator:
 
         # The pool: the block goes back to its segment, merged with its free neighbours; a segment wholly free over
         # the parked cap returns to the driver. A block of a segment is never handed to the driver alone.
-        if DeviceAllocator._pool_enabled and ptr in DeviceAllocator._POOL.blocks:
+        #
+        # Chosen by who issued the pointer, never by the switch in force now: a block taken while the pool was on and
+        # freed while it is off (a test fixture measuring with the pool off) was handed to the driver alone, which
+        # refuses a block that is not its segment's base (rc 3) and releases the WHOLE segment for the one that is,
+        # under the segment's other live blocks (the engine suite's segfault in from_numpy, Mac M4 Pro 2026-11-19).
+        # With the pool off, a segment that this free leaves wholly free goes back to the driver at once, as the
+        # switch asks.
+        if ptr in DeviceAllocator._POOL.blocks:
             if DeviceAllocator._POOL.blocks[ptr][3]:
                 _log.error(f"[NBX-ALLOC-ERROR] free of a block already free: {ptr:#x}")
                 return
@@ -1182,6 +1189,8 @@ class DeviceAllocator:
                 # refusal (`_range_reclaim`), as torch's expandable segments release only on an out-of-memory — an unmap
                 # here needed a device synchronisation at every free over the cap (Allegro triton 16g's VAE: 3x slower)
                 DeviceAllocator._POOL.evict(dev, cached - cap, DeviceAllocator._segment_to_driver)
+            if not DeviceAllocator._pool_enabled:
+                DeviceAllocator._pool_flush(dev)
             if _MALLOC_TRACE_FILE is not None:
                 _record_free_site(ptr, nbytes)
             return
