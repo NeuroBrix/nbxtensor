@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Conv2d and the mixture-of-experts kernels no longer refuse an NVIDIA card for want of its shared-memory figure, on
+  any card the bundled compiler targets. They size their tiles by the card's shared memory per block and refuse by
+  name when no device file states it; the library described
+  only compute capabilities 7.0, 8.0 and 9.0, so a Pascal, Maxwell or Blackwell card (and, with the library alone, a
+  Turing or Ada card) got a refusal instead of a run. The library now describes 5.x, 6.x, 7.5, 8.9, 10.x and 12.x in
+  its own device files (Turing, Ada and Blackwell moved from the engine's files, where the library's keys had stayed),
+  each figure with its NVIDIA source; a capability without a file of its own reads its major's base file (x.0), chosen
+  by rule and no longer by the order the files are read in. Sm_86 (A10, A40, RTX 30) now reads its own 99 KB where it
+  read sm_80's figure, and sm_80 reads 163 KB, the documented figure per block, where 164 KB (the figure per SM) was
+  written. A test checks every target of the shipped ptxas against NVIDIA's documented figures.
 - Conv2d gives the same bits whichever launch candidate the run-time autotune picks. Its input features are summed in
   one fixed 16-wide chunk order whatever the candidate, and on a GPU whose threadgroup memory cannot hold a
   candidate's float32 accumulator tile that candidate is no longer offered: Metal lowers such a tile in passes and
@@ -26,7 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   by timing, so two installs could pick differently and round differently. The fault was already in published
   releases: nbxtensor 0.1.3 (with neurobrix 0.6.8) and 0.0.8 (with neurobrix 0.6.3) changed the fifth answer of a
   granite-3.1-1b-a400m conversation on some fresh installs and not others, on both V100 memory classes (2 and 3 of 6
-  on a 32 GB card). Every candidate of these kernels now sums in one fixed order: row sums and dot products pairwise
+  on a 32 GB card; each old release ran on a fresh install holding this release's measured hardware profile, copied
+  in). Every candidate of these kernels now sums in one fixed order: row sums and dot products pairwise
   in a fixed tree, the GEMV over K in fixed 128-wide sub-chunks, the paged decode by one fixed 64-position tile; the
   norms divide correctly rounded. With this release the same conversation gave the vendor's answer on 36 of 36 fresh
   installs, 18 on each memory class, where the library before it gave it on 17 of 24. Cost on a V100: the paged decode
