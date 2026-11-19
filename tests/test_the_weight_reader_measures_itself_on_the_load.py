@@ -200,3 +200,9 @@ def test_a_round_counts_only_the_reads_started_in_it(monkeypatch):
     assert m["workers"] == 4, m
     assert m["bytes"] == 64 << 20, "a carried read's bytes still count in the load's total"
 
+
+def test_a_closed_reader_starts_no_read():
+    r = Reader(2)
+    r.close()
+    with pytest.raises(RuntimeError):
+        r.io[1].submit(int)

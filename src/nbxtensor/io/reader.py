@@ -182,6 +182,11 @@ class Reader:
                 for f in pending:
                     f.cancel()
 
+    def close(self) -> None:
+        """Ends the threads of `read_bytes` (`io`). The reader's maker owns its life: one reader serves every load of a
+        process, so the loader that made it closes it once it loads no more. `map` runs threads of its own call."""
+        self._pool.shutdown(wait=True)
+
     def measured(self) -> Dict[str, object]:
         """What the loads measured: the width reached and whether it settled, the rate at each width (bytes/s), the
         bytes read and their seconds, the ceiling."""
