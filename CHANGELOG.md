@@ -14,6 +14,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   configurations on a number that did not depend on them. Ordering events (expert slots, weight block uploads) now
   also come after the work encoded before them. The same timer serves the run-time autotune of a key with no
   certificate on the user's own machine, and a test now proves that path ranks on times that follow the work.
+- A served model gives the same answer on every fresh install. Softmax, RMS norm, layer norm, the vector GEMV and the
+  paged decode attention summed in an order that followed their launch configuration (warps, rows per program, the K
+  chunk, the attention tile), and a key with no certificate gets its configuration from a run-time autotune that picks
+  by timing, so two installs could pick differently and round differently. The fault was already in published
+  releases: nbxtensor 0.1.3 (with neurobrix 0.6.8) and 0.0.8 (with neurobrix 0.6.3) changed the fifth answer of a
+  granite-3.1-1b-a400m conversation on some fresh installs and not others, on both V100 memory classes (2 and 3 of 6
+  on a 32 GB card). Every candidate of these kernels now sums in one fixed order: row sums and dot products pairwise
+  in a fixed tree, the GEMV over K in fixed 128-wide sub-chunks, the paged decode by one fixed 64-position tile; the
+  norms divide correctly rounded. With this release the same conversation gave the vendor's answer on 36 of 36 fresh
+  installs, 18 on each memory class, where the library before it gave it on 17 of 24. Cost on a V100: the paged decode
+  kernel is 3 to 10 % slower, a served chat within run-to-run noise (8000-token context: 101 against 103 tokens/s);
+  the norms and the GEMV are within noise. Tests launch every candidate of these kernels, and of matmul, addmm and
+  baddbmm, and require one set of bits.
 
 ## [0.1.11] - 2026-11-18
 
