@@ -14,6 +14,7 @@ documents is refused by name, never handed its major's figures.
 What it catches: a capability with no device file or a wrong figure (Pascal and Blackwell had none until 2026-11-19;
 sm_86 read sm_80's 164 KB; sm_107 read sm_100's 227 KB where NVIDIA documents 327) - red; an undocumented minor given
 its major's figures without a word - red."""
+import errno
 import re
 import subprocess
 from pathlib import Path
@@ -71,7 +72,15 @@ def test_every_target_of_the_shipped_ptxas_is_documented_here():
     ptxas = Path(triton.__file__).parent / "backends" / "nvidia" / "bin" / "ptxas"
     if not ptxas.is_file():
         pytest.skip("this Triton ships no NVIDIA ptxas (no CUDA backend on this machine)")
-    out = subprocess.run([str(ptxas), "--help"], capture_output=True, text=True, timeout=60).stdout
+    try:
+        out = subprocess.run([str(ptxas), "--help"], capture_output=True, text=True, timeout=60).stdout
+    except OSError as e:
+        # The wheel ships ptxas built for its own platform (a Linux ELF in every wheel); a host of another system or
+        # architecture cannot execute it at all (Mac M4 Pro, 2026-11-19: "[Errno 8] Exec format error"). Only that
+        # refusal is a skip: any other failure to run the shipped compiler is a fault and stays one.
+        if e.errno != errno.ENOEXEC:
+            raise
+        pytest.skip(f"the shipped ptxas ({ptxas}) is built for another system and cannot run on this host: {e}")
     targets = sorted({m for m in re.findall(r"\bsm_(\d+)\b", out)}, key=int)
     assert targets, "ptxas --help named no sm_ target"
     caps = [f"{t[:-1]}.{t[-1]}" for t in targets]
