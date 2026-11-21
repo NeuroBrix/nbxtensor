@@ -43,7 +43,7 @@ def test_zeroing_a_strided_view_zeroes_that_view_alone():
     from nbxtensor.tensor import NBXTensor
     base = np.arange(1, 33, dtype=np.float32).reshape(4, 8)
     t = NBXTensor.from_numpy(base)
-    t[:, 2:4].zero_()
+    t[:, 2:4].fill_(0)                 # fill_ exists on main too: main shows the wrong value, not a missing method
     want = base.copy()
     want[:, 2:4] = 0
     assert np.array_equal(host_values(t), want)
