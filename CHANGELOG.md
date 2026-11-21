@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The weight reader judges a width on a window of its reads: the window opens once the reads started before the
   width moved have ended, and each read gives it the bytes it moved inside it, pro rata to its life; a width is no
   longer overrated by the reads carried into it nor underrated by the reads still in flight at its end. A window the
-  end of the load reaches before it closes is not judged: a short load no longer settles a doubling or two low. A load
+  end of the load reaches before it is judged is not judged: a short load no longer settles a doubling or two low. A load
   too short to conclude ends unsettled, and `measured()` then gives the best width it measured with its spread, never
   the next width to try. `Reader.close()` ends its threads (the reader's maker owns its life). The read-rate trial
   functions it replaces (`workers_for`, `measure`, `choose`, `mount_of`, `can_bypass_the_cache`) give a
