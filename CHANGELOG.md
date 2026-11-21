@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- A kernel's tuning keyword that the installed Triton does not take is refused by name when the kernel is defined.
+  Before, it was dropped with a warning, so a Triton lacking `restore_value` or `reset_to_zero` would have tuned an
+  overwriting or accumulating kernel on its previous configuration's output.
 - Certification measures every candidate configuration from the state the caller gave: the arguments a kernel declares
   `restore_value` are copied back and those it declares `reset_to_zero` are zeroed before each run, as Triton's own
   tuning does. Before, a kernel that overwrites an input or accumulates into a buffer gave every candidate after the
