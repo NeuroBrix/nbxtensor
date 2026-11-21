@@ -15,11 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   A width an earlier load settled on can be handed back (`Reader(ceiling, start=)`): the reader starts there instead
   of at one and keeps measuring it, and `measured()` gives every reading per width and the spread at the width
   reached, so the application can keep the figure with its spread. The library itself keeps nothing.
-- The weight reader judges a width on a window of its reads: the window opens once the reads started at the
-  narrower width have ended, and each read gives it the bytes it moved inside it, pro rata to its life; a width is no
-  longer overrated by the reads carried into it nor underrated by the reads still in flight at its end. `Reader.close()`
-  ends its threads (the reader's maker owns its life). The read-rate trial functions it replaces (`workers_for`,
-  `measure`, `choose`, `mount_of`, `can_bypass_the_cache`) give a `DeprecationWarning` when called.
+- The weight reader judges a width on a window of its reads: the window opens once the reads started before the
+  width moved have ended, and each read gives it the bytes it moved inside it, pro rata to its life; a width is no
+  longer overrated by the reads carried into it nor underrated by the reads still in flight at its end. A window the
+  end of the load reaches before it closes is not judged: a short load no longer settles a doubling or two low. A load
+  too short to conclude ends unsettled, and `measured()` then gives the best width it measured with its spread, never
+  the next width to try. `Reader.close()` ends its threads (the reader's maker owns its life). The read-rate trial
+  functions it replaces (`workers_for`, `measure`, `choose`, `mount_of`, `can_bypass_the_cache`) give a
+  `DeprecationWarning` when called.
 - `backend.install_help.one_device_env(device)`: the environment of a child process that sees one device only, through the
   variable the backend's runtime reads to hide devices.
 
