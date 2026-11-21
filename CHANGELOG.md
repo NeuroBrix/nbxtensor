@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- A tensor zeroes in place with `zero_()`, so a kernel that declares `reset_to_zero` tunes through Triton's own tuning.
+  Before, that tuning failed with "object has no attribute 'zero_'". Zeroing a strided view with `fill_(0)` now
+  zeroes that view's elements only; before, it cleared a contiguous span from the view's first element.
 - Every kernel launches through nbxtensor's launcher whatever module a program imports first: each kernel module
   installs it. Before, a program whose first kernel came from a module other than `wrappers`, the twelve `*_wrappers`
   modules, `token_bitmask` and `memory.kv_host_pages` (the chunked gated delta rule imported alone) failed on Apple

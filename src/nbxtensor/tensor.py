@@ -1551,11 +1551,18 @@ class NBXTensor:
         # aten::lift_fresh); collapse it to a host scalar before the kernel.
         if isinstance(value, NBXTensor):
             value = value.item()
-        if value == 0:
+        if value == 0 and self.is_contiguous():
+            # Bytes zero only over a contiguous span: on a strided view the span from data_ptr() is not the view's
+            # elements (it zeroes ones outside the view and misses ones inside), so a view goes to the kernel.
             DeviceAllocator.memset_cuda(self.data_ptr(), 0, self._nbytes)
             return self
-        # Non-zero fill via the pure-Triton fill_kernel.
+        # Non-zero fill, or a strided view, via the pure-Triton fill_kernel.
         return _fill_constant(self, value)
+
+    def zero_(self) -> 'NBXTensor':
+        """Every element set to zero, in place (`torch.Tensor.zero_`): what Triton's tuning calls on each argument a
+        kernel declares `reset_to_zero`, before every configuration it measures."""
+        return self.fill_(0)
 
     def is_same_memory(self, other: 'NBXTensor') -> bool:
         """Whether `other` reads the very elements `self` does, in the same order: one address, one device, one dtype,
