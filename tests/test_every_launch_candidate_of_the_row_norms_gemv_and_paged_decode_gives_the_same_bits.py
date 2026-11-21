@@ -104,8 +104,9 @@ def test_gemv_vec_every_candidate_gives_the_same_bits(n, k):
     assert float(np.abs(next(iter(outs.values())) - ref).max()) <= 1e-4 * max(1.0, float(np.abs(ref).max()))
 
 
-@pytest.mark.parametrize("bk", [64, 192], ids=["below-K_SUB", "not-a-multiple"])
-def test_gemv_vec_refuses_a_chunk_that_is_not_whole_sub_chunks(bk):
+@pytest.mark.parametrize("bk, says", [(64, "at least K_SUB"), (192, "whole multiple of K_SUB")],
+                         ids=["below-K_SUB", "not-a-multiple"])
+def test_gemv_vec_refuses_a_chunk_that_is_not_whole_sub_chunks(bk, says):
     """A chunk narrower than the fixed sub-chunk ran zero sub-chunks and stored 0 for every row, without a word; a
     chunk of 1.5 sub-chunks dropped the half. Such a candidate must be refused when it is compiled."""
     from triton.compiler.errors import CompilationError
@@ -116,7 +117,7 @@ def test_gemv_vec_refuses_a_chunk_that_is_not_whole_sub_chunks(bk):
     a = _dev(np.ones((n, k), np.float16))
     b = _dev(np.ones(k, np.float32))
     c = NBXTensor.from_numpy(np.full(n, -1.0, np.float32)).to(device="cuda:0")
-    with pytest.raises(CompilationError, match="whole multiple of K_SUB"):
+    with pytest.raises(CompilationError, match=says):
         G.gemv_vec_kernel.fn[(triton.cdiv(n, 8),)](a, b, c, n, k, bucket_of("N", n), bucket_of("K", k),
                                                    a.stride(0), a.stride(1), b.stride(0), c.stride(0),
                                                    BLOCK_N=8, BLOCK_K=bk, num_warps=4, num_stages=1)

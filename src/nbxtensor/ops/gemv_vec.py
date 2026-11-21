@@ -63,7 +63,8 @@ def gemv_vec_kernel(
 ):
     # A chunk narrower than K_SUB, or not a whole number of sub-chunks, would run fewer sub-chunks than it loads
     # (none at all below K_SUB) and store a partial sum without a word: refused when the candidate is compiled.
-    tl.static_assert(BLOCK_K >= K_SUB and BLOCK_K % K_SUB == 0, "gemv_vec: BLOCK_K must be a whole multiple of K_SUB")
+    tl.static_assert(BLOCK_K >= K_SUB, "gemv_vec: BLOCK_K must be at least K_SUB")
+    tl.static_assert(BLOCK_K % K_SUB == 0, "gemv_vec: BLOCK_K must be a whole multiple of K_SUB")
     pid = tl.program_id(0).to(tl.int64)
     offs_n = pid * BLOCK_N + tl.arange(0, BLOCK_N)
     mask_n = offs_n < N

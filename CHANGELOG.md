@@ -41,6 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `PIECE`, `evict` and `cold_read_gbps` stay.
 
 ### Fixed
+- No kernel of the library uses Python's `and` / `or` to produce a value, which Triton deprecates on tensors and
+  short-circuits without a word on compile-time constants; a test reads every kernel for it. The one case, a
+  compile-time check in the matrix-vector kernel, computed the right answer and is now two checks.
 - The cost of the chunked gated delta rule names the copy of its U buffer a call that tunes holds (134 MB at a
   length of 8192 with 32 value heads of 128): its peak memory is now the cold call's. Before, that copy was left out,
   so a memory plan could fit a call whose first run did not fit.
