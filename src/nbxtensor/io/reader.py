@@ -153,9 +153,11 @@ class Reader:
         has ended: each read gives the window its bytes pro rata to the part of its life inside it, over the window's
         seconds. Counting whole reads by their completion overrated a wider width with the reads carried into it (1196)
         and, counting only the reads started in a round, underrated every width by the reads in flight at its end
-        (1197; qa, 2026-11-19 and 21). A window the end of the items reaches before it closes (fewer than `width` reads
-        in flight from then: the load's tail, not the width) is not judged and only counts in the bytes: judging it
-        settled a short load a doubling or two low (qa on 1200). The reads a wait hands back together are taken in the
+        (1197; qa, 2026-11-19 and 21). A window the end of the items reaches before it is judged is not judged and only
+        counts in the bytes: open, fewer than `width` reads are in flight from then (the load's tail, not the width),
+        which settled a short load a doubling or two low (qa on 1200); closed, the reads straddling its close then run
+        faster and their share inside it, pro rata to their life, credits it with bytes moved after it, up to +10 %
+        (qa on 1204). The reads a wait hands back together are taken in the
         order they ended. Each read's end is taken in its own thread, not when the caller sees it. `fn` reads by its own
         means and must not use this reader's `io` (its threads are this call's own)."""
         todo = list(items)
@@ -212,8 +214,8 @@ class Reader:
                         carried = set(pending) if width != was else set()
                         carried_end = float("-inf")
                         opens = None if carried else clock()
-                    if fill() and closes is None:
-                        drained = True
+                    if fill():                   # the end of the items before the judgment: an open window then
+                        drained = True           # measures the tail, a closed one its straddling reads sped up
             finally:
                 self._note(width, 0, clock() - begun, False)
                 for f in pending:

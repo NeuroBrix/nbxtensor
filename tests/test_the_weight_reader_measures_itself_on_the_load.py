@@ -241,3 +241,20 @@ def test_a_settled_widths_spread_holds_no_window_of_the_loads_tail(monkeypatch, 
     for w, ds in m["draws"].items():
         for d in ds:
             assert abs(d - min(w, store)) <= 0.02 * min(w, store), (w, ds, m)
+
+
+@pytest.mark.parametrize("store", [4, 6])
+@pytest.mark.parametrize("ceiling", [8, 32])
+@pytest.mark.parametrize("n", [36, 37, 38, 39, 52, 53, 54, 68, 69, 70])
+def test_a_closed_window_the_end_of_the_load_reaches_before_its_judgment_is_not_judged(monkeypatch, store, ceiling, n):
+    """qa on 1204 (the drain after the close): a window closed, not yet judged, when the load ran out of pieces: the
+    reads straddling its close then ran faster, fewer in flight, and their share inside it, pro rata to their life,
+    credited it with bytes moved after it: it read HIGH, up to +10 %, and settled (store 4, ceiling 8, 36 pieces of 1
+    and 3: width 8 judged at 4.3 for a true 4). Such a window only counts in the bytes; every draw reads the store."""
+    r = Reader(ceiling)
+    m = _on_a_store(monkeypatch, r, lambda i: 1.0 if i % 2 else 3.0, n, 1.0, float(store))
+    for w, ds in m["draws"].items():
+        for d in ds:
+            assert abs(d - min(w, store)) <= 0.02 * min(w, store), (w, ds, m)
+    best = max(m["rates"], key=m["rates"].get) if m["rates"] else None
+    assert m["workers"] == best, m
