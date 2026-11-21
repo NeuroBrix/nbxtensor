@@ -230,8 +230,6 @@ def main() -> int:
     return 0
 
 
-if __name__ == "__main__":                 # python -m nbxtensor.backend.install_help
-    raise SystemExit(main())
 
 def one_device_env(device: int, environ=None) -> dict:
     """The environment of a child process that sees ONE device: this process's `device` (an index in what THIS process
@@ -256,3 +254,7 @@ def one_device_env(device: int, environ=None) -> dict:
                            f"({inner}={env[inner]!r})")
     env[inner] = listed[int(device)]
     return env
+
+
+if __name__ == "__main__":                 # python -m nbxtensor.backend.install_help
+    raise SystemExit(main())
