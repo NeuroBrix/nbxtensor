@@ -153,8 +153,11 @@ class Reader:
         has ended: each read gives the window its bytes pro rata to the part of its life inside it, over the window's
         seconds. Counting whole reads by their completion overrated a wider width with the reads carried into it (1196)
         and, counting only the reads started in a round, underrated every width by the reads in flight at its end
-        (1197; qa, 2026-11-19 and 21). Each read's end is taken in its own thread, not when the caller sees it. `fn` reads by its own means
-        and must not use this reader's `io` (its threads are this call's own)."""
+        (1197; qa, 2026-11-19 and 21). A window the end of the items reaches before it closes (fewer than `width` reads
+        in flight from then: the load's tail, not the width) is not judged and only counts in the bytes: judging it
+        settled a short load a doubling or two low (qa on 1200). The reads a wait hands back together are taken in the
+        order they ended. Each read's end is taken in its own thread, not when the caller sees it. `fn` reads by its own
+        means and must not use this reader's `io` (its threads are this call's own)."""
         todo = list(items)
         if not todo:
             return
@@ -167,25 +170,33 @@ class Reader:
 
         with ThreadPoolExecutor(max_workers=self.ceiling, thread_name_prefix="nbx-read-map") as pool:
             def fill():
+                """Fills the width; True when the items ran out short of it (the in-flight count falls from now)."""
                 while len(pending) < self._growth.width:
                     item = next(it, _END)
                     if item is _END:
-                        return
+                        return True
                     pending[pool.submit(timed, item)] = (item, clock())
+                return False
             begun = clock()
             width, carried, opens, closes, ended, lives = self._growth.width, set(), begun, None, 0, []
-            fill()
+            carried_end = begun                  # the latest end of the reads carried into this width
+            drained = fill()                     # the end of the items reached this window before it closed
             try:
                 while pending:
                     finished, _ = wait(list(pending), return_when=FIRST_COMPLETED)
+                    done = []
                     for f in finished:
                         item, start = pending.pop(f)
-                        result, end = f.result()
+                        done.append((f, item, start) + tuple(f.result()))
+                    for f, item, start, result, end in sorted(done, key=lambda d: d[4]):
                         n = int(nbytes(item))
                         self._note(width, n, 0.0, False)
-                        carried.discard(f)
                         if opens is None:
-                            opens = None if carried else end
+                            if f in carried:
+                                carried.discard(f)
+                                carried_end = max(carried_end, end)
+                            if not carried:
+                                opens = carried_end
                         else:
                             lives.append((n, start, end))
                             if closes is None and end >= opens:
@@ -194,11 +205,15 @@ class Reader:
                         yield result
                     if closes is not None and all(s >= closes for _, s in pending.values()):
                         was = width
-                        self._judge(width, sum(n * _inside(s, e, opens, closes) for n, s, e in lives), closes - opens)
-                        width, closes, ended, lives = self._growth.width, None, 0, []
+                        if not drained:
+                            self._judge(width, sum(n * _inside(s, e, opens, closes) for n, s, e in lives),
+                                        closes - opens)
+                        width, closes, ended, lives, drained = self._growth.width, None, 0, [], False
                         carried = set(pending) if width != was else set()
+                        carried_end = float("-inf")
                         opens = None if carried else clock()
-                    fill()
+                    if fill() and closes is None:
+                        drained = True
             finally:
                 self._note(width, 0, clock() - begun, False)
                 for f in pending:
@@ -210,11 +225,13 @@ class Reader:
         self._pool.shutdown(wait=True)
 
     def measured(self) -> Dict[str, object]:
-        """What the loads measured: the width reached and whether it settled, the rate at each width (bytes/s), the
-        bytes read and their seconds, the ceiling."""
+        """What the loads measured: the width settled on, or, when the loads did not conclude (`settled` False), the
+        best width they measured, never the next one to try (None when no width was measured); its draws' spread; the
+        rate at each width (bytes/s), the bytes read and their seconds, the ceiling. Keeping it is the caller's."""
         g = self._growth
-        at = g.draws.get(g.width) or []
-        return {"workers": g.width, "settled": g.settled, "rates": dict(g.rates), "bytes": self.bytes,
+        best = g.width if g.settled else (max(g.rates, key=g.rates.get) if g.rates else None)
+        at = g.draws.get(best) or []
+        return {"workers": best, "settled": g.settled, "rates": dict(g.rates), "bytes": self.bytes,
                 "seconds": self.seconds, "ceiling": g.ceiling, "start": g.start,
                 "draws": {w: list(v) for w, v in g.draws.items()},
                 "spread": (min(at), max(at)) if at else None}
@@ -227,6 +244,8 @@ class Reader:
         spread = (f", {m['spread'][0] / 1e9:.2f}-{m['spread'][1] / 1e9:.2f} GB/s over {len(m['draws'][m['workers']])} "
                   f"round(s) at that width") if m["spread"] else ""
         began = f", started at {m['start']} (an earlier load's)" if m["start"] else ""
-        return (f"read {m['bytes'] / 1e9:.2f} GB in {m['seconds']:.1f} s ({gbps:.2f} GB/s), {m['workers']} parallel "
-                f"read(s){'' if m['settled'] else ' (still growing)'} of at most {m['ceiling']}{began}{spread}"
+        width = ("no width measured" if m["workers"] is None else
+                 f"{m['workers']} parallel read(s){'' if m['settled'] else ' (the best measured, not settled)'}")
+        return (f"read {m['bytes'] / 1e9:.2f} GB in {m['seconds']:.1f} s ({gbps:.2f} GB/s), {width} of at most "
+                f"{m['ceiling']}{began}{spread}"
                 + (f"; GB/s by width {steps}" if steps else ""))

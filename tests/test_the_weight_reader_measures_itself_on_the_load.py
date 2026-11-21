@@ -197,3 +197,47 @@ def test_a_closed_reader_starts_no_read():
     r.close()
     with pytest.raises(RuntimeError):
         r.io[1].submit(int)
+
+
+def _on_a_store(monkeypatch, reader, sizes, n, per_read, total):
+    RD, Pool, wait, clock, load = _shared_store_load(reader, sizes, n, per_read, total)
+    monkeypatch.setattr(RD, "ThreadPoolExecutor", Pool)
+    monkeypatch.setattr(RD, "wait", wait)
+    monkeypatch.setattr(RD.time, "perf_counter", clock)
+    assert sorted(load()) == list(range(n))
+    return reader.measured()
+
+
+@pytest.mark.parametrize("store,n", [(8, 8), (8, 9), (8, 22), (8, 23), (16, 50), (16, 51)])
+def test_a_window_the_end_of_the_load_reaches_before_it_closes_is_not_judged(monkeypatch, store, n):
+    """qa on 1200 (the drain): a window closed at the width-th read ended inside it, whatever was in flight; once the
+    load ran out of pieces, an open window measured the load's tail, its width read low and the reader SETTLED a
+    doubling or two below the store (store 8, ceiling 8: 8 and 9 pieces settled at 2, 22 and 23 at 4; store 16: 50 and
+    51 at 8), a wrong figure the engine keeps. Now such a window only counts in the bytes: every width judged reads at
+    the store's rate for it, min(width, store); a load too short to conclude ends unsettled and says the best width it
+    measured, never the next one to try."""
+    r = Reader(store)
+    m = _on_a_store(monkeypatch, r, lambda i: 1.0, n, 1.0, float(store))
+    assert m["rates"], m
+    for w, ds in m["draws"].items():
+        for d in ds:
+            assert abs(d - min(w, store)) <= 0.02 * min(w, store), (w, ds, m)
+    best = max(m["rates"], key=m["rates"].get)
+    assert m["workers"] == best, m
+    assert m["settled"] is False or best == store, m
+    assert m["spread"] == (min(m["draws"][best]), max(m["draws"][best])), m
+    assert m["bytes"] == n
+
+
+@pytest.mark.parametrize("store", [4, 6, 8])
+@pytest.mark.parametrize("n", [240, 241, 247])
+def test_a_settled_widths_spread_holds_no_window_of_the_loads_tail(monkeypatch, store, n):
+    """qa on 1200: on a long load, the one draw of a settled width more than 2 % off its rate was the load's LAST window
+    (from -33 %, 2.67 on a 4-unit store, to +5 %), the tail measured instead of the width. No draw of it now."""
+    r = Reader(32)
+    m = _on_a_store(monkeypatch, r, lambda i: 1.0 if i % 2 else 3.0, n, 1.0, float(store))
+    reach = next(w for w in (1, 2, 4, 8, 16, 32) if w >= store)    # the first doubling that reads at the store's rate
+    assert m["settled"] and m["workers"] == reach, m
+    for w, ds in m["draws"].items():
+        for d in ds:
+            assert abs(d - min(w, store)) <= 0.02 * min(w, store), (w, ds, m)
