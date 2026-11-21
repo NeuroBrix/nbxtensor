@@ -69,6 +69,13 @@ class Growth:
             self.width = min(2 * width, self.ceiling)
 
 
+def _inside(start: float, end: float, opens: float, closes: float) -> float:
+    """The part of a read's life [start, end] inside the window [opens, closes]."""
+    if end <= start:
+        return 1.0 if opens <= end <= closes else 0.0
+    return max(0.0, min(end, closes) - max(start, opens)) / (end - start)
+
+
 class Reader:
     """Parallel reads of one process's weight loads, their width grown by their own measure (`Growth`) up to
     `ceiling`. One reader serves every load of a process: what it settled on holds for the process's later loads (a
@@ -133,52 +140,67 @@ class Reader:
                 self._round = [self._growth.width, 0, 0, 0.0]
         return buf
 
+    def _judge(self, width: int, nbytes: float, seconds: float) -> None:
+        with self._lock:
+            self._growth.note(width, nbytes, seconds)
+
     def map(self, fn: Callable[[T], R], items: Iterable[T], nbytes: Callable[[T], int]) -> Iterator[R]:
         """`fn(item)` for every item, `width` of them in flight, the results as they complete. A round is as many
         completions as the width it started at; its rate (the bytes `nbytes` gives the items completed in it, over its
-        seconds) judges that width, and the next round runs at the width the rule gives. A round counts only the
-        pieces SUBMITTED in it: a piece started in the round before and still in flight when the width moved spent
-        part of its time in that round, so its full bytes over the new round's shorter window would inflate the new
-        width's rate and bias the growth upward (qa on 1196, 2026-11-19); its bytes go to the load's total alone. A round has its width
-        of its OWN pieces in flight from its start (the carried ones do not hold its places; never past `ceiling`
-        in all): a round started short of its width would read it slower than it reads and settle low. `fn` reads by its own means
+        seconds) judges that width, and the next round runs at the width the rule gives. A width is judged on a WINDOW: it
+        opens once the reads started before the width moved have ended (from then every read in flight was started at
+        this width), closes when `width` reads have ended inside it, and is judged once every read that overlapped it
+        has ended: each read gives the window its bytes pro rata to the part of its life inside it, over the window's
+        seconds. Counting whole reads by their completion overrated a wider width with the reads carried into it (1196)
+        and, counting only the reads started in a round, underrated every width by the reads in flight at its end
+        (1197; qa, 2026-11-19 and 21). Each read's end is taken in its own thread, not when the caller sees it. `fn` reads by its own means
         and must not use this reader's `io` (its threads are this call's own)."""
         todo = list(items)
         if not todo:
             return
         it = iter(todo)
-        pending: Dict = {}
+        pending: Dict = {}                   # future -> (item, the second it was started)
+        clock = time.perf_counter
+
+        def timed(item):
+            return fn(item), clock()          # its end, in the thread that read it
+
         with ThreadPoolExecutor(max_workers=self.ceiling, thread_name_prefix="nbx-read-map") as pool:
             def fill():
-                while (sum(1 for _, of in pending.values() if of == rnd) < self._growth.width
-                       and len(pending) < self.ceiling):
+                while len(pending) < self._growth.width:
                     item = next(it, _END)
                     if item is _END:
                         return
-                    pending[pool.submit(fn, item)] = (item, rnd)
-            rnd = 0
-            width, started, done, got = self._growth.width, time.perf_counter(), 0, 0
+                    pending[pool.submit(timed, item)] = (item, clock())
+            begun = clock()
+            width, carried, opens, closes, ended, lives = self._growth.width, set(), begun, None, 0, []
             fill()
             try:
                 while pending:
                     finished, _ = wait(list(pending), return_when=FIRST_COMPLETED)
                     for f in finished:
-                        item, of = pending.pop(f)
-                        result = f.result()
-                        if of == rnd:
-                            got += int(nbytes(item))
-                            done += 1
+                        item, start = pending.pop(f)
+                        result, end = f.result()
+                        n = int(nbytes(item))
+                        self._note(width, n, 0.0, False)
+                        carried.discard(f)
+                        if opens is None:
+                            opens = None if carried else end
                         else:
-                            self._note(width, int(nbytes(item)), 0.0, False)
+                            lives.append((n, start, end))
+                            if closes is None and end >= opens:
+                                ended += 1
+                                closes = end if ended >= width else None
                         yield result
-                    if done >= width:
-                        self._note(width, got, time.perf_counter() - started, True)
-                        rnd += 1
-                        width, started, done, got = self._growth.width, time.perf_counter(), 0, 0
+                    if closes is not None and all(s >= closes for _, s in pending.values()):
+                        was = width
+                        self._judge(width, sum(n * _inside(s, e, opens, closes) for n, s, e in lives), closes - opens)
+                        width, closes, ended, lives = self._growth.width, None, 0, []
+                        carried = set(pending) if width != was else set()
+                        opens = None if carried else clock()
                     fill()
-                if done:
-                    self._note(width, got, time.perf_counter() - started, False)
             finally:
+                self._note(width, 0, clock() - begun, False)
                 for f in pending:
                     f.cancel()
 

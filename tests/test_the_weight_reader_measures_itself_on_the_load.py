@@ -56,23 +56,6 @@ class _Clock:
             self.t += units / min(width, self.saturation)
 
 
-def test_a_store_that_saturates_at_four_readers_is_read_four_wide(monkeypatch):
-    import nbxtensor.io.reader as RD
-    clock = _Clock(4)
-    monkeypatch.setattr(RD.time, "perf_counter", clock)
-    r = Reader(32)
-    items = list(range(60))
-
-    def read(i):
-        clock.take(1.0, r.width)
-        return i
-    out = list(r.map(read, items, lambda i: 1 << 20))
-    assert sorted(out) == items
-    m = r.measured()
-    assert m["settled"] and m["workers"] == 4 and sorted(m["rates"]) == [1, 2, 4, 8], m
-    assert m["bytes"] == 60 << 20 and m["spread"] is not None
-
-
 def test_a_width_kept_by_an_earlier_load_starts_there_and_gives_its_spread(monkeypatch):
     """The next launch starts from the kept figure, never from one again; its rounds measure the figure's spread."""
     import nbxtensor.io.reader as RD
@@ -140,37 +123,25 @@ def test_a_split_read_is_judged_on_rounds_of_reads_the_split_cuts(monkeypatch):
     assert m["settled"] and m["workers"] == 4, m
 
 
-class _Store:
-    """A store read through an event clock (deterministic: no thread runs a read): a read submitted while the reader
-    is at width w takes base(item) * w / min(w, saturation) seconds FROM ITS SUBMISSION, and reads complete in order of
-    their finish; the clock moves to each finish."""
 
-    def __init__(self, saturation, base):
-        self.t, self.saturation, self.base, self.n = 0.0, saturation, base, 0
-
-    def __call__(self):
-        return self.t
-
-
-class _Done:
-    def __init__(self, value, finish, seq):
-        self.value, self.finish, self.seq = value, finish, seq
-
-    def result(self):
-        return self.value
-
-    def cancel(self):
-        pass
-
-
-def test_a_round_counts_only_the_reads_started_in_it(monkeypatch):
-    """qa on 1196: a read started at the narrower width and still in flight when the width moved counted its whole
-    bytes in the wider width's shorter round, overrating the wider width. With reads of unequal length on a store that
-    gives no more past four readers, that grew the reader to eight; counted on its own reads, the round settles at four
-    (red before: 8)."""
+def _shared_store_load(reader, sizes, n, per_read=1.0, total=4.0):
+    """`reader.map` over `n` reads on a store whose reads in flight SHARE its bandwidth: each moves at
+    min(per_read, total / in flight) bytes a second, so `w` readers move min(w * per_read, total). An event clock
+    (deterministic, no thread runs a read): a read ends at the next completion its share allows, and its function runs
+    at its end, as a read's thread returns then."""
+    import itertools
     import nbxtensor.io.reader as RD
-    store = _Store(4, lambda i: 1.0 if i % 2 else 3.0)
-    r = Reader(32)
+    t, live, seq = [0.0], {}, itertools.count()
+
+    class Read:
+        def __init__(self, call):
+            self.call, self.seq = call, next(seq)
+
+        def result(self):
+            return self.value
+
+        def cancel(self):
+            pass
 
     class Pool:
         def __init__(self, **kw):
@@ -183,23 +154,43 @@ def test_a_round_counts_only_the_reads_started_in_it(monkeypatch):
             return False
 
         def submit(self, fn, item):
-            w = r.width
-            store.n += 1
-            return _Done(fn(item), store.t + store.base(item) * w / min(w, store.saturation), store.n)
+            f = Read(lambda: fn(item))
+            live[f] = float(sizes(item))
+            return f
 
     def wait(fs, return_when=None):
-        f = min(fs, key=lambda f: (f.finish, f.seq))
-        store.t = max(store.t, f.finish)
+        rate = min(per_read, total / len(live))
+        f = min(live, key=lambda g: (live[g], g.seq))
+        dt = live[f] / rate
+        t[0] += dt
+        for g in live:
+            live[g] -= rate * dt
+        del live[f]
+        f.value = f.call()
         return {f}, set(fs) - {f}
+    return RD, Pool, wait, (lambda: t[0]), lambda: list(reader.map(lambda i: i, range(n), sizes))
+
+
+@pytest.mark.parametrize("sizes", [lambda i: 1.0, lambda i: 1.0 if i % 2 else 3.0, lambda i: 1.0 + i % 3],
+                         ids=["equal", "one-and-three", "one-two-three"])
+@pytest.mark.parametrize("ceiling", [32, 4], ids=["below-the-ceiling", "at-the-ceiling"])
+def test_each_width_is_judged_on_the_bytes_its_reads_moved(monkeypatch, sizes, ceiling):
+    """qa on 1196 and 1197: on a store whose reads in flight share its bandwidth (four readers fill it), every width
+    is judged at the rate it reads, min(width, 4), and the reader settles at four, whether the reads are equal or not,
+    below the ceiling and when the ceiling is the width. Red before: counting whole completions overrated a wider width
+    and with unequal reads settled at one (1196); counting only the reads started in a round underrated every width by
+    up to half (1197)."""
+    r = Reader(ceiling)
+    RD, Pool, wait, clock, load = _shared_store_load(r, sizes, 240)
     monkeypatch.setattr(RD, "ThreadPoolExecutor", Pool)
     monkeypatch.setattr(RD, "wait", wait)
-    monkeypatch.setattr(RD.time, "perf_counter", store)
-    out = list(r.map(lambda i: i, range(64), lambda i: 1 << 20))
-    assert sorted(out) == list(range(64))
+    monkeypatch.setattr(RD.time, "perf_counter", clock)
+    assert sorted(load()) == list(range(240))
     m = r.measured()
+    for w, rate in m["rates"].items():
+        assert abs(rate - min(w, 4)) <= 0.02 * min(w, 4), (w, rate, m["rates"])
     assert m["workers"] == 4, m
-    assert m["bytes"] == 64 << 20, "a carried read's bytes still count in the load's total"
-
+    assert m["bytes"] == sum(int(sizes(i)) for i in range(240)), "every read's bytes count in the load's total"
 
 def test_a_closed_reader_starts_no_read():
     r = Reader(2)
