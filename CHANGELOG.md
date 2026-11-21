@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Certification measures every candidate configuration from the state the caller gave: the arguments a kernel declares
+  `restore_value` are copied back and those it declares `reset_to_zero` are zeroed before each run, as Triton's own
+  tuning does. Before, a kernel that overwrites an input or accumulates into a buffer gave every candidate after the
+  first the previous candidate's result as its input, so correct configurations could be excluded and wrong ones kept.
 - A device block taken while the memory pool was on and freed while it is off goes back to the pool, and its segment
   goes to the driver once wholly free. Before, the free handed that one block to the driver alone: the driver refused
   a block inside a segment, and released the whole segment for its first block while the segment's other blocks were

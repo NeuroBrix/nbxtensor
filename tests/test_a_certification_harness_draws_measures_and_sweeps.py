@@ -5,12 +5,14 @@ engine's certifier on 2026-11-12: what each piece promises, on its own.
   its floor, and refuses what nothing fits, before a value is drawn.
 - `key_operands` names exactly the operands `synthesize` builds: the price a caller reads cannot drift from the draw.
 - `LaunchUnderTest.sweep` poisons the output before every candidate: a configuration that writes nothing reads as NaN
-  and is excluded, never credited with its predecessor's correct values; a configuration that raises is counted unrun.
+  and is excluded, never credited with its predecessor's correct values; a configuration that raises is counted unrun;
+  every candidate starts from the caller's state (`restore_value` copied back, `reset_to_zero` zeroed).
 - `config_to_dict` / `config_from_dict` round-trip a Triton config; `matmul_oracle` windows rows above the cap.
 
 Injections, each seen red then restored (2026-11-12): `Room.row_shape` returning the top unchanged; `key_operands`
 drawing a GEMM at its bucket's top instead of `gemm_rows`; `LaunchUnderTest.sweep` without its `poison()`;
-`row_windows` returning the whole product above the cap; `flash_route_heads` stepping its heads by four.
+`row_windows` returning the whole product above the cap; `flash_route_heads` stepping its heads by four;
+`LaunchUnderTest.launch` without its `_prepare` (2026-11-21).
 """
 from __future__ import annotations
 
@@ -117,6 +119,57 @@ def test_every_candidate_runs_on_a_poisoned_output():
     assert [u["config"]["kwargs"]["MODE"] for u in unrun] == ["raise"]
     launch.final(cfgs[0])
     assert np.array_equal(F.host_values(out), want)
+
+
+class _OverwritesItsInput:
+    """A kernel that reads `a` into `out`, then writes over `a` (the chunked gated delta rule's state kernel and its
+    `u_ptr`, declared `restore_value`)."""
+    def __init__(self, other):
+        self.other = other
+
+    def run(self, a, out, MODE):
+        out.copy_(a)
+        a.copy_(self.other)
+
+
+class _Accumulates:
+    """A kernel that adds one into `acc` and writes the sum to `out` (an atomic accumulator, `reset_to_zero`)."""
+    def run(self, acc, out, MODE):
+        from nbxtensor.tensor import NBXTensor
+        acc.copy_(NBXTensor.from_numpy(F.host_values(acc).astype(np.float32) + 1.0))
+        out.copy_(acc)
+
+
+def test_every_candidate_starts_from_the_state_the_caller_gave():
+    """`restore_value` copied back and `reset_to_zero` zeroed before every run, as Triton's sweep does (qa on the gated
+    delta rule's cold call, 2026-11-19: the harness launched bare, so the second candidate read the first one's
+    output). Injection: `LaunchUnderTest.launch` without its `_prepare` - the second candidate is excluded, red."""
+    from nbxtensor.tensor import NBXTensor
+    want = np.arange(1, 65, dtype=np.float32).reshape(8, 8)
+    a = NBXTensor.from_numpy(want)
+    out = NBXTensor.from_numpy(np.zeros((8, 8), dtype=np.float32))
+    tuner = type("T", (), {"arg_names": ["a", "out"], "restore_value": ["a"],
+                           "fn": _OverwritesItsInput(NBXTensor.from_numpy(want * -3.0))})()
+    launch = H.LaunchUnderTest(tuner, (a, out), {}, "out", "test")
+    accepted, excluded, unrun = launch.sweep([_Cfg("first"), _Cfg("second")], want.astype(np.float64), 1e-6)
+    assert [c.kwargs["MODE"] for c, _d, _s in accepted] == ["first", "second"], excluded
+    launch.final(_Cfg("first"))
+    assert np.array_equal(F.host_values(out), want)
+
+    acc = NBXTensor.from_numpy(np.full((8, 8), 5.0, dtype=np.float32))
+    out2 = NBXTensor.from_numpy(np.zeros((8, 8), dtype=np.float32))
+    tuner2 = type("T", (), {"arg_names": ["acc", "out"], "reset_to_zero": ["acc"], "fn": _Accumulates()})()
+    launch2 = H.LaunchUnderTest(tuner2, (acc, out2), {}, "out", "test")
+    accepted, excluded, unrun = launch2.sweep([_Cfg("first"), _Cfg("second")], np.ones((8, 8)), 1e-6)
+    assert [c.kwargs["MODE"] for c, _d, _s in accepted] == ["first", "second"], excluded
+
+
+def test_a_restore_naming_no_argument_of_the_launch_is_refused_by_name():
+    from nbxtensor.tensor import NBXTensor
+    t = NBXTensor.from_numpy(np.zeros((2, 2), dtype=np.float32))
+    tuner = type("T", (), {"arg_names": ["a", "out"], "restore_value": ["u_ptr"], "fn": None})()
+    with pytest.raises(RuntimeError, match="restore_value names \\['u_ptr'\\]"):
+        H.LaunchUnderTest(tuner, (t, t), {}, "out", "test")
 
 
 def test_a_configuration_round_trips_through_its_record():

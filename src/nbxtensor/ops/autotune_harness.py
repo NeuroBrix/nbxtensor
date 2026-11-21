@@ -891,7 +891,10 @@ def _sync() -> None:
 def launch_and_measure(tuner, args, kwargs, cfg, out, oracle):
     """(the launch's return, its deviation): `args` launched at configuration `cfg`, synchronised, `out` measured
     against `oracle` (a later launch of a key inside one wrapper call, run at the configuration already chosen)."""
-    ret = tuner.fn.run(*args, **{**kwargs, **cfg.all_kwargs()})
+    run_kwargs = {**kwargs, **cfg.all_kwargs()}
+    if getattr(cfg, "pre_hook", None):                # as Triton runs the configuration it chose: its own hook first
+        cfg.pre_hook({**dict(zip(tuner.arg_names, args)), **run_kwargs})
+    ret = tuner.fn.run(*args, **run_kwargs)
     _sync()
     return ret, F.deviation_against(out, oracle)
 
@@ -899,7 +902,14 @@ def launch_and_measure(tuner, args, kwargs, cfg, out, oracle):
 class LaunchUnderTest:
     """One intercepted launch of an autotuned kernel, as the autotuner receives it (`args`, `kwargs`), whose output is
     the argument `out_name`. Every run poisons the output first — every byte 0xFF, NaN in every float dtype, on the
-    device — so a configuration that writes only part of it cannot inherit its predecessor's correct values."""
+    device — so a configuration that writes only part of it cannot inherit its predecessor's correct values.
+
+    Every run also starts from the state the caller gave, as Triton's own sweep does (`Autotuner._bench`): the
+    arguments the tuner names in `restore_value` are copied back from a snapshot taken here, the ones in
+    `reset_to_zero` are zeroed, then the configuration's `pre_hook` runs (a tuner's own `pre_hook` replaces the
+    zeroing, as in Triton). Before, the harness launched the kernel bare: a kernel that overwrites an input (the
+    chunked gated delta rule's state kernel and its `u_ptr`) gave every candidate after the first the previous
+    candidate's output as its input, and a kernel that accumulates added onto the previous candidate's sums."""
 
     def __init__(self, tuner, args, kwargs, out_name: str, label: str):
         from nbxtensor.backend import launcher as L
@@ -910,12 +920,35 @@ class LaunchUnderTest:
             raise RuntimeError(f"{label}: a strided view among the arguments — not certifiable")
         self.tuner, self.args, self.kwargs, self.out = tuner, args, kwargs, args[idx]
         self._span = (int(self.out.data_ptr()), int(self.out.nbytes()))
+        named = {**dict(zip(tuner.arg_names, args)), **kwargs}
+        for which in ("restore_value", "reset_to_zero"):
+            absent = [n for n in (getattr(tuner, which, None) or []) if n not in named]
+            if absent:
+                raise RuntimeError(f"{label}: {which} names {absent}, not among the launch's arguments")
+        self._snapshot = {n: named[n].clone() for n in (getattr(tuner, "restore_value", None) or [])
+                          if named[n] is not None}
+
+    def _prepare(self, cfg) -> None:
+        """The caller's state back before a run: `restore_value` copied back, `reset_to_zero` zeroed, then the hooks."""
+        nargs = {**dict(zip(self.tuner.arg_names, self.args)), **self.kwargs, **cfg.all_kwargs()}
+        for name, snap in self._snapshot.items():
+            nargs[name].copy_(snap)
+        if getattr(cfg, "pre_hook", None):
+            cfg.pre_hook(nargs)
+        if getattr(self.tuner, "user_defined_pre_hook", False):
+            self.tuner.pre_hook(nargs)
+        else:
+            from nbxtensor.memory.allocator import DeviceAllocator
+            for name in getattr(self.tuner, "reset_to_zero", None) or []:
+                if nargs[name] is not None:                # contiguous: the constructor refused a strided view
+                    DeviceAllocator.memset_cuda(int(nargs[name].data_ptr()), 0, int(nargs[name].nbytes()))
 
     def poison(self) -> None:
         from nbxtensor.memory.allocator import DeviceAllocator
         DeviceAllocator.memset_cuda(self._span[0], 0xFF, self._span[1])
 
     def launch(self, cfg):
+        self._prepare(cfg)
         return self.tuner.fn.run(*self.args, **{**self.kwargs, **cfg.all_kwargs()})
 
     def final(self, cfg):
