@@ -3,13 +3,14 @@ buffers (the output at v's dtype, the state out float32), then the float32 works
 names and shapes `gated_delta_rule_chunked_workspace` gives (one answer for the wrapper, its cost and its tests), the
 chunk states counted whole for a ragged last chunk; the bytes each of its three launches reads and writes; its flops
 per chunk; and every refusal of the wrapper, by name. What it catches: a workspace buffer forgotten or sized at the
-input dtype, the chunk count floored, a state in counted when none is given, a cost that accepts what the wrapper
+input dtype, the tuning sweep's copy of U left unnamed, the chunk count floored, a state in counted when none is given, a cost that accepts what the wrapper
 refuses - red."""
 import pytest
 
 from nbxtensor.dtype.nbx_dtype import NBXDtype
 from nbxtensor.ops import _cost as C
-from nbxtensor.ops.gated_delta_rule_chunked import GATED_DELTA_RULE_CHUNK, gated_delta_rule_chunked_workspace
+from nbxtensor.ops.gated_delta_rule_chunked import (GATED_DELTA_RULE_CHUNK, gated_delta_rule_chunked_tuning_copies,
+                                                    gated_delta_rule_chunked_workspace)
 
 F32 = NBXDtype.float32
 
@@ -40,8 +41,10 @@ def test_the_cost_is_the_outputs_then_the_float32_workspace_its_helper_names(dt,
     assert ws["states"] == 4 * B * chunks * Hv * dk * dv
     out, so = B * L * Hv * dv * size, B * Hv * dk * dv * 4
     assert [(b.name, b.nbytes) for b in c.outputs] == [("output", out), ("state out", so)]
-    assert [(b.name, b.nbytes) for b in c.workspace] == [(f"workspace {n}", b) for n, b in ws.items()]
-    assert c.peak_bytes == out + so + sum(ws.values())
+    u_copy = 4 * B * L * Hv * dv                                   # the tuning sweep's clone of U (restore_value)
+    assert [(b.name, b.nbytes) for b in c.workspace] == ([(f"workspace {n}", b) for n, b in ws.items()]
+                                                         + [("tuning copy u_ptr", u_copy)])
+    assert c.peak_bytes == out + so + sum(ws.values()) + u_copy
     q, k, v, g, beta, s = (0 if x is None else x.nbytes for x in specs)
     assert c.bytes_moved == (k + v + g + beta + ws["w"] + ws["u"] + ws["gc"]
                              + k + ws["w"] + ws["u"] + ws["gc"] + s + ws["states"] + ws["u"] + so
@@ -81,3 +84,16 @@ def test_the_cost_refuses_a_state_of_the_wrong_shape_and_a_sequence_of_no_token_
         C.gated_delta_rule_chunked(*specs, qk_l2norm=True, compute_dtype=F32)
     with pytest.raises(ValueError, match="a sequence of length 0: the delta rule runs over at least 1 token"):
         C.gated_delta_rule_chunked(*_specs(L=0), qk_l2norm=True, compute_dtype=F32)
+
+
+def test_the_cost_names_the_copy_every_restored_argument_of_the_state_kernel_takes_while_it_tunes():
+    """Each argument the state kernel declares `restore_value` is cloned over a call that tunes: 134 MB of U at
+    L=8192, Hv=32, dv=128 that the cost did not name (qa, 2026-11-19). A restored argument with no copy in
+    `gated_delta_rule_chunked_tuning_copies`, or a copy of an argument it does not restore - red."""
+    pytest.importorskip("triton")
+    from nbxtensor.ops import gated_delta_rule_chunked as CH
+    assert set(gated_delta_rule_chunked_tuning_copies(1, 8192, 32, 128, 128)) == set(
+        CH.gated_delta_rule_chunk_state_kernel.restore_value)
+    c = C.gated_delta_rule_chunked(*_specs(B=1, L=8192, Hk=16, Hv=32, dk=128, dv=128, dt="bfloat16"),
+                                   qk_l2norm=True, compute_dtype=F32)
+    assert dict((b.name, b.nbytes) for b in c.workspace)["tuning copy u_ptr"] == 134_217_728

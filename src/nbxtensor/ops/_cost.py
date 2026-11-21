@@ -263,7 +263,9 @@ def gated_delta_rule_chunked(q: Spec, k: Spec, v: Spec, g: Spec, beta: Spec, sta
     """`ops.gated_delta_rule_chunked.gated_delta_rule_chunked_wrapper` over a length L, refused by name where the
     wrapper refuses (the same `gated_delta_rule_shapes` and `gated_delta_rule_dtypes`): the output [B, L, Hv, dv] at
     v's dtype and the state out [B, Hv, dk, dv] float32, both returned, then the float32 workspace
-    `gated_delta_rule_chunked_workspace` names (W, U, gc, the chunk states), alive until the wrapper returns.
+    `gated_delta_rule_chunked_workspace` names (W, U, gc, the chunk states), alive until the wrapper returns, and the
+    copy of U a call that tunes holds over the state kernel's sweep (`gated_delta_rule_chunked_tuning_copies`: the
+    state kernel restores U before each configuration it measures): the peak is the cold call's, the one a plan must fit.
     Bytes moved, launch by launch: the prepare kernel reads k, v, g, beta and writes W, U, gc; the state kernel reads
     k, W, U, gc and the state in (when given), writes the chunk states, V' over U and the state out; the output kernel
     reads q, k, V', gc and the chunk states and writes the output. Flops per (batch row, value head, chunk of C
@@ -273,7 +275,8 @@ def gated_delta_rule_chunked(q: Spec, k: Spec, v: Spec, g: Spec, beta: Spec, sta
     3 dk + 1 each, per token and value head."""
     from nbxtensor.dtype.nbx_dtype import NBXDtype
     from nbxtensor.ops.gated_delta_rule import gated_delta_rule_dtypes, gated_delta_rule_shapes
-    from nbxtensor.ops.gated_delta_rule_chunked import GATED_DELTA_RULE_CHUNK, gated_delta_rule_chunked_workspace
+    from nbxtensor.ops.gated_delta_rule_chunked import (GATED_DELTA_RULE_CHUNK, gated_delta_rule_chunked_tuning_copies,
+                                                        gated_delta_rule_chunked_workspace)
     B, L, Hk, Hv, dk, dv = gated_delta_rule_shapes(q, k, v, g, beta, state)
     gated_delta_rule_dtypes(*(None if t is None else NBXDtype[t.dtype] for t in (q, k, v, g, beta, state)),
                             compute_dtype)
@@ -287,6 +290,10 @@ def gated_delta_rule_chunked(q: Spec, k: Spec, v: Spec, g: Spec, beta: Spec, sta
           gated_delta_rule_chunked_workspace(B, L, Hv, dk, dv).items()}
     for name, nbytes in ws.items():
         st.alloc(f"workspace {name}", nbytes)
+    copies = [st.alloc(f"tuning copy {name}", Spec.contiguous(shape, f32).nbytes)          # over the state kernel's sweep
+              for name, shape in gated_delta_rule_chunked_tuning_copies(B, L, Hv, dk, dv).items()]
+    for i in copies:
+        st.free(i)
     state_in = 0 if state is None else state.nbytes
     st.moved += (k.nbytes + v.nbytes + g.nbytes + beta.nbytes + ws["w"] + ws["u"] + ws["gc"]          # prepare
                  + k.nbytes + ws["w"] + ws["u"] + ws["gc"] + state_in + ws["states"] + ws["u"]

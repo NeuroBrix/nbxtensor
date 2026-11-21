@@ -41,6 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `PIECE`, `evict` and `cold_read_gbps` stay.
 
 ### Fixed
+- The cost of the chunked gated delta rule names the copy of its U buffer a call that tunes holds (134 MB at a
+  length of 8192 with 32 value heads of 128): its peak memory is now the cold call's. Before, that copy was left out,
+  so a memory plan could fit a call whose first run did not fit.
 - A kernel's tuning keyword that the installed Triton does not take is refused by name when the kernel is defined.
   Before, it was dropped with a warning, so a Triton lacking `restore_value` or `reset_to_zero` would have tuned an
   overwriting or accumulating kernel on its previous configuration's output.
