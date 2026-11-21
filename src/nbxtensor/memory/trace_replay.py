@@ -86,9 +86,9 @@ def replay_trace(events: Sequence[Tuple[str, int, int]], device: int, chunk: int
 
 def _child(trace: str, device: int, chunk: int, stop_after: Optional[float] = None) -> Dict[str, float]:
     """One replay in a fresh process (no allocator state carried between candidates), shown `device` ALONE (the
-    backend's `visible_env`, `backend.runtime.one_device_env`): it replays on its device 0 and never initialises a
+    backend's `visible_env`, `backend.install_help.one_device_env`): it replays on its device 0 and never initialises a
     runtime on another card — on a 4-card rack every child saw the four (the 2026-11-19 first launch)."""
-    from nbxtensor.backend.runtime import one_device_env
+    from nbxtensor.backend.install_help import one_device_env
     code = ("import json, sys; from nbxtensor.memory import trace_replay as T; "
             "m, ev = T.load_trace(sys.argv[1]); "
             "print('" + _MARK + "' + json.dumps(T.replay_trace(ev, int(sys.argv[2]), int(sys.argv[3]), "
@@ -147,7 +147,7 @@ def first_replay(device: int, trace: Optional[str] = None) -> Tuple[float, float
     return seconds, time.perf_counter() - t0
 
 
-def decided(seconds: Sequence[float], reps: int, bound: float) -> Optional[bool]:
+def _decided(seconds: Sequence[float], reps: int, bound: float) -> Optional[bool]:
     """Whether `reps` replays whose first ones took `seconds` have a median within `bound` — True, False, or None while
     the replays still to come can change it. The median of `reps` lies within the bound exactly when more than half of
     them do (odd `reps`: the middle one; even: both middle ones); past half on one side, the rest cannot move it. An
@@ -192,7 +192,7 @@ def chunk_by_replay(device: int, granularity: int, ks: Sequence[int], reps: int,
         verdict = None
         while verdict is None:
             times[chunk].append(child(trace, device, chunk, stop)["seconds"])
-            verdict = decided(times[chunk], reps, bound)
+            verdict = _decided(times[chunk], reps, bound)
         if verdict:
             return chunk, times
     return None, times

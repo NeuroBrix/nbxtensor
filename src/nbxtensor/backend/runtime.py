@@ -404,30 +404,6 @@ def backend_table() -> dict:
     return _GPU_BACKENDS[name]
 
 
-def one_device_env(device: int, environ=None) -> dict:
-    """The environment of a child process that sees ONE device: this process's `device` (an index in what THIS process
-    sees), through the variable the backend's runtime reads to hide devices (its table's `visible_env`, listed outermost
-    first: ROCm's ROCR_ filters what HIP_/CUDA_ then index). The innermost one set here is narrowed to its own entry for
-    `device` (the outer ones kept: the inner indexes into them); none set, the innermost is set to `device`. The child
-    then knows that device as its device 0. A backend whose table names no such variable, or a `device` this process
-    does not see, is refused by name: never a child shown every card."""
-    names = tuple(backend_table().get("visible_env") or ())
-    if not names:
-        raise RuntimeError(f"ZERO FALLBACK: the {gpu_backend()} runtime names no variable that hides devices: a child "
-                           f"cannot be shown device {device} alone")
-    env = dict(os.environ if environ is None else environ)
-    inner = next((n for n in reversed(names) if env.get(n) is not None), None)
-    if inner is None:
-        env[names[-1]] = str(int(device))
-        return env
-    listed = [x.strip() for x in env[inner].split(",") if x.strip()]
-    if not 0 <= int(device) < len(listed):
-        raise RuntimeError(f"ZERO FALLBACK: device {device} is not among the {len(listed)} this process sees "
-                           f"({inner}={env[inner]!r})")
-    env[inner] = listed[int(device)]
-    return env
-
-
 @functools.lru_cache(maxsize=1)
 def _metal_backend_table() -> dict:
     """The Metal entry-point table, imported ONCE and then cached.
