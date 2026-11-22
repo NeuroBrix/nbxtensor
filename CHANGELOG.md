@@ -29,8 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - A matmul-family call runs one fixed unit by rule, never by a timing: where the device profile declares a matrix unit,
   the operands' dtype has a representation on it and the call's rows fill its smallest tile, `mm`, `addmm`, `bmm`,
-  `baddbmm`, `conv2d` and the fused mixture-of-experts GEMM run on the unit, and every other call runs the FMA kernel; a
-  device that declares no matrix unit has one path, the FMA kernel. Before, the certificate of a `mm`, an `addmm` or a
+  `baddbmm` and `conv2d` run on the unit, and every other call runs the FMA kernel; the fused mixture-of-experts GEMM
+  has its own rule, read from its activations' dtype only: float16 activations run on the unit's `mm` tiles whatever
+  their rows, any other dtype runs the FMA kernel; a device that declares no matrix unit has one path, the FMA kernel. Before, the certificate of a `mm`, an `addmm` or a
   fused MoE launch chose between the two by which was faster on the card that certified it, so two certifications of one
   key could answer a near tie two ways, and a launch with no certificate took the unit where a fused MoE took the FMA
   kernel. The certificate now names only which of the unit's own tiles (all of one set of bits); an entry that names the
