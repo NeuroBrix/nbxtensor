@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   load a certificate of another epoch, or with none (every certificate written before the matrix-family rule of
   2026-11-22), is REFUSED BY NAME — the file, its epoch and the library's — and its keys take the normal autotune
   path: a user who certified with the old library is not served stale settings after the upgrade.
+- The machine's replay artifact (`autotune_cache`, the configurations its own sweeps chose) is named by the bits epoch
+  too (`autotune_configs_<arch>-<generator>-e<epoch>.json`, its screen exclusions likewise): after an upgrade that
+  raises the epoch the older artifact is never read, so it cannot seed back a setting the certificate's epoch refusal
+  sent to autotune.
 - A weight reader that measures itself on the load it serves (`nbxtensor.io.reader.Reader`): the model's weight files
   are read with parallel reads that start at one and double while the rate measured on those same reads rises, then
   settle on the best width. Nothing is measured ahead of the load and nothing is kept; the caller sets the most reads

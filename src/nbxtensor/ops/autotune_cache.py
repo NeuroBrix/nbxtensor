@@ -17,7 +17,7 @@ in-memory caches, immune to source-hash invalidation:
 
 R33: imports triton + stdlib only. The artifact is an optimization,
 never a failure source — every I/O error degrades to "no seed".
-Storage: <replay cache directory>/autotune_configs_<arch>.json; the directory is the application's to give
+Storage: <replay cache directory>/autotune_configs_<arch>-<generator>-e<bits epoch>.json; the directory is the application's to give
 (`set_replay_cache_dir`), see `_dir`.
 """
 
@@ -140,14 +140,20 @@ def _artifact_path() -> Optional[str]:
     of the compiler that produced it (the certified directory's generator door, 2026-09-06): a
     sweep made under one generator is never seeded under another. Before 2026-09-28 the file was
     named by arch alone, and on the Mac the two "served" gates of the triton-ext bump took 545 of
-    their 1 400 key uses from sweeps the retired compiler had made. No generator name, no artifact."""
+    their 1 400 key uses from sweeps the retired compiler had made. No generator name, no artifact.
+
+    And by the library's BITS EPOCH (`autotune_certified.BITS_EPOCH`): a configuration was chosen
+    against the bits of the library that swept it, so after an upgrade that moves the bits the older
+    artifact is never read and its keys autotune again — the replay artifact is no back door around
+    the certificate's epoch refusal."""
     arch = _arch_fingerprint()
     if arch is None:
         return None
     gen = _generator_tag()
     if gen is None:
         return None
-    return os.path.join(_dir(), f"autotune_configs_{arch}-{gen}.json")
+    from nbxtensor.ops.autotune_certified import BITS_EPOCH
+    return os.path.join(_dir(), f"autotune_configs_{arch}-{gen}-e{BITS_EPOCH}.json")
 
 
 _KERNEL_MODULE_PREFIXES: Tuple[str, ...] = ("nbxtensor.ops.",)
