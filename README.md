@@ -133,7 +133,7 @@ What changed from one version to the next — added, changed, fixed, removed —
 nbxtensor never needs torch: it is not a dependency, not even an optional one, and the library and its kernels run in
 an environment where torch is not installed (proven on Metal, 2026-10-29: `tools/torch_free_proof.py` records every
 attempt to import torch, caught ones included, and recorded none). Python 3.10 or later; its dependencies are numpy,
-pyyaml and Triton (on a Mac, `pyobjc-framework-Metal` and the Triton `install-metal` brings).
+pyyaml and Triton 3.5.0 or later (on a Mac, `pyobjc-framework-Metal` and the Triton `install-metal` brings).
 
 ```
 pip install nbxtensor

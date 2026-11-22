@@ -21,7 +21,10 @@ maintainers = [{ name = "Hocine Benkelaya", email = "contact@neurobrix.org" }]
 # before it, no sdist), so a triton asked for on Windows or a Mac has no solution and the library did not install there
 # (macOS 2026-11-06, native Windows 2026-11-18). The Metal Triton is built from source, with triton-ext's AppleGPU
 # backend (the README's install, `install-metal`); on a Mac the Metal device is opened through pyobjc's Metal framework.
-dependencies = ["numpy", "triton; sys_platform == 'linux' and (platform_machine == 'x86_64' or platform_machine == 'aarch64')",
+# The Triton floor is 3.5.0, read from the code: the launch path calls JITFunction._pack_args (first in 3.5.0) and
+# JITFunction.is_gluon (3.4.0) with no fallback, and the tuning keywords (restore_value 3.0, do_bench 3.2), tl.assume (3.2)
+# and triton.backends.compiler (3.0) all come earlier. A test reads this line and the installed Triton against it.
+dependencies = ["numpy", "triton>=3.5.0; sys_platform == 'linux' and (platform_machine == 'x86_64' or platform_machine == 'aarch64')",
                 "pyyaml", "nvidia-cuda-runtime-cu12; platform_system == 'Linux'",
                 "pyobjc-framework-Metal; platform_system == 'Darwin'"]
 

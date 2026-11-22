@@ -41,6 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `PIECE`, `evict` and `cold_read_gbps` stay.
 
 ### Fixed
+- The library's metadata states its Triton floor, 3.5.0 (`triton>=3.5.0`), the first release with everything the launch
+  path calls without a fallback (`JITFunction._pack_args`, `is_gluon`); it allowed any Triton before, and an older one
+  failed on an AttributeError at the first launch. A test reads the declared floor and the installed Triton against it.
 - No kernel of the library uses Python's `and` / `or` to produce a value, which Triton deprecates on tensors and
   short-circuits without a word on compile-time constants; a test reads every kernel for it. The one case, a
   compile-time check in the matrix-vector kernel, computed the right answer and is now two checks.
