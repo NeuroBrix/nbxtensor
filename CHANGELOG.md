@@ -41,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `PIECE`, `evict` and `cold_read_gbps` stay.
 
 ### Fixed
+- A tuning keyword the installed Triton's autotuner lacks is refused with the kernel's qualified name in the message
+  (`module.kernel`), so a failure at import says which kernel asked for it.
 - The library's metadata states its Triton floor, 3.5.0 (`triton>=3.5.0`), the first release with everything the launch
   path calls without a fallback (`JITFunction._pack_args`, `is_gluon`); it allowed any Triton before, and an older one
   failed on an AttributeError at the first launch. A test reads the declared floor and the installed Triton against it.

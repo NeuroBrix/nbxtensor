@@ -20,9 +20,18 @@ _log = logging.getLogger(__name__)
 # Autotune compatibility across Triton versions
 # ---------------------------------------------------------------------------
 
+def _kernel_name(fn) -> str:
+    """The qualified name of the kernel a tuning decorator is applied to: its module and its qualified name, through
+    a `JITFunction`'s `fn` when it is one."""
+    inner = getattr(fn, "fn", fn)
+    module = getattr(inner, "__module__", None)
+    name = getattr(inner, "__qualname__", None) or getattr(inner, "__name__", None) or repr(fn)
+    return f"{module}.{name}" if module else name
+
+
 def nbx_autotune(*args, **kwargs):
     """`triton.autotune`, with the library's timer and without Triton's own on-disk cache; any other keyword the
-    installed Triton lacks is refused by name.
+    installed Triton lacks is refused by name, the kernel's qualified name with it.
 
     The installed Triton's autotuner must take every keyword a kernel passes. A keyword it lacks used to be dropped
     with a warning, which hid a change of result: `restore_value` and `reset_to_zero` decide what each measured
@@ -51,14 +60,13 @@ def nbx_autotune(*args, **kwargs):
         kwargs["do_bench"] = _nbx_do_bench
 
     unsupported = sorted(k for k in kwargs if k not in supported)
-    if unsupported:
-        raise TypeError(f"triton.autotune of Triton {getattr(triton, '__version__', '?')} does not take "
-                        f"{unsupported}: a kernel's tuning keyword is never dropped (it can change what each "
-                        f"configuration is measured from)")
-
-    decorator = triton.autotune(*args, **kwargs)
+    decorator = None if unsupported else triton.autotune(*args, **kwargs)
 
     def announce_then_decorate(fn):
+        if unsupported:
+            raise TypeError(f"{_kernel_name(fn)}: triton.autotune of Triton {getattr(triton, '__version__', '?')} "
+                            f"does not take {unsupported}: a kernel's tuning keyword is never dropped (it can "
+                            f"change what each configuration is measured from)")
         return _announce_first_sweep(decorator(fn))
 
     return announce_then_decorate
