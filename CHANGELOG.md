@@ -27,6 +27,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   variable the backend's runtime reads to hide devices.
 
 ### Changed
+- A matmul-family call runs one fixed unit by rule, never by a timing: where the device profile declares a matrix unit,
+  the operands' dtype has a representation on it and the call's rows fill its smallest tile, `mm`, `addmm`, `bmm`,
+  `baddbmm`, `conv2d` and the fused mixture-of-experts GEMM run on the unit, and every other call runs the FMA kernel; a
+  device that declares no matrix unit has one path, the FMA kernel. Before, the certificate of a `mm`, an `addmm` or a
+  fused MoE launch chose between the two by which was faster on the card that certified it, so two certifications of one
+  key could answer a near tie two ways, and a launch with no certificate took the unit where a fused MoE took the FMA
+  kernel. The certificate now names only which of the unit's own tiles (all of one set of bits); an entry that names the
+  FMA kernel, or a tile the profile does not declare, is refused by name (`autotune_certified.refused_unit_entries`, said
+  once) and the rule's tile runs; `NBX_AUTOTUNE_CERTIFIED=off`, a confirmation run and a tuning sweep of the FMA kernel
+  no longer move the unit; a certificate's unit tile is no longer required to beat the FMA kernel's time.
+- The cost of the fixed unit, from the shipped NVIDIA certificates: of the 9,752 entries timed on both routes, 447 (4.6
+  percent; 0.3 percent of the fp16 matmul keys to 16 percent of the fp32 addmm keys) were faster on the FMA kernel, by a
+  median of 13 to 208 microseconds per group of kernel, dtype and card class; 10,228 further entries were never timed on
+  the unit (no cost is known for them), and all 10,675 name the FMA kernel for a launch the rule gives to the unit: they
+  are re-certified by the certification queue.
 - The library's tests no longer carry a test that imports the engine: the check that Prism's budget reader never builds a
   card of 0 MB from a broken driver lives in the engine's tests, and the library's own check (the runtime's refusal is
   raised by name) stays.

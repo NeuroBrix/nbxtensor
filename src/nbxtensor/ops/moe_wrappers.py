@@ -249,23 +249,23 @@ def _fused_moe_launch(hidden_states, expert_ptrs, output, topk_weights, sorted_t
 def fused_moe_unit_tile(hidden_states, expert_ptrs, output, topk_weights, sorted_token_ids, expert_ids,
                         num_tokens_post_padded, N, K, stride_bk, stride_bn, top_k, mul_routed_weight=False,
                         topk_divide=True):
-    """The matrix unit's tile (a `matrix_unit.mm` row) a fused MoE launch runs at when its certificate measured the
-    unit faster than the FMA kernel (`autotune_certified.unit_choice`, the FMA launch's key), else None. The unit takes
-    experts of its operand dtype only (no split), and a launch with no certificate keeps the FMA kernel; a census
-    shadow and the certifier's sweep take the FMA kernel (the unit's tiles are measured beside it,
-    `matrix_unit_runs`). The arguments are `invoke_fused_moe`'s at the FMA alignment."""
-    from nbxtensor.ops._configs import matrix_unit
+    """The matrix unit's tile (a `matrix_unit.mm` row) a fused MoE launch runs at, or None for the FMA kernel. THE RULE
+    decides, never a timing: experts of the unit's operand dtype (no split) on a profile that declares a unit run on
+    it, with a certificate or without one; the certificate picks only among the unit's own tiles
+    (`autotune_certified.ruled_unit_tile`) and an entry naming the FMA kernel is refused by name. A census shadow and the
+    certifier's sweep take the FMA kernel (the unit's tiles are measured beside it, `matrix_unit_runs`). The
+    arguments are `invoke_fused_moe`'s at the FMA alignment."""
     from nbxtensor.ops import autotune_certified as _cert
     from nbxtensor.ops.launch_observer import launch_observer
-    if hidden_states.nbx_dtype != NBXDtype.float16 or not (matrix_unit() or {}).get("mm"):
+    tiles = fused_moe_unit_tiles(hidden_states)
+    if not tiles:
         return None
     if launch_observer().active() or _cert.certifying():
         return None
     _grid, args, kwargs = _fused_moe_launch(hidden_states, expert_ptrs, output, topk_weights, sorted_token_ids,
                                             expert_ids, num_tokens_post_padded, N, K, stride_bk, stride_bn, top_k,
                                             mul_routed_weight, topk_divide)
-    chosen = _cert.unit_choice(fused_moe_kernel, args, kwargs)
-    return chosen[1] if chosen is not None and chosen[0] == "unit" else None
+    return _cert.ruled_unit_tile(fused_moe_kernel, args, kwargs, tiles[0], tiles)
 
 
 def fused_moe_unit_tiles(hidden_states):

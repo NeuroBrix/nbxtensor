@@ -181,8 +181,8 @@ def matrix_unit_operands(a: NBXDtype, b: NBXDtype, M: int, unit: Optional[dict] 
 
 def matrix_unit_takes(a: NBXDtype, b: NBXDtype, M: int) -> bool:
     """The profile's matrix unit can run this GEMM (`matrix_unit_operands`). A batched product on it has NO autotune
-    key (`bmm_launches`, `baddbmm_launches` return []); `mm` and `addmm` keep their FMA key, whose certificate chose
-    between the two routes."""
+    key (`bmm_launches`, `baddbmm_launches` return []); `mm` and `addmm` keep their FMA key, whose certificate names
+    the unit's tile (the unit itself is the rule's, never the faster of two routes)."""
     return matrix_unit_operands(a, b, M) is not None
 
 
@@ -245,8 +245,8 @@ def mm_launches(M: int, K: int, N: int, a: NBXDtype, b: NBXDtype, native_bf16: b
     a, b, promote_a, promote_b = mm_dtypes(a, b, native_bf16, force_accum)
     if M <= 4:
         return mv_launches(N, K, b, a, native_bf16, force_accum, contract_half)
-    # where the matrix unit can take it too, the key is the FMA launch's: its certificate measured both routes and
-    # names the faster (`linalg_wrappers._gemm_route`), the unit's tile included
+    # where the matrix unit can take it too, the key is the FMA launch's: the rule gives the GEMM to the unit
+    # (`linalg_wrappers._gemm_route`), and the key's certificate names only which of the unit's tiles
     out = matmul_out_dtype(a, M, promote_a, native_bf16, force_accum, contract_half)
     ieee = (not native_bf16) and out == F32
     return [(MATMUL, (bucket_of("M", M), N, K, ieee, promote_b, tag(a), tag(b), tag(out)))]
@@ -255,8 +255,7 @@ def mm_launches(M: int, K: int, N: int, a: NBXDtype, b: NBXDtype, native_bf16: b
 def addmm_launches(M: int, K: int, N: int, a: NBXDtype, b: NBXDtype, bias: NBXDtype,
                    native_bf16: bool, force_accum: bool = False, contract_half: bool = False, bias_row: bool = True) -> List[Launch]:
     """`addmm` on a 2-D activation (an N-D one is flattened to (numel/K, K) first): M <= 4 runs
-    per-row addmv; otherwise one key, whose certificate decides the matrix unit or the FMA kernel where a [N] / [1, N]
-    bias (`bias_row`) lets the unit take it."""
+    per-row addmv; otherwise one key, where a [N] / [1, N] bias (`bias_row`) lets the unit take it, the unit runs it by rule."""
     a, b, bias, promote_a, promote_b, _ = addmm_dtypes(a, b, bias, native_bf16, force_accum)
     if M <= 4:
         # one addmv per row on the operands as cast, the weight transposed to [N, K], the bias its row or the shared one

@@ -817,9 +817,10 @@ def certifying(on: Optional[bool] = None) -> bool:
 
 
 def unit_choice(tuner, args, kwargs) -> Optional[Tuple[str, Optional[Dict[str, int]]]]:
-    """What the certificate of this FMA launch chose on the executing card's class: ("unit", tile) when the matrix
-    unit was measured faster, ("fma", None) when the FMA kernel was, None when no certificate serves the key — read at
-    the key the door forms (`autotune_cache.key_of`), and at its computed twin as the door does."""
+    """What the certificate of this FMA launch NAMES on the executing card's class: ("unit", tile) when it carries a
+    matrix-unit tile, ("fma", None) when it carries none, None when no certificate serves the key — read at the key the
+    door forms (`autotune_cache.key_of`), and at its computed twin as the door does. A reading, never a decision: which
+    unit a launch runs is the RULE's (`ruled_unit_tile`), and a certificate that names the other one is refused there."""
     from nbxtensor.ops import autotune_cache as _atc
     qual = _UNIT_QUALS.get(id(tuner))
     if qual is None:
@@ -842,6 +843,46 @@ def unit_choice(tuner, args, kwargs) -> Optional[Tuple[str, Optional[Dict[str, i
         choice = ("unit", {f: int(unit["tile"][f]) for f in _UNIT_TILE_FIELDS}) if unit else ("fma", None)
     _UNIT_CHOICES[memo] = choice
     return choice
+
+
+#: (kernel, key) -> why the certificate's entry was refused by `ruled_unit_tile`; each is said once, and kept here
+_REFUSED_UNIT_ENTRIES: Dict[Tuple[str, tuple], str] = {}
+
+
+def refused_unit_entries() -> Dict[Tuple[str, tuple], str]:
+    """The certificate entries this process refused for naming the other unit than the rule's (a copy)."""
+    return dict(_REFUSED_UNIT_ENTRIES)
+
+
+def reset_refused_unit_entries() -> None:
+    """Forget what was refused and said. For tests, which must not depend on order."""
+    _REFUSED_UNIT_ENTRIES.clear()
+
+
+def ruled_unit_tile(tuner, args, kwargs, rule_tile: Dict[str, int], rows: List[Dict[str, Any]]) -> Dict[str, int]:
+    """The matrix-unit tile a launch the RULE gives to the unit runs at. Which unit runs is never a timing: the rule
+    (the profile's unit, the operands' representation, the rows the unit fills) gave it to the unit, whatever the
+    certificate says. The certificate decides only WHICH of the unit's own tiles (`rows`, the profile's declared
+    tiles for this representation: every one computes the same bits), and `rule_tile` is the tile with none.
+    A certificate entry that names the FMA kernel for this key (it carries no unit tile), or a tile the profile does not
+    declare, is a stale reading of the other route: it is REFUSED BY NAME (said once, kept in `refused_unit_entries`;
+    re-certify it) and the rule's tile runs."""
+    chosen = unit_choice(tuner, args, kwargs)
+    if chosen is None:
+        return dict(rule_tile)
+    kind, tile = chosen
+    declared = [tuple(int(r[f]) for f in _UNIT_TILE_FIELDS) for r in rows]
+    if kind == "unit" and tuple(tile[f] for f in _UNIT_TILE_FIELDS) in declared:
+        return dict(tile)
+    from nbxtensor.ops import autotune_cache as _atc
+    qual, key = _UNIT_QUALS.get(id(tuner)) or _atc.qual_of(tuner) or getattr(tuner, "__name__", "?"), _atc.key_of(tuner, args, kwargs)
+    if (qual, key) not in _REFUSED_UNIT_ENTRIES:
+        why = ("names the FMA kernel (no matrix-unit tile)" if kind == "fma"
+               else f"names a matrix-unit tile the profile does not declare ({tile})")
+        _REFUSED_UNIT_ENTRIES[(qual, key)] = why
+        _log.warning("[autotune] certificate entry %s %s REFUSED: it %s, and the rule gives this launch to the matrix "
+                     "unit; the entry is ignored for the unit (re-certify it)", kernel_short(qual), key, why)
+    return dict(rule_tile)
 
 
 def executing_memory_gb(args=None, device_idx: Optional[int] = None) -> Optional[int]:
@@ -951,14 +992,13 @@ def _validate_certification(where: str, entry: Any, fmt: str, expected_tol, key,
             problems.append(f"{where}: a matrix-unit choice without its tile ({', '.join(_UNIT_TILE_FIELDS)})")
         else:
             try:
-                udev, ums, fms = float(unit["deviation"]), float(unit["best_ms"]), float(unit["fma_best_ms"])
+                udev, ums = float(unit["deviation"]), float(unit["best_ms"])
             except (KeyError, TypeError, ValueError):
-                problems.append(f"{where}: a matrix-unit choice without its deviation and both timings")
+                problems.append(f"{where}: a matrix-unit choice without its deviation and its timing")
             else:
+                # the unit is the rule's, not the faster one: its tile is no longer required to beat the FMA kernel
                 if not (udev == udev) or udev < 0 or udev > tol:
                     problems.append(f"{where}: the matrix unit's deviation {udev:.3e} exceeds the tolerance {tol:.1e}")
-                if not ums < fms:
-                    problems.append(f"{where}: the matrix unit chosen at {ums:.4f} ms against the FMA kernel's {fms:.4f}")
     for ex in entry.get("excluded") or []:
         try:
             if float(ex.get("deviation")) <= tol:

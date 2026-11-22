@@ -895,8 +895,9 @@ def upsample_linear1d_wrapper(x, output_size, align_corners: bool=False, scales=
 def mm_cost(a, b, epilogue: int=0, native_bf16=None, force_accum=None, contract_half=None)
     # `mm` on `a` [M, K] and `b` [K, N] (`_cost.Spec`s), in the wrapper's order
 def matrix_unit_runs(tuner, args, kwargs)
-    # (tile, run) for each matrix-unit tile the profile declares for a matmul_kernel / addmm_kernel launch the unit
-    # can take: each run writes the launch's output on the unit, for a certifier to prove and time it
+    # (tile, run) for each matrix-unit tile the profile declares for a matmul_kernel / addmm_kernel launch the rule
+    # gives to the unit: each run writes the launch's output on the unit, for a certifier to prove and time (the unit is
+    # the rule's, never the faster of two routes)
 def addmm_cost(bias, a, b, epilogue: int=0, native_bf16=None, force_accum=None, contract_half=None)
     # `addmm` on `bias` ([N], [1, N] or [M, N]), `a` [..., K] and `b` [K, N] (`_cost.Spec`s), in the wrapper's order
 def bmm_cost(a, b, allow_strided_b: bool=False, native_bf16=None, force_accum=None, contract_half=None, unit=None)
@@ -3598,8 +3599,13 @@ def refuse_missing(kernel_qual: str, tuner, key: tuple) -> None
 def certified_config_for(kernel_name: str, key_fields: tuple) -> Optional[Dict[str, Any]]
     # for the screen: the certified entry of a kernel whose key starts with these fields, on the profile in force
 def unit_choice(tuner, args, kwargs) -> Optional[Tuple[str, Optional[Dict[str, int]]]]
-    # what the certificate of this FMA GEMM launch chose on the card's class: ("unit", tile) when the matrix unit was
-    # measured faster, ("fma", None), or None when no certificate serves the key
+    # what the certificate of this FMA GEMM launch NAMES on the card's class: ("unit", tile) when it carries a unit
+    # tile, ("fma", None) when it carries none, or None when no certificate serves the key. A reading, not a decision
+def ruled_unit_tile(tuner, args, kwargs, rule_tile, rows) -> Dict[str, int]
+    # the tile a launch the rule gave to the matrix unit runs at: the certificate's when it is one of `rows` (the
+    # profile's tiles, all of one set of bits), else `rule_tile`; an entry naming the FMA kernel or an undeclared tile
+    # is refused by name (said once)
+def refused_unit_entries() -> Dict[Tuple[str, tuple], str]    # the entries refused so, with why
 def certifying(on: Optional[bool] = None) -> bool
     # True while a certifier sweeps a key: a GEMM the matrix unit could take runs its FMA kernel; `on` sets it
 def report_contradictions(tuner, dropped) -> List[Dict[str, Any]]

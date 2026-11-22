@@ -369,23 +369,23 @@ def _gemm_unit_tile(a, b, M: int, N: int):
 
 def _gemm_route(tuner, args, kwargs, unit_tile):
     """The tile a GEMM the matrix unit can take (`unit_tile`, `_gemm_unit_tile`) runs at on the unit, or None for its
-    FMA kernel: the certificate of the FMA launch's key decides, which measured both routes on this card's class and
-    keeps the faster (`autotune_certified.unit_choice`) — never a threshold. A census shadow and the certifier's sweep
-    take the FMA kernel (its key is recorded, its configurations measured, the unit's tiles beside them); a
-    confirmation run with no certificate takes it too, and the launch refuses the missing key by name; any other run
-    with no certificate takes the unit at the profile's tile, as the vendor file declares it."""
+    FMA kernel. THE RULE decides, never a timing: a GEMM whose operands the profile's unit carries and whose rows fill
+    its smallest tile runs on the unit, on every machine, with every certificate and with none (a certificate's
+    `NBX_AUTOTUNE_CERTIFIED=off`, a confirmation run, an autotune sweep of the FMA kernel change nothing here). The
+    certificate picks only among the unit's own tiles (`autotune_certified.ruled_unit_tile`), and an entry that names
+    the FMA kernel is refused by name. A census shadow and the certifier's sweep take the FMA kernel (its key is
+    recorded, its configurations measured, the unit's tiles beside them); their output is not an answer."""
     if unit_tile is None:
         return None
     from nbxtensor.ops import autotune_certified as _cert
     from nbxtensor.ops.launch_observer import launch_observer
     if launch_observer().active() or _cert.certifying():
         return None
-    chosen = _cert.unit_choice(tuner, args, kwargs)
-    if chosen is None:
-        return None if _cert.certified_only() else unit_tile
-    kind, tile = chosen
-    if kind == "fma":
-        return None
+    mu = _matrix_unit()
+    split = unit_tile["split_a"] or unit_tile["split_b"]
+    rows = (mu["fp32_split"] if split else mu)["mm"]
+    rule_tile = {f: int(unit_tile[f]) for f in _cert._UNIT_TILE_FIELDS}
+    tile = _cert.ruled_unit_tile(tuner, args, kwargs, rule_tile, rows)
     return {**tile, "split_a": unit_tile["split_a"], "split_b": unit_tile["split_b"]}
 
 
@@ -394,7 +394,8 @@ def matrix_unit_runs(tuner, args, kwargs):
     launch (its arguments as the autotuner receives them), where the unit can take the GEMM
     (`launch_keys.matrix_unit_operands`): the rows of `matrix_unit.mm`, or of `fp32_split.mm` for an operand carried
     as hi + lo. Each run writes the launch's own output on the unit, so a certifier can prove it against the launch's
-    oracle and time it beside the FMA configurations (the certificate then names the faster). Empty otherwise."""
+    oracle and time it (the certificate then names the unit's fastest tile; the unit itself is the rule's, never the
+    faster of the two routes). Empty where the rule gives the GEMM to the FMA kernel."""
     from nbxtensor.ops import autotune_certified as _cert
     if getattr(getattr(tuner, "base_fn", None), "__name__", None) not in ("matmul_kernel", "addmm_kernel"):
         return []

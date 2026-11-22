@@ -413,9 +413,9 @@ def _three_passes(c: _Call, dev: int, hidden, route):
 
 
 def _projection(c: _Call, dev: int, name: str, x, out, dims, route) -> None:
-    """One grouped-GEMM pass: W4 when the tables are quantized; else on the matrix unit where the projection's
-    certificate chose it (`moe_wrappers.fused_moe_unit_tile`, the routing aligned again at the unit tile's rows, once
-    per block size), on the FMA kernel otherwise. `dims`: (N, K, the routing weight multiplied, divided by top_k)."""
+    """One grouped-GEMM pass: W4 when the tables are quantized; else on the matrix unit where the rule gives it
+    to the unit (`moe_wrappers.fused_moe_unit_tile`, the routing aligned again at the unit tile's rows, once per block
+    size), on the FMA kernel otherwise. `dims`: (N, K, the routing weight multiplied, divided by top_k)."""
     n, k, mul_routed, topk_div = dims
     scores, aligned, indices, unit_aligned = route
     t = c.tables
