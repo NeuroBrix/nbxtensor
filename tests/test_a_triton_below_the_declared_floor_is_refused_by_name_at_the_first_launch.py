@@ -74,6 +74,10 @@ def test_a_pre_release_of_the_floor_is_below_it(suffix):
 def test_the_launcher_refuses_before_it_touches_the_kernel_and_says_the_same_name(monkeypatch):
     import triton
     monkeypatch.setattr(triton, "__version__", _text(_below(), "+git0000000.nbx1"))
+
+    def touched(kernel):                 # what a launch reaches first after the floor: reaching it means no floor check
+        raise AssertionError("the launcher reached the kernel before checking the Triton floor")
+    monkeypatch.setattr(L, "_binder", touched)   # card-less too: no NoGpuRuntime to turn a missing check into a skip
     with pytest.raises(TF.TritonBelowFloor, match="needs Triton"):
         L.prepare(None, (), {})          # no kernel is needed: the refusal comes first
     with pytest.raises(TF.TritonBelowFloor):      # not remembered as fine: every launch is refused, none falls back
