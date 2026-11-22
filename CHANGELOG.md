@@ -44,6 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `PIECE`, `evict` and `cold_read_gbps` stay.
 
 ### Fixed
+- The test that gates Python `and` / `or` in the library's kernels states what the engine's own gate reads (the library's
+  `ops` kernels too, where it was red on the matrix-vector kernel) and what a mixed expression loses (the dropped
+  operand's effects and block shape, not a mask); only its text changes.
 - The copy of U a tuning call holds is read from the chunked gated delta rule's workspace entry for U, not typed beside
   it, so the cost's copy and the buffer the kernel launches cannot drift apart; a test changes the workspace's U and
   the copy follows.

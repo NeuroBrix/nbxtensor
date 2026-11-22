@@ -3,12 +3,14 @@
 Triton lowers `and` / `or` itself (`code_generator.visit_BoolOp`): on a tensor operand it warns that the construct is
 deprecated (Triton names it for removal) and computes both sides elementwise; on a constexpr operand it short-circuits,
 so a constexpr that is True drops out of the expression and the other operand alone is the result, with no word. A
-kernel that mixes the two loses a mask in silence. `&` / `|` on parenthesised comparisons say what they compute.
+kernel that mixes the two gets the short-circuit on one side only: what the dropped operand would have done (its side
+effects, its block shape) is gone with no word. `&` / `|` on parenthesised comparisons say what they compute.
 A boolean operator in the TEST of an `if`, `while` or conditional expression on constexpr values is scalar Python and
 is left alone.
 
-The engine's gate read only its own kernels; the library's had none, and `ops/gemv_vec.py` carried
-`tl.static_assert(BLOCK_K >= K_SUB and BLOCK_K % K_SUB == 0, ...)` (engine census, Mac M4 Pro, 2026-11-19).
+The engine's gate reads the library's `ops` kernels too (its OPS_DIRS) and was red on `ops/gemv_vec.py`, which carried
+`tl.static_assert(BLOCK_K >= K_SUB and BLOCK_K % K_SUB == 0, ...)` (engine census, Mac M4 Pro, 2026-11-19); the library
+held no test of its own for it, so the library alone, without the engine beside it, did not gate its own kernels.
 
 What this test would do if the code were wrong: a kernel with `and` / `or` producing a value is named with its line."""
 import ast
