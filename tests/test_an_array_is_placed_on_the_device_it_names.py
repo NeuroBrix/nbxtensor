@@ -73,12 +73,17 @@ def test_the_reader_sees_a_device_held_in_a_variable_and_lets_a_dtype_cast_pass(
     assert seen == [1, 2, 3]
 
 
-def test_no_upload_in_the_library_or_the_triton_engine_is_written_as_from_numpy_then_to_a_device():
+def test_no_upload_in_the_library_is_written_as_from_numpy_then_to_a_device():
+    """The library's own source only, found from this file (tests/ beside src/): a walk out of the repository by a
+    guessed layout read the engine's files on one machine and nothing at all on another."""
     import ast
     from pathlib import Path
-    root = Path(__file__).resolve().parents[2]
+    import nbxtensor
+    repo = Path(__file__).resolve().parents[1]
+    src = repo / "src" / "nbxtensor"
+    files = sorted(src.rglob("*.py"))
+    assert files and Path(nbxtensor.__file__).resolve().parent == src.resolve(), (src, nbxtensor.__file__)
     bad = []
-    for base in (root / "nbxtensor" / "src", root / "src" / "neurobrix" / "triton", root / "src" / "neurobrix" / "kernels"):
-        for f in sorted(base.rglob("*.py")):
-            bad += [f"{f.relative_to(root)}:{n}" for n in _moved_after_upload(ast.parse(f.read_text()))]
+    for f in files:
+        bad += [f"{f.relative_to(repo)}:{n}" for n in _moved_after_upload(ast.parse(f.read_text()))]
     assert not bad, bad
