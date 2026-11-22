@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- The host's speeds beside the device's (`nbxtensor.backend.host_measure`): `host_matmul_gflops` (a float32 GEMM on
+  numpy's BLAS) and `host_memory_gbps` (one host-memory copy), moved unchanged from NeuroBrix's planner, which keeps
+  calling its own copy until its side moves.
 - The expandable range's chunk BY RULE per memory class (`nbxtensor.memory.chunk_rule`, data in `chunk_rule.yml`): on
   a class with an entry the allocator takes the largest chunk of the class's measured grid that replayed faster than
   the driver segments, is whole units of the device's VMM granularity, and lies within the allocator's bound (what a
