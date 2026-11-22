@@ -37,6 +37,13 @@ _log = logging.getLogger(__name__)
 
 FORMAT = "nbx-autotune-certified/2"
 
+#: The library's BITS EPOCH: one number, raised by every change that moves the bits a kernel computes. A certified
+#: setting was proven against the bits of the library that wrote it; under another epoch the same setting may give
+#: other bits, so a certificate of another epoch (or with none, written before the epoch existed) is refused by name
+#: at load and its keys take the normal autotune path. 1: the matrix-family rule of 2026-11-22 (one unit tile per
+#: block_k, float16 activations on the unit's mm tiles), which moved the bits of every certificate written before it.
+BITS_EPOCH = 1
+
 #: Formats this reader accepts. `/2` added the `built` field, which says the
 #: kernel actually COMPILED on the device during its certifying run. A `/1`
 #: file pre-dates that field and is READ, not refused: the 5628 shapes the
@@ -372,6 +379,21 @@ def entry_certifications(entry: Optional[Dict[str, Any]]) -> List[Dict[str, Any]
 def entry_proofs(entry: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Every proof an entry carries, over every class and every certification (the rename and migration tools)."""
     return [p for c in entry_certifications(entry) for p in certification_proofs(c)]
+
+
+def entry_epochs(entry: Optional[Dict[str, Any]]) -> set:
+    """The bits epochs an entry's proofs were made under (`BITS_EPOCH`); None for a proof that carries none."""
+    return {p.get("bits_epoch") for p in entry_proofs(entry)}
+
+
+def epoch_refusal(entries: Any) -> Optional[str]:
+    """Why a file of these entries is not of this library's bits epoch, or None when every proof in it is."""
+    found = set().union(*(entry_epochs(e) for e in entries.values())) if isinstance(entries, dict) and entries else set()
+    if found <= {BITS_EPOCH}:
+        return None
+    said = ", ".join(sorted("none" if e is None else str(e) for e in found if e != BITS_EPOCH))
+    return (f"certified at bits epoch {said}, this library computes bits epoch {BITS_EPOCH}: its settings were proven "
+            f"against bits this library no longer computes")
 
 
 def certification_for_generator(cert: Optional[Dict[str, Any]], gen: Optional[str]) -> Optional[Dict[str, Any]]:
@@ -719,12 +741,24 @@ def file_certification(entries: Dict[str, Dict[str, Any]], ktext: str, cert: Dic
     generator (`_merge_into_class`): a proof of another generator is never
     replaced — the same configuration gains the fresh proof in `also_proven`,
     another configuration becomes an alternate of the class — and a proof of
-    the same generator is replaced."""
+    the same generator is replaced.
+
+    Every proof placed carries the library's `BITS_EPOCH`, and an entry the
+    file holds from another epoch (or from before the epoch) is dropped: the
+    loader refuses such a file whole, so the tool that files through here
+    writes the new epoch with no change of its own."""
     cls = proof_memory_gb(cert.get("proof"))
     if cls is None:
         raise ValueError("the certification's proof does not say which card's memory it was made on "
                          "(no machine.device.memory_mb): refused — an entry without a memory class is served to no card")
-    body = {"config": cert["config"], "proof": cert["proof"], "excluded": cert.get("excluded") or []}
+    stale = [k for k, e in entries.items() if entry_epochs(e) - {BITS_EPOCH}]
+    for k in stale:
+        del entries[k]      # proven under another bits epoch: refused at load whole, so dropped on purpose, not kept
+    if stale:
+        _log.warning("%s", f"[autotune] {len(stale)} entries of another bits epoch dropped from the file being "
+                           f"certified at bits epoch {BITS_EPOCH}; their keys certify again")
+    body = {"config": cert["config"], "proof": {**cert["proof"], "bits_epoch": BITS_EPOCH},
+            "excluded": cert.get("excluded") or []}
     if cert.get("unit"):
         body["unit"] = cert["unit"]          # the matrix unit's tile, measured faster than `config` on this class
     cur = entries.get(ktext)
@@ -1021,6 +1055,9 @@ def validate(doc: Any, path: Path, tuner=None) -> List[str]:
     fmt = doc.get("format") if isinstance(doc, dict) else None
     if fmt not in _FORMATS:
         return [f"format is not one of {list(_FORMATS)!r}"]
+    epoch = epoch_refusal(doc.get("entries"))
+    if epoch:
+        return [epoch]
     vendor, profile = path.parent.parent.name, path.parent.name
     stem_kernel, stem_dtype = path.stem.rsplit(".", 1) if "." in path.stem else (path.stem, "")
     if doc.get("vendor") != vendor or doc.get("profile") != profile:

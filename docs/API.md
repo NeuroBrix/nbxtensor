@@ -3607,6 +3607,11 @@ def read(path: Path) -> Optional[IndexedEntries]                 # None when abs
 
 ```python
 def say_once(msg: str) -> None   # a DEBUG line said once a process (a refusal or a notice repeated per launch)
+BITS_EPOCH: int   # raised by every change that moves a kernel's bits; a certificate of another epoch (or none) is refused
+def entry_epochs(entry) -> set   # the bits epochs an entry's proofs were made under (None for a proof that carries none)
+def epoch_refusal(entries) -> Optional[str]
+    # why a file's entries are not of this library's bits epoch (naming theirs and the library's), or None; `validate`
+    # gives it first, the loader refuses the file by name and its keys autotune
 # serving a run
 def enabled() -> bool   # False under NBX_AUTOTUNE_CERTIFIED=off: every key sweeps at run time (the proof's runtime-sweep arm)
 def active_profile() -> Optional[Tuple[str, str]]   # (vendor, profile) in force, from the profile files themselves

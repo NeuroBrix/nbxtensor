@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- The library's bits epoch (`autotune_certified.BITS_EPOCH`, now 1): one number raised by every change that moves a
+  kernel's bits. Every proof the placement rule (`file_certification`) files carries it, and the entries a file holds
+  from another epoch are dropped as it files, so a certifying tool writes the new epoch with no change of its own. At
+  load a certificate of another epoch, or with none (every certificate written before the matrix-family rule of
+  2026-11-22), is REFUSED BY NAME — the file, its epoch and the library's — and its keys take the normal autotune
+  path: a user who certified with the old library is not served stale settings after the upgrade.
 - A weight reader that measures itself on the load it serves (`nbxtensor.io.reader.Reader`): the model's weight files
   are read with parallel reads that start at one and double while the rate measured on those same reads rises, then
   settle on the best width. Nothing is measured ahead of the load and nothing is kept; the caller sets the most reads
