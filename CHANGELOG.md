@@ -51,6 +51,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   17 replays of 24 and about a tenth of their replay time. The replay still runs under the card size the trace was
   recorded on: under the trace's own live peak the same events are refused and map more, not fewer.
   `pool.simulate` now returns the chunks it maps and unmaps.
+- The library names no application in the autotune record's module walk: the kernel modules it walks for autotuners are
+  its own (`nbxtensor.ops.`) and the prefixes the application registers (`autotune_cache.register_kernel_module_prefix`);
+  the engine's `neurobrix.kernels.ops.` prefix is gone from the source (the engine holds no autotuned kernel under it
+  today). The application gives the replay cache directory through `autotune_cache.set_replay_cache_dir` (a path or a
+  callable read when used), which wins over every default; the engine's own variable and `~/.neurobrix` home stay as the
+  default until the engine passes its directory, so the engine keeps its cache where it is, and leave with that call.
 
 ### Deprecated
 - The read-rate trial API of `nbxtensor.io.read_rate` (`workers_for`, `measure`, `choose`, `mount_of`,

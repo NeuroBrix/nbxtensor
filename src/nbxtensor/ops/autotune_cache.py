@@ -17,7 +17,8 @@ in-memory caches, immune to source-hash invalidation:
 
 R33: imports triton + stdlib only. The artifact is an optimization,
 never a failure source — every I/O error degrades to "no seed".
-Storage: ~/.neurobrix/replay_cache/autotune_configs_<arch>.json.
+Storage: <replay cache directory>/autotune_configs_<arch>.json; the directory is the application's to give
+(`set_replay_cache_dir`), see `_dir`.
 """
 
 import ast
@@ -32,18 +33,35 @@ _log = logging.getLogger(__name__)
 # a gate that needs a truly cold sweep per arm gives every arm its own, else
 # sweep mode seeds the autotuners from here and no arm sweeps (2026-09-06:
 # a screened arm reported "checked 0 key(s)" for exactly this reason).
+_REPLAY_DIR: list = [None]      # what the application gave (`set_replay_cache_dir`): a path, or a callable returning one
+
+
+def set_replay_cache_dir(where) -> None:
+    """The application gives the library the directory of its replay cache: a path, or a callable returning one (read
+    when used, never frozen); None forgets it. The library holds no application's name or path: the directory is the
+    caller's to give, and what it gives wins over every default below."""
+    if where is not None and not (callable(where) or isinstance(where, (str, os.PathLike))):
+        raise TypeError("set_replay_cache_dir: a path, a callable returning a path, or None")
+    _REPLAY_DIR[0] = where
+
+
 def _dir() -> str:
-    """Where the local replay cache lives, read WHEN USED.
+    """Where the local replay cache lives, read WHEN USED: the directory the application gave
+    (`set_replay_cache_dir`), else, UNTIL THE ENGINE GIVES ITS OWN, the one the engine's own environment variable and
+    home name (kept only so the engine keeps its cache where it is; removed with the engine's call, see the changelog).
 
     This was a module global computed at import time. A value frozen at import
     from an environment variable is the same class of defect as a literal
     standing in for a runtime value: whoever imports the module first decides it
     for the whole process. Measured 2026-09-17 — a test redirecting
-    NEUROBRIX_REPLAY_CACHE to a tmp path imported this module inside its own
+    the cache to a tmp path imported this module inside its own
     body, froze the tmp path, and a later test in the same process asserting on
     the real directory failed. monkeypatch restored the env; it could not
     restore a constant already computed from it.
     """
+    given = _REPLAY_DIR[0]
+    if given is not None:
+        return str(given() if callable(given) else given)
     return (os.environ.get("NEUROBRIX_REPLAY_CACHE")
             or os.path.join(os.path.expanduser("~"), ".neurobrix", "replay_cache"))
 
@@ -132,11 +150,28 @@ def _artifact_path() -> Optional[str]:
     return os.path.join(_dir(), f"autotune_configs_{arch}-{gen}.json")
 
 
+_KERNEL_MODULE_PREFIXES: Tuple[str, ...] = ("nbxtensor.ops.",)
+
+
+def register_kernel_module_prefix(prefix: str) -> None:
+    """An application that keeps Triton kernels of its own names the module prefix they live under (`"app.kernels."`):
+    every autotuned kernel of a module loaded under it is then captured, seeded and certified like the library's. The
+    library holds no application's prefix; with none registered only `nbxtensor.ops.` is walked. Idempotent; a prefix
+    ends in a dot (one is added)."""
+    global _KERNEL_MODULE_PREFIXES
+    if not isinstance(prefix, str) or not prefix.strip("."):
+        raise ValueError(f"register_kernel_module_prefix: a module prefix such as 'app.kernels.', not {prefix!r}")
+    p = prefix if prefix.endswith(".") else prefix + "."
+    if p not in _KERNEL_MODULE_PREFIXES:
+        _KERNEL_MODULE_PREFIXES = _KERNEL_MODULE_PREFIXES + (p,)
+
+
 def _autotuners() -> Iterator[Tuple[str, object]]:
     """Every Autotuner the process has loaded from the kernel library — the
-    five sanctioned sites first (imported on demand), then every other
-    `neurobrix.kernels.ops.*` module already in sys.modules. Since 2026-09-05
-    the engine is the only persistence of a sweep (upstream's on-disk cache
+    five sanctioned sites first (imported on demand), then every other kernel
+    module already in sys.modules under the library's own prefix (`nbxtensor.ops.`) or one the application registered
+    (`register_kernel_module_prefix`). Since 2026-09-05
+    the application is the only persistence of a sweep (upstream's on-disk cache
     keyed its files by a torch-importing driver probe and was dropped), so
     every tuner's selections are captured, not only the matmul class's."""
     import importlib
@@ -152,8 +187,8 @@ def _autotuners() -> Iterator[Tuple[str, object]]:
             seen.add(id(obj))
             yield f"{mod_name}.{attr}", obj
     for mod_name, mod in list(sys.modules.items()):
-        # the kernel files: the library's (`nbxtensor.ops`) and the engine's still to move (`neurobrix.kernels.ops`)
-        if not mod_name.startswith(("nbxtensor.ops.", "neurobrix.kernels.ops.")) or mod is None:
+        # the kernel files: the library's own (`nbxtensor.ops.`) and the prefixes the application registered
+        if not mod_name.startswith(_KERNEL_MODULE_PREFIXES) or mod is None:
             continue
         for attr, obj in list(vars(mod).items()):
             if isinstance(obj, Autotuner) and id(obj) not in seen:

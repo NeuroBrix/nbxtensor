@@ -1223,7 +1223,7 @@ def dispatch(op_type: str) -> Optional[Callable]:
         _OP_MAP = _build_op_map()
 
     # The library's own op names, as given: a graph's aliases (aten::multiply for mul) are the application's to
-    # resolve before it asks (NeuroBrix: neurobrix.kernels.classification.kernel_for).
+    # resolve before it asks (the application keeps its own table of them).
     op_name = op_type.split("::")[-1] if "::" in op_type else op_type
     return _OP_MAP.get(op_name)
 

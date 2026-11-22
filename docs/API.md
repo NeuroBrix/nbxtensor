@@ -3553,6 +3553,11 @@ def seed_late(at) -> int                  # a tuner imported after the first see
 def qual_of(at) -> Optional[str]          # a loaded tuner's qualified name `module.attr`
 def config_to_dict(cfg) -> Dict           # a Triton config as the store and a certified directory record it
 def config_from_dict(d)                   # ... and back
+def set_replay_cache_dir(where) -> None   # the application gives the replay cache directory (a path, or a callable read
+    # when used; None forgets it); it wins over every default
+def register_kernel_module_prefix(prefix: str) -> None
+    # the application names the module prefix its autotuned kernels live under; the walk covers `nbxtensor.ops.` and
+    # the prefixes registered
 ```
 
 ### `nbxtensor.ops.autotune_bucket` — the autotune keys' size classes, from the profile's ladders
