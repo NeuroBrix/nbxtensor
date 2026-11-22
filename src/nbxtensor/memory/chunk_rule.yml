@@ -1,0 +1,19 @@
+# The expandable range's chunk BY RULE per memory class (nbxtensor.memory.chunk_rule; orders row 211, 2026-11-22):
+# no sweep at a first launch when the card's class has an entry here. A class with no entry is measured once
+# (memory.trace_replay.chunk_by_replay) and kept in the hardware profile, as before.
+#
+# Per class: the carried trace the class is replayed on (memory/traces/), and the grid measured on a quiet card of
+# that class: chunk MiB -> mean of 5 runs of the per-run median replay seconds (OFF/8/16/32/64 MiB round-robin x3 a
+# run, no stop bound; 0 = the driver segments, R16 OFF). The rule takes the largest measured chunk that is faster
+# than OFF AND within the allocator's bound (chunk_rule.bound_bytes, computed from the trace, not stated here).
+# Source of the grids: the Dell, V100-SXM2 cards 0 (16 GB) and 3 (32 GB), clocks 1290/877, 2026-11-22
+# (transfer/dell_cards/first_launch_measure/stability_c0.txt, stability_c3.txt). The first-launch sweep on the same
+# cards chose 16 MiB once and 32 MiB nine times out of ten: its stop bound (OFF's max of 3 replays) sat on 16 MiB's
+# own time, so OFF's noise decided; the grid has no stop bound.
+classes:
+  16g:
+    trace: sana-video-2b-720p.16g.2026-11-02.tsv
+    grid_seconds: {0: 2.656, 8: 4.404, 16: 3.105, 32: 2.347, 64: 2.114}
+  32g:
+    trace: sana-video-2b-720p.16g.2026-11-02.tsv
+    grid_seconds: {0: 2.027, 8: 4.140, 16: 2.592, 32: 1.983, 64: 1.714}

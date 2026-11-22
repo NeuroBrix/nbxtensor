@@ -711,14 +711,21 @@ class DeviceAllocator:
 
     @staticmethod
     def _vmm_chunk_fact(dev: int) -> int:
-        """The expandable pool's chunk on `dev`: the hardware profile's measured `vmm_chunk_bytes` (first launch,
-        `facts_probe.vmm_chunk_bytes`; 0 = the device has no VMM). No profile installed (a tool, a test): 0. A profile
-        whose device states no measurement: refused by name — never a chunk the code chose."""
+        """The expandable pool's chunk on `dev`: the RULE for the card's memory class (`memory.chunk_rule`, its
+        `chunk_rule.yml`) when the class has an entry; else the hardware profile's measured `vmm_chunk_bytes` (the
+        class measured once at its first launch, `facts_probe.vmm_chunk_bytes`; 0 = the device has no VMM). No profile
+        installed (a tool, a test): 0. A class with no rule whose profile states no measurement: refused by name —
+        never a chunk the code chose."""
+        from nbxtensor.memory import chunk_rule
         from nbxtensor.ops.wrappers import get_hardware_profile
         prof = get_hardware_profile()
         if prof is None or not getattr(prof, "devices", None):
             return 0
         spec = next((d for d in prof.devices if getattr(d, "index", None) == dev), None)
+        card_mb = int(getattr(spec, "memory_mb", 0) or 0) if spec is not None else 0
+        ruled = chunk_rule.vmm_chunk_bytes(dev, card_mb * chunk_rule.MiB) if card_mb > 0 else None
+        if ruled:
+            return ruled
         measured = (getattr(spec, "measured", None) or {}) if spec is not None else {}
         if "vmm_chunk_bytes" not in measured:
             raise RuntimeError(

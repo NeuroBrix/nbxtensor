@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- The expandable range's chunk BY RULE per memory class (`nbxtensor.memory.chunk_rule`, data in `chunk_rule.yml`): on
+  a class with an entry the allocator takes the largest chunk of the class's measured grid that replayed faster than
+  the driver segments, is whole units of the device's VMM granularity, and lies within the allocator's bound (what a
+  refusal's reclaim can strand, (2 (B + 1) + 1) chunks for B large blocks live at the carried run's peak, within the
+  card's room over that peak; 75.7 MiB on the carried 16 GB trace). Both measured classes (16 and 32 GB) get 64 MiB, so
+  their first launch owes no chunk sweep (40-48 s on the rack, and its choice varied between 16 and 32 MiB). A class
+  with no entry is measured once and kept, as before.
 - The library's bits epoch (`autotune_certified.BITS_EPOCH`, now 1): one number raised by every change that moves a
   kernel's bits. Every proof the placement rule (`file_certification`) files carries it, and the entries a file holds
   from another epoch are dropped as it files, so a certifying tool writes the new epoch with no change of its own. At
