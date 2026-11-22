@@ -41,6 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `PIECE`, `evict` and `cold_read_gbps` stay.
 
 ### Fixed
+- The copy of U a tuning call holds is read from the chunked gated delta rule's workspace entry for U, not typed beside
+  it, so the cost's copy and the buffer the kernel launches cannot drift apart; a test changes the workspace's U and
+  the copy follows.
 - A tuning keyword the installed Triton's autotuner lacks is refused with the kernel's qualified name in the message
   (`module.kernel`), so a failure at import says which kernel asked for it.
 - The library's metadata states its Triton floor, 3.5.0 (`triton>=3.5.0`), the first release with everything the launch

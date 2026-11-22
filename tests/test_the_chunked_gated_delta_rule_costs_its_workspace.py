@@ -97,3 +97,20 @@ def test_the_cost_names_the_copy_every_restored_argument_of_the_state_kernel_tak
     c = C.gated_delta_rule_chunked(*_specs(B=1, L=8192, Hk=16, Hv=32, dk=128, dv=128, dt="bfloat16"),
                                    qk_l2norm=True, compute_dtype=F32)
     assert dict((b.name, b.nbytes) for b in c.workspace)["tuning copy u_ptr"] == 134_217_728
+
+
+def test_the_tuning_copy_of_u_has_the_shape_of_the_workspace_entry_for_u(monkeypatch):
+    """The copy's shape is read from the workspace's entry for U, not repeated beside it: were the workspace to hold U
+    at another shape, the copy follows (a copy typed beside the workspace stays at the old shape - red; qa on 1212)."""
+    pytest.importorskip("triton")
+    from nbxtensor.ops import gated_delta_rule_chunked as CH
+    real = CH.gated_delta_rule_chunked_workspace
+    assert gated_delta_rule_chunked_tuning_copies(2, 100, 6, 32, 48)["u_ptr"] == real(2, 100, 6, 32, 48)["u"]
+
+    def drifted(B, L, Hv, dk, dv):
+        ws = dict(real(B, L, Hv, dk, dv))
+        ws["u"] = (B, L, Hv, dv + 7)
+        return ws
+
+    monkeypatch.setattr(CH, "gated_delta_rule_chunked_workspace", drifted)
+    assert gated_delta_rule_chunked_tuning_copies(2, 100, 6, 32, 48)["u_ptr"] == (2, 100, 6, 55)

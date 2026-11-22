@@ -390,12 +390,19 @@ def gated_delta_rule_chunked_workspace(B: int, L: int, Hv: int, dk: int, dv: int
     return {"w": (B, L, Hv, dk), "u": (B, L, Hv, dv), "gc": (B, L, Hv), "states": (B, chunks, Hv, dk, dv)}
 
 
+# The state kernel's restored argument -> the workspace entry whose buffer it is (U is `ws["u"]`, launched as `u_ptr`).
+_TUNING_COPY_OF = {"u_ptr": "u"}
+
+
 def gated_delta_rule_chunked_tuning_copies(B: int, L: int, Hv: int, dk: int, dv: int) -> Dict[str, Tuple[int, ...]]:
     """The float32 buffers a call that tunes holds beside the workspace, by the state kernel's argument they copy: the
     state kernel overwrites U with V' and declares `restore_value=['u_ptr']`, so the sweep clones U before each
     configuration it measures and copies it back after (one copy alive at a time; 134 MB at B=1, L=8192, Hv=32,
-    dv=128). A call that finds its setting tuned makes none. One answer for the cost and its tests."""
-    return {"u_ptr": (B, L, Hv, dv)}
+    dv=128). A call that finds its setting tuned makes none. The copy's shape is the workspace's entry for the
+    buffer the argument holds (`_TUNING_COPY_OF`), read at each call, so the two cannot drift. One answer for the cost
+    and its tests."""
+    workspace = gated_delta_rule_chunked_workspace(B, L, Hv, dk, dv)
+    return {arg: workspace[entry] for arg, entry in _TUNING_COPY_OF.items()}
 
 
 def gated_delta_rule_chunked_launch(q, k, v, g, beta, state, out, state_out, ws, *, qk_l2norm: bool, eps: float,
