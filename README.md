@@ -88,7 +88,7 @@ the keys (`pip install neurobrix`), with these commands (run as written on a cle
 
    ```
    neurobrix autotune certify --profile volta \
-       --keys ~/.neurobrix/replay_cache/autotune_configs_cuda-70-triton_3.8.0.json --out ./my-certificates
+       --keys ~/.neurobrix/replay_cache/autotune_configs_cuda-70-triton_3.8.0-e1.json --out ./my-certificates
    ```
 
 3. Check that they are served: a certified-only run uses only certificates and fails, naming the key, if one is missing:

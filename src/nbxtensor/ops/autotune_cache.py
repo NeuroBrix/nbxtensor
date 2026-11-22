@@ -26,6 +26,7 @@ import json
 import os
 from typing import Dict, Iterator, List, Optional, Tuple
 import logging
+import re
 _log = logging.getLogger(__name__)
 
 # The machine's replay cache (the producer's accumulation across models, and
@@ -380,10 +381,37 @@ _STORED: List[Optional[Dict[str, Dict]]] = [None]     # the artifact, read once 
 _SEEDED_TUNERS: set = set()                           # id() of every tuner the artifact was offered to
 
 
+_RETIRED_NAMED: set = set()     # replay artifacts of another bits epoch already named in this process
+
+
+def _name_retired(path: Optional[str]) -> None:
+    """Name, once, every replay artifact of this arch and generator that the bits epoch retired: the old name of
+    before the epoch (`autotune_configs_<arch>-<gen>.json`) and any other `-e<n>`. Never read: its keys sweep."""
+    if path is None:
+        return
+    from nbxtensor.ops.autotune_certified import BITS_EPOCH
+    base = path[: -len(f"-e{BITS_EPOCH}.json")]
+    folder, stem = os.path.dirname(base), os.path.basename(base)
+    try:
+        names = os.listdir(folder)
+    except OSError:
+        return
+    for name in sorted(names):
+        m = re.fullmatch(re.escape(stem) + r"(?:-e(\d+))?\.json", name)
+        full = os.path.join(folder, name)
+        if m is None or full == path or full in _RETIRED_NAMED:
+            continue
+        _RETIRED_NAMED.add(full)
+        _log.warning("%s", f"[autotune] replay artifact NOT READ {full}: written at bits epoch {m.group(1) or 'none'}, "
+                           f"this library computes bits epoch {BITS_EPOCH} — its keys sweep at runtime")
+
+
 def _stored() -> Dict[str, Dict]:
-    """The artifact's entries, read once per process ({} when there is none or it cannot be read)."""
+    """The artifact's entries, read once per process ({} when there is none or it cannot be read). A replay artifact
+    of another bits epoch is never read; it is named once (`_name_retired`)."""
     if _STORED[0] is None:
         path = _artifact_path()
+        _name_retired(path)
         try:
             with open(path) as f:
                 _STORED[0] = json.load(f) if path is not None else {}
