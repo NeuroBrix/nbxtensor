@@ -81,7 +81,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it (`CC`, else `gcc` then `clang` on PATH), and refuses a missing one by name (`NoCCompiler`) instead of failing on
   "Failed to find C compiler" inside the first build. A `CC` naming a compiler that does not exist is refused by that name.
   The library's own launch path needs no C compiler and is not checked: a kernel compiles to its binary with the vendor's
-  assembler and the library's driver loads it.
+  assembler and the library's driver loads it. Triton builds only on a cache miss, so a machine whose Triton cache already
+  holds the built helper keeps working with no compiler: the refusal is registered as Triton's build implementation
+  (`triton.knobs.build.impl`), which Triton reaches only on a miss, and the driver is made at once, so the helper loads
+  from the cache or the miss is refused by name before the hand-back.
 - The launcher checks the installed Triton once against the floor the library declares and refuses a Triton below it by
   name, with no fallback: the dependency's floor binds only where pip installs Triton, so on a Mac or with a source-built
   Triton anywhere an older one still failed on an AttributeError at the first launch (qa on 1217). The floor is read from

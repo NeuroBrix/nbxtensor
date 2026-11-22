@@ -3469,7 +3469,9 @@ TRITON_NAMES: Tuple[str, ...]           # ("gcc", "clang"): the names Triton tri
 def ensure(target=None, environ=None) -> None
     # refuse by name a process with no C compiler where Triton's own driver will build one (a foreign kernel handed back
     # by the launcher's seam, the differential arm's device selection); answered once per process; a backend whose
-    # driver never builds with triton/runtime/build.py, or a registered triton.knobs.build.impl, needs none
+    # driver never builds with triton/runtime/build.py, or a registered triton.knobs.build.impl, needs none; with no
+    # compiler the refusal is registered as triton.knobs.build.impl (reached only on a Triton cache miss) and the active
+    # driver is made at once: a cache holding the helper loads it, a miss is refused by name there
 def resolve(environ=None) -> Tuple[Optional[str], str]
     # (executable or None, what was asked for): CC when set (it must resolve), else gcc then clang on PATH, as
     # triton/runtime/build.py `_find_compiler` resolves it

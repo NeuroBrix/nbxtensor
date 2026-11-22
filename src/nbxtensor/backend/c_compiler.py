@@ -14,6 +14,14 @@ fails at the build if it names nothing; here it must resolve to an executable (`
 name on PATH), so a `CC` naming a missing compiler is refused by its own name. A build implementation registered with
 Triton (`triton.knobs.build.impl`) replaces the compiler there, so none is needed here either.
 
+Triton builds only on a cache miss (`triton/runtime/build.py`, `_compile_so`: the cache is read first, `_build` only when
+the file is absent), so a machine whose Triton cache already holds the built helper (a pre-warmed image, a compiler
+removed after the first run) works with no compiler. The cache is not read here by a second, guessed key: where no
+compiler is found, the refusal is registered as Triton's build implementation (`triton.knobs.build.impl`, the hook
+Triton's own error names), which Triton reaches only on a miss, and Triton's active driver is made at once, so its C
+helper is either loaded from the cache or refused by name now, before the hand-back; a later kernel's launcher stub that
+misses the cache is refused by the same name at its build.
+
 Checked only where a Triton build can happen: the Triton backend that serves this process's compile target must be one
 whose driver builds with `triton/runtime/build.py` (read from the backend's own driver module, never from a list of
 names). A backend that never builds with it is not checked. Answered once per process: a launch then pays a flag."""
@@ -84,12 +92,29 @@ def ensure(target=None, environ=None) -> None:
         return
     found, asked = resolve(environ)
     if found is None:
-        raise NoCCompiler(
-            f"Triton's driver builds a C helper at its first use and no C compiler was found ({asked}; Triton resolves "
-            f"CC, else {' then '.join(TRITON_NAMES)} on PATH, triton/runtime/build.py): refused here, by name, instead "
-            f"of inside the first build. Install a C compiler (e.g. gcc) or set CC to one that exists.")
+        _refuse_at_build(NoCCompiler(
+            f"Triton's driver builds a C helper that its cache does not hold and no C compiler was found ({asked}; "
+            f"Triton resolves CC, else {' then '.join(TRITON_NAMES)} on PATH, triton/runtime/build.py): refused by name "
+            f"instead of inside the build. Install a C compiler (e.g. gcc) or set CC to one that exists; a Triton cache "
+            f"already holding the built helper needs none."))
+        _make_driver()                  # the helper loads from Triton's cache, or the refusal fires here
     if not explicit:
         _OK[0] = True
+
+
+def _refuse_at_build(error: NoCCompiler) -> None:
+    """Register `error` as Triton's build implementation: Triton calls it only for a build its cache misses."""
+    from triton import knobs
+
+    def refuse(name, src, srcdir, library_dirs, include_dirs, libraries):
+        raise error
+    knobs.build.impl = refuse
+
+
+def _make_driver() -> None:
+    """Make Triton's active driver now: its C helper is loaded from Triton's cache or built at this point."""
+    from triton.runtime import driver
+    driver.active.get_current_target()
 
 
 def reset() -> None:

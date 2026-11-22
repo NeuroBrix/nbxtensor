@@ -8,7 +8,8 @@ launch to Triton's own driver: a kernel that is not the library's, and the diffe
 What this test does if the code is wrong: a CC naming a missing compiler accepted (red), the refusal without the name
 asked for (red), no CC and nothing on PATH accepted or refused without the names tried (red), a second read of the
 environment after a positive answer (red), a hand-back to Triton's driver that does not ask first (red), a backend that
-never builds with a C compiler refused (red), names or an order Triton does not use (red).
+never builds with a C compiler refused (red), names or an order Triton does not use (red), a machine whose Triton
+cache already holds the helper refused for having no compiler (red).
 
 Run: python -m pytest tests/<this file>"""
 import inspect
@@ -25,9 +26,22 @@ from nbxtensor.backend import c_compiler as C  # noqa: E402
 BUILDS = GPUTarget("cuda", 70, 32)          # a target whose Triton backend builds a C helper (read, not assumed below)
 
 
+#: a C helper built through Triton's own build and cache (`compile_so_from_src`), standing for the driver's
+PROBE = "int nbx_cc_probe(void) { return 1; }\n"
+
+
+def _probe_build():
+    from triton.runtime import build
+    return build.compile_so_from_src(PROBE, "nbx_cc_probe")
+
+
 @pytest.fixture(autouse=True)
-def _fresh(monkeypatch):
+def _fresh(monkeypatch, tmp_path):
+    from triton import knobs
     monkeypatch.setattr(C, "_build_impl", lambda: None)
+    monkeypatch.setattr(knobs.build, "impl", None)
+    monkeypatch.setenv("TRITON_CACHE_DIR", str(tmp_path / "triton_cache"))   # cold unless a test warms it
+    monkeypatch.setattr(C, "_make_driver", _probe_build, raising=False)                   # the driver's helper build, through Triton
     C.reset()
     yield
     C.reset()
@@ -131,3 +145,20 @@ def test_the_differential_arm_asks_before_it_reaches_tritons_driver(tmp_path, mo
     monkeypatch.setenv("CC", str(tmp_path / "gone"))
     with pytest.raises(C.NoCCompiler):
         DeviceAllocator.ensure_triton_device(0)
+
+
+def test_a_triton_cache_that_holds_the_helper_needs_no_compiler(tmp_path, monkeypatch):
+    """Triton builds only on a cache miss (build.py `_compile_so`): a machine whose cache holds the helper works with no
+    compiler and is not refused."""
+    from triton import knobs
+    if C.resolve({})[0] is None:
+        pytest.skip("no C compiler here to warm the cache with")
+    _probe_build()                                   # warmed with this machine's compiler
+    assert knobs.build.impl is None
+    C.ensure(BUILDS, {"CC": str(tmp_path / "gone")})  # the helper is a cache hit: no build, no refusal
+
+
+def test_a_cold_cache_with_no_compiler_is_refused_by_name_at_the_driver(tmp_path):
+    with pytest.raises(C.NoCCompiler) as err:
+        C.ensure(BUILDS, {"CC": str(tmp_path / "gone")})
+    assert "gone" in str(err.value) and "cache" in str(err.value)
