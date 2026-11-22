@@ -70,6 +70,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the copy follows.
 - A tuning keyword the installed Triton's autotuner lacks is refused with the kernel's qualified name in the message
   (`module.kernel`), so a failure at import says which kernel asked for it.
+- The launcher checks the installed Triton once against the floor the library declares and refuses a Triton below it by
+  name, with no fallback: the dependency's floor binds only where pip installs Triton, so on a Mac or with a source-built
+  Triton anywhere an older one still failed on an AttributeError at the first launch (qa on 1217). The floor is read from
+  the declaration (the dependency line of `pyproject.toml` beside the source, or the installed package's metadata), never
+  typed a second time; a local version such as `3.8.0+git4a15f415.nbx1` is read as its release, and a pre-release is
+  below the release it precedes.
 - The library's metadata states its Triton floor, 3.5.0 (`triton>=3.5.0`), the first release with everything the launch
   path calls without a fallback (`JITFunction._pack_args`, `is_gluon`); it allowed any Triton before, and an older one
   failed on an AttributeError at the first launch. A test reads the declared floor and the installed Triton against it.

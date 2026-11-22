@@ -26,6 +26,7 @@ import ctypes
 import os
 
 from nbxtensor.backend import cuda_profile as _profile
+from nbxtensor.backend import triton_floor as _triton_floor
 
 import numpy as np
 import struct
@@ -1111,6 +1112,7 @@ def prepare(kernel, args, kwargs) -> Tuple[_Prepared, Dict[str, Any]]:
     runtime round trip per launch is what a launcher must not do (2026-09-08:
     the launcher held ten times the decode rate of the engine).
     """
+    _triton_floor.ensure()              # the installed Triton against the declared floor, once; refused by name
     from triton.compiler import compile as triton_compile
     from triton.runtime.jit import compute_cache_key
     kernel_cache, key_cache, backend = _binder(kernel)

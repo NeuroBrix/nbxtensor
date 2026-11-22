@@ -3461,6 +3461,17 @@ A service still refused in the environment without NeuroBrix names its row here.
 Every public name of these modules, with its signature and what it answers (the first line of its docstring);
 the guard `tests/unit/nbxtensor_boundary/test_every_public_name_is_in_the_api.py` keeps this complete.
 
+### `nbxtensor.backend.triton_floor` — the Triton floor the library declares, checked against the installed one
+
+```python
+class TritonBelowFloor(RuntimeError)    # the installed Triton is older than the declared floor
+def ensure(installed: Optional[str]=None) -> None
+    # refuse by name a Triton below the floor (the dependency line of pyproject.toml beside the source, else the installed
+    # metadata: one declaration); answered once per process, the launcher's `prepare` calls it; no floor declared, no check
+def parse_version(text: str) -> Tuple[Tuple[int, ...], bool]    # `3.8.0+git4a15f415.nbx1` -> ((3, 8, 0), False)
+def reset() -> None                     # forget the answer (tests)
+```
+
 ### `nbxtensor.backend.launcher` — compile, load and launch a Triton kernel; time and screen autotune candidates
 
 ```python
