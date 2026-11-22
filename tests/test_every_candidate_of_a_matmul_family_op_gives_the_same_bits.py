@@ -101,3 +101,27 @@ def test_every_candidate_of_the_op_gives_the_same_bits(monkeypatch, op, dtype, m
         tuner.configs[:] = kept_configs
         tuner.cache.clear()
         tuner.cache.update(kept_cache)
+
+
+def _unit_mm_tiles(profile_dir):
+    """(file, representation, [block_k of each declared mm tile]) for every matrix unit a device profile declares: the
+    unit's own operands (`matrix_unit.mm`) and every other representation on it (`matrix_unit.<name>.mm`)."""
+    import yaml
+    for f in sorted(profile_dir.rglob("*.yml")):
+        mu = (yaml.safe_load(f.read_text()) or {}).get("matrix_unit") or {}
+        reps = [("operand_dtype", mu)] + [(k, v) for k, v in mu.items() if isinstance(v, dict) and "mm" in v]
+        for name, rep in reps:
+            if rep.get("mm"):
+                yield f.name, name, [int(t["block_k"]) for t in rep["mm"]]
+
+
+def test_every_representation_declares_its_unit_tiles_at_one_block_k():
+    """Card-less, on the shipped profiles. The unit kernel sums each block_k tile's MMA steps into a partial before adding
+    it into the accumulator (matmul_m8n8k4), so the order of the sums follows block_k: tiles of one representation at two
+    block_k would let the certificate's choice of tile change the bits again, and only a card would see it."""
+    from pathlib import Path
+    import nbxtensor
+    found = list(_unit_mm_tiles(Path(nbxtensor.__file__).resolve().parent / "backend" / "devices"))
+    assert found, "no shipped profile declares a matrix unit's mm tiles: nothing was checked"
+    mixed = [(f, name, ks) for f, name, ks in found if len(set(ks)) > 1]
+    assert not mixed, mixed
