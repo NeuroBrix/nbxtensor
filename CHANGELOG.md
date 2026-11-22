@@ -44,6 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `PIECE`, `evict` and `cold_read_gbps` stay.
 
 ### Fixed
+- The test that gates Python `and` / `or` in the library's kernels spares a boolean operator in an `if`, `while` or
+  conditional-expression test only when its operands are compile-time values (it spared any test by position), and finds a
+  kernel through the module's imports (`import triton as t` with `@t.jit` was missed). No kernel of the library changes.
 - The test that gates Python `and` / `or` in the library's kernels states what the engine's own gate reads (the library's
   `ops` kernels too, where it was red on the matrix-vector kernel) and what a mixed expression loses (the dropped
   operand's effects and block shape, not a mask); only its text changes.
