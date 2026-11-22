@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   variable the backend's runtime reads to hide devices.
 
 ### Changed
+- The library's tests no longer carry a test that imports the engine: the check that Prism's budget reader never builds a
+  card of 0 MB from a broken driver lives in the engine's tests, and the library's own check (the runtime's refusal is
+  raised by name) stays.
 - The expandable pool's chunk probe runs each replay on its own card alone, and stops a candidate once more than half
   of its replays lie on one side of the bound the driver segments set (with an odd count, a replay also stops at that
   bound). It picks the same chunk as the full sweep on every draw; on the recorded seconds of a 4-card V100 rack it runs
