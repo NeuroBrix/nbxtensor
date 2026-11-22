@@ -2003,6 +2003,8 @@ class DeviceAllocator:
         #    backend probes import torch — R33, universal since 2026-09-05).
         if os.environ.get("NBX_LAUNCHER", "nbx").lower() == "triton":
             import triton.runtime.driver
+            from nbxtensor.backend import c_compiler
+            c_compiler.ensure()     # the arm's driver builds a C helper at its first use: its compiler first, or by name
             active = triton.runtime.driver.active
             # A single-device backend has nothing to set and need not
             # implement the setter: triton-msl's MetalDriver provides

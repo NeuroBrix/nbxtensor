@@ -26,6 +26,7 @@ import ctypes
 import os
 
 from nbxtensor.backend import cuda_profile as _profile
+from nbxtensor.backend import c_compiler as _c_compiler
 from nbxtensor.backend import triton_floor as _triton_floor
 
 import numpy as np
@@ -2383,6 +2384,7 @@ def install(force: Optional[bool] = None) -> bool:
 
     def __getitem__(self, grid):
         if not _is_ours(self):
+            _c_compiler.ensure()        # Triton's own driver builds a C helper: its compiler found first, or refused by name
             return _upstream_getitem(self, grid)
         return lambda *args, **kwargs: launch(self, grid, *args, **kwargs)
 
@@ -2390,6 +2392,7 @@ def install(force: Optional[bool] = None) -> bool:
         """`JITFunction.run` is the Autotuner's launch path (every autotuned
         kernel: mm, bmm, addmm, conv2d, ...) and `warmup`'s — both routed here."""
         if not _is_ours(self):
+            _c_compiler.ensure()
             return _upstream_run(self, *args, grid=grid, warmup=warmup, **kwargs)
         if warmup:
             prepare(self, args, kwargs)

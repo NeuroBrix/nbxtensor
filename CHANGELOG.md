@@ -76,6 +76,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the copy follows.
 - A tuning keyword the installed Triton's autotuner lacks is refused with the kernel's qualified name in the message
   (`module.kernel`), so a failure at import says which kernel asked for it.
+- Where the library hands a launch to Triton's own driver (a kernel that is not the library's, and the differential arm
+  `NBX_LAUNCHER=triton`), it first finds the C compiler that driver builds its C helper with, resolved as Triton resolves
+  it (`CC`, else `gcc` then `clang` on PATH), and refuses a missing one by name (`NoCCompiler`) instead of failing on
+  "Failed to find C compiler" inside the first build. A `CC` naming a compiler that does not exist is refused by that name.
+  The library's own launch path needs no C compiler and is not checked: a kernel compiles to its binary with the vendor's
+  assembler and the library's driver loads it.
 - The launcher checks the installed Triton once against the floor the library declares and refuses a Triton below it by
   name, with no fallback: the dependency's floor binds only where pip installs Triton, so on a Mac or with a source-built
   Triton anywhere an older one still failed on an AttributeError at the first launch (qa on 1217). The floor is read from

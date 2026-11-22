@@ -3461,6 +3461,23 @@ A service still refused in the environment without NeuroBrix names its row here.
 Every public name of these modules, with its signature and what it answers (the first line of its docstring);
 the guard `tests/unit/nbxtensor_boundary/test_every_public_name_is_in_the_api.py` keeps this complete.
 
+### `nbxtensor.backend.c_compiler` — the C compiler Triton's own driver builds with, found ahead or refused by name
+
+```python
+class NoCCompiler(RuntimeError)         # no C compiler for Triton to build its driver's C helper with
+TRITON_NAMES: Tuple[str, ...]           # ("gcc", "clang"): the names Triton tries on PATH without CC, in its order
+def ensure(target=None, environ=None) -> None
+    # refuse by name a process with no C compiler where Triton's own driver will build one (a foreign kernel handed back
+    # by the launcher's seam, the differential arm's device selection); answered once per process; a backend whose
+    # driver never builds with triton/runtime/build.py, or a registered triton.knobs.build.impl, needs none
+def resolve(environ=None) -> Tuple[Optional[str], str]
+    # (executable or None, what was asked for): CC when set (it must resolve), else gcc then clang on PATH, as
+    # triton/runtime/build.py `_find_compiler` resolves it
+def builds_with_a_c_compiler(target=None) -> bool
+    # the Triton backend serving the target (default: launcher.target()) has a driver that builds with runtime/build.py
+def reset() -> None                     # forget the answer (tests)
+```
+
 ### `nbxtensor.backend.triton_floor` — the Triton floor the library declares, checked against the installed one
 
 ```python
