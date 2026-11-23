@@ -226,6 +226,36 @@ def _exclusions_path() -> Optional[str]:
     return path.replace("autotune_configs_", "autotune_exclusions_")
 
 
+#: the kind of an exclusion whose candidate's compile did not end within the profile's bound (C18)
+COMPILE_DID_NOT_END = "compile did not end"
+
+
+def _compile_timeout_ident(kernel: str, key, config: str, stamp: str) -> str:
+    """The exclusions file's identity of a compile timeout: kernel, key, candidate and the stamp it was met under."""
+    return f"{kernel}::{key!r}::{config}::{COMPILE_DID_NOT_END}::{stamp}"
+
+
+def record_compile_timeout(kernel: str, key, config: str, stamp: str) -> int:
+    """Keep a candidate whose compile did not end within the bound, under the proofs' stamp (device class, compiler
+    identity, assembler build: a new compiler tries it again), beside the screen's other exclusions; a later sweep in
+    this home skips it by name instead of paying the bound again (orchestrator 18:30 23/11)."""
+    return record_screen_exclusions([{"kernel": kernel, "key": key, "config": config, "kind": COMPILE_DID_NOT_END,
+                                      "stamp": stamp, "ident": _compile_timeout_ident(kernel, key, config, stamp)}])
+
+
+def compile_timed_out(kernel: str, key, config: str, stamp: str) -> bool:
+    """Whether this candidate's compile was recorded as not ending within the bound, under this stamp."""
+    path = _exclusions_path()
+    if path is None:
+        return False
+    try:
+        with open(path) as f:
+            stored = json.load(f)
+    except (OSError, ValueError):
+        return False
+    return _compile_timeout_ident(kernel, key, config, stamp) in stored
+
+
 def record_screen_exclusions(entries) -> int:
     """Persist configs the correctness screen refused, so a later sweep and its readers see them.
 
@@ -252,7 +282,7 @@ def record_screen_exclusions(entries) -> int:
         added = 0
         for entry in entries:
             entry = dict(entry)
-            ident = f"{entry.get('kernel')}::{entry.get('key')!r}::{entry.get('config')}"
+            ident = entry.pop("ident", None) or f"{entry.get('kernel')}::{entry.get('key')!r}::{entry.get('config')}"
             if ident not in stored:
                 stored[ident] = entry
                 added += 1

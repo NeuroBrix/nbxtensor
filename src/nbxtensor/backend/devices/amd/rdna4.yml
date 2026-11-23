@@ -62,6 +62,9 @@ sdpa_thresholds:
     num_warps: 4
 
 memory:
+  # The runtime's own context outside every allocator block: not measured on this class yet; null = the chunk
+  # rule reads it once at its first ask, said by name (memory/chunk_rule.py). A measured figure replaces null.
+  runtime_context_mb: null
   max_shared_memory_per_block: 65536   # 64 KB LDS per workgroup (RDNA4, TargetFeatures.cpp)
   max_registers_per_block: 65536
   # The wavefront (RDNA4: 32 lanes, Triton v3.8.0 TargetFeatures.cpp), named `warp_size` as on every device.

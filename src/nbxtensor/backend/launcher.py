@@ -2205,15 +2205,24 @@ def _screen_configs(tuner, configs, key, meta=None, record_key=None):
     # -- run each candidate once, from the same starting state --------------
     results, unrun = [], []
     from nbxtensor.backend.compile_bound import CompileUnbounded, CompileWorkerDied, precompile
+    from nbxtensor.ops import autotune_cache as _ac
+    stamp = _compile_stamp()
     for config in configs:
+        if stamp is not None and _ac.compile_timed_out(kernel_name, key, str(config), stamp):
+            print(f"[AUTOTUNE_SCREEN] {kernel_name} {config}: skipped — its compile was recorded as not ending within "
+                  f"the bound under this compiler and card class", file=sys.stderr)
+            continue
         try:
             precompile(tuner.fn, args, {**meta, **config.all_kwargs()})     # under the profile's bound, in the worker
             _restore(buffers, before)
             tuner.fn.run(*args, **{**meta, **config.all_kwargs()})
             results.append((config, _snapshot(buffers)))
         except CompileUnbounded as exc:
-            # excluded for good: it goes neither to the vote nor to the timer, which would compile it again
+            # excluded for good: it goes neither to the vote nor to the timer, which would compile it again; kept
+            # under the stamp so a later sweep in this home does not pay the bound again
             print(f"[AUTOTUNE_SCREEN] {kernel_name}: {exc}", file=sys.stderr)
+            if stamp is not None:
+                _ac.record_compile_timeout(kernel_name, key, str(config), stamp)
         except CompileWorkerDied:
             raise                       # a fault of this library: an error with its text, never a lost candidate
         except Exception:
@@ -2343,6 +2352,16 @@ def _screen_configs(tuner, configs, key, meta=None, record_key=None):
         + f", and the winner is a {len(clusters[0])}-config majority — which "
           f"is the other failure mode consensus cannot see, a majority wrong "
           f"in the same way")
+
+
+def _compile_stamp():
+    """The proofs' stamp key (device class, compiler identity, assembler build) a compile timeout is kept under, or
+    None when no vendor profile is in force (nothing is kept then, nothing skipped)."""
+    from nbxtensor.ops import ew_proof
+    try:
+        return ew_proof.stamp_key(ew_proof.stamp())
+    except ew_proof.TileUnproven:
+        return None
 
 
 def _record_screen_exclusions(dropped) -> None:

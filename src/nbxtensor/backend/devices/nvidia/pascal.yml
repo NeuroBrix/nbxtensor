@@ -7,6 +7,9 @@ architecture: pascal
 compute_capability: "6.0"
 
 memory:
+  # The runtime's own context outside every allocator block: not measured on this class yet; null = the chunk
+  # rule reads it once at its first ask, said by name (memory/chunk_rule.py). A measured figure replaces null.
+  runtime_context_mb: null
   # SOURCE: https://docs.nvidia.com/cuda/archive/12.9.0/cuda-c-programming-guide/index.html, read 2026-11-19, table "Technical Specifications per Compute Capability", column 6.0, 6.1, 6.2: "Maximum amount of shared memory per thread block: 48 KB" (1 KB = 1024 bytes).
   # 48 x 1024 = 49152.
   max_shared_memory_per_block: 49152

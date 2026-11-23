@@ -7,6 +7,9 @@ architecture: blackwell_consumer
 compute_capability: "12.0"
 
 memory:
+  # The runtime's own context outside every allocator block: not measured on this class yet; null = the chunk
+  # rule reads it once at its first ask, said by name (memory/chunk_rule.py). A measured figure replaces null.
+  runtime_context_mb: null
   # SOURCE: https://docs.nvidia.com/cuda/cuda-programming-guide/05-appendices/compute-capabilities.html, read 2026-11-19, Table 34 "Memory Information per Compute Capability", column 12.x: "Maximum amount of shared memory per thread block: 99 KB" (1 KB = 1024 bytes).
   # 99 x 1024 = 101376.
   max_shared_memory_per_block: 101376

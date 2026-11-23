@@ -126,6 +126,14 @@ def jit_of_or_none(obj):
         return None
 
 
+def candidate_text(kernel, kwargs: Dict[str, Any]) -> str:
+    """The candidate a line names: the kernel's constexpr settings and the launch options, as `name=value` (the
+    pointers, sizes and strides left out: they are the launch's, not the candidate's)."""
+    constexprs = {p.name for p in getattr(kernel, "params", ()) if getattr(p, "is_constexpr", False)}
+    shown = [f"{k}={v}" for k, v in kwargs.items() if k in constexprs or k in ("num_warps", "num_stages", "num_ctas")]
+    return " ".join(shown) or "(no setting)"
+
+
 def precompile(kernel, args: tuple, kwargs: Dict[str, Any]) -> None:
     """Compile `kernel` for this launch in the run's worker, under the profile's bound; raise CompileUnbounded when it
     does not end in time. A no-op where the profile declares no bound."""
@@ -151,14 +159,16 @@ def _compile_in(where, kernel, args: tuple, kwargs: Dict[str, Any], bound: float
         pickle.dump(spec, fh)
     code, text = ew_proof_child._WORKER.ask({"mode": "compile", "where": where, "start": 0}, timeout=bound)
     if code == ew_proof_child.TIMED_OUT:
-        raise CompileUnbounded(f"{kernel.__name__}: the candidate's compile did not end within {bound:g} s "
-                               f"(autotune.compile_bound_s) — excluded: {text.strip()[-300:]}")
+        raise CompileUnbounded(f"{kernel.__name__} {candidate_text(kernel, kwargs)}: the candidate's compile did not end "
+                               f"within {bound:g} s (autotune.compile_bound_s) — excluded")
     if code != 0:
-        raise CompileWorkerDied(f"{kernel.__name__}: the compile worker died (exit {code}) — not a timeout, not an "
+        raise CompileWorkerDied(f"{kernel.__name__} {candidate_text(kernel, kwargs)}: the compile worker died (exit "
+                                f"{code}) — not a timeout, not an "
                                 f"exclusion: {text.strip()[-1500:]}")
     refused = os.path.join(where, _REFUSED)
     if os.path.exists(refused):
-        raise CompileRefused(f"{kernel.__name__}: Triton's compiler refused the candidate: {open(refused).read()}")
+        raise CompileRefused(f"{kernel.__name__} {candidate_text(kernel, kwargs)}: Triton's compiler refused the "
+                             f"candidate: {open(refused).read()}")
 
 
 def jit_of(obj):

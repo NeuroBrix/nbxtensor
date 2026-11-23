@@ -49,9 +49,11 @@ def test_a_grid_without_off_is_refused_by_name(monkeypatch):
         rule(V100_16)
 
 
-def test_no_room_over_the_peak_is_refused_by_name():
+def test_no_room_over_the_peak_states_why_the_bound_cannot_be_drawn():
+    """The bound itself names the reference run, its peak and the room; the RULE then answers for this run only
+    (C18: tests/test_a_card_a_neighbour_holds_gets_a_chunk_never_a_refusal.py), it never refuses the run."""
     chunk_rule.bound_bytes.cache_clear()
-    with pytest.raises(RuntimeError, match="states no room for any chunk"):
+    with pytest.raises(chunk_rule.RoomTooSmall, match="peaks at .* MiB live, at or over the room this card leaves"):
         chunk_rule.bound_bytes(traces()[0].name, 1024 * MiB)
 
 

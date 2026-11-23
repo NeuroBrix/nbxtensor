@@ -23,6 +23,16 @@ THE 64 MiB FIGURES (the grid of `chunk_rule.yml`): 16g 2.114 s against OFF 2.656
 64 MiB under the card: 989 maps, 807 unmaps, no refusal (32 MiB: 1 944 / 1 579). Nothing is extrapolated past the
 largest chunk measured on a card: an unmeasured chunk is never the rule's answer.
 
+THE ROOM (C18, the Dell 23/11: a granite server refused on a card a neighbour held, "the carried trace sana-video...
+peaks at 14559087916 live bytes, at or over the room this card leaves (13505 MiB)"): the card's total less the runtime
+context of ITS device class, a value of the library's device file (`memory.runtime_context_mb`), READ — never total
+less free, which counts a neighbour's memory as this card's context. A class whose file states null reads its own
+context once, at its first ask, said by name (a measure, for a fact that exists nowhere yet).
+THE RULE THAT CANNOT ANSWER: a class's reference run that does not fit the present room is no reason to refuse a run.
+The rule then answers `ThisRunOnly(0)`: this run takes the driver segments, said once, and NOTHING is kept (a chunk
+chosen under a neighbour would poison later launches); a user model that truly does not fit is refused by its own
+allocation, by name.
+
 Torch-free, numpy-free."""
 from __future__ import annotations
 
@@ -45,6 +55,18 @@ def _classes() -> Dict[str, dict]:
 def _class_of(card_bytes: int) -> str:
     """A card's memory class: its memory in whole GiB, rounded up (a V100-SXM2-16GB's 16 160 MiB: `16g`)."""
     return f"{-(-int(card_bytes) // _GiB)}g"
+
+
+class ThisRunOnly(int):
+    """A chunk for this run only (0: the driver segments): the rule could not answer on the card as it stands, so the
+    value is neither the class's rule nor a measurement, and no caller keeps it."""
+
+
+class RoomTooSmall(RuntimeError):
+    """The class's reference run does not fit the room this card leaves now: the rule cannot bound a chunk."""
+
+
+_SAID: set = set()
 
 
 @functools.lru_cache(maxsize=None)
@@ -70,8 +92,8 @@ def bound_bytes(trace: str, room_bytes: int) -> int:
             blocks_at_peak = sum(1 for k, n in sizes.values() if k == "M" and n > POOL_SMALL_BYTES)
     slack = int(room_bytes) - peak
     if slack <= 0:
-        raise RuntimeError(f"ZERO FALLBACK: the carried trace {trace} peaks at {peak} live bytes, at or over the room "
-                           f"this card leaves ({int(room_bytes) // MiB} MiB): it states no room for any chunk")
+        raise RoomTooSmall(f"the class's reference run {trace} peaks at {peak // MiB} MiB live, at or over the room "
+                           f"this card leaves ({int(room_bytes) // MiB} MiB)")
     return slack // (2 * (blocks_at_peak + 1) + 1)
 
 
@@ -87,7 +109,14 @@ def rule_chunk_bytes(card_bytes: int, granularity: int, room_bytes: int, archite
     if 0 not in grid:
         raise RuntimeError(f"ZERO FALLBACK: {RULE_FILE.name} class {_class_of(card_bytes)} states no OFF (0) time: "
                            f"no chunk can be judged faster than the driver segments")
-    bound = bound_bytes(str(entry["trace"]), int(room_bytes))
+    try:
+        bound = bound_bytes(str(entry["trace"]), int(room_bytes))
+    except RoomTooSmall as exc:
+        if str(exc) not in _SAID:
+            _SAID.add(str(exc))
+            print(f"[chunk rule] {exc}: the rule does not answer on this card as it stands; this run takes the driver "
+                  f"segments, and nothing is kept", file=__import__("sys").stderr)
+        return ThisRunOnly(0)
     fit = [mb for mb, s in grid.items() if mb > 0 and s < grid[0] and (mb * MiB) % int(granularity) == 0
            and mb * MiB <= bound]
     return max(fit) * MiB if fit else None
@@ -109,5 +138,33 @@ def vmm_chunk_bytes(device: int, card_bytes: int, architecture: Optional[str] = 
         architecture = prof[1] if prof else ""       # no profile in force: no rule answers, the caller measures
     from nbxtensor.memory.allocator import DeviceAllocator
     free_b, total_b = DeviceAllocator.mem_get_info(device)
-    context = max(0, int(total_b) - int(free_b) - DeviceAllocator._cuda_live_bytes.get(device, 0))
+    held = int(total_b) - int(free_b) - DeviceAllocator._cuda_live_bytes.get(device, 0)   # context + any neighbour
+    context = _context_bytes(device, held)
+    others = max(0, held - context)
+    if others and ("others", device) not in _SAID:
+        _SAID.add(("others", device))
+        print(f"[chunk rule] device {device}: another process holds about {others // MiB} MiB of this card; the room "
+              f"is the card's own (total {int(total_b) // MiB} MiB less its runtime context {context // MiB} MiB)",
+              file=__import__("sys").stderr)
     return rule_chunk_bytes(card_bytes, gran, int(total_b) - context, architecture)
+
+
+def _context_bytes(device: int, held_now: int) -> int:
+    """The runtime context of the card's device class: the device file's `memory.runtime_context_mb` (READ); a class
+    whose file states null reads it once now (what the card holds beyond this process's blocks), said by name; a file
+    that states nothing is refused by name."""
+    from nbxtensor.ops._configs import active_vendor_profile
+    memory = active_vendor_profile().get("memory") or {}
+    if "runtime_context_mb" not in memory:
+        raise RuntimeError("ZERO FALLBACK: the device file in force states no memory.runtime_context_mb (a measured "
+                           "figure, or null for 'read once at the first ask'): a value of the device file, added at "
+                           "its source")
+    stated = memory["runtime_context_mb"]
+    if stated is not None:
+        return int(stated) * MiB
+    if ("context", device) not in _SAID:
+        _SAID.add(("context", device))
+        print(f"[chunk rule] device {device}: its device file states memory.runtime_context_mb: null: read once now "
+              f"({max(0, int(held_now)) // MiB} MiB, a neighbour included if one holds the card)",
+              file=__import__("sys").stderr)
+    return max(0, int(held_now))

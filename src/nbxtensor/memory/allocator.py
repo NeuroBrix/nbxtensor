@@ -725,8 +725,8 @@ class DeviceAllocator:
         card_mb = int(getattr(spec, "memory_mb", 0) or 0) if spec is not None else 0
         ruled = (chunk_rule.vmm_chunk_bytes(dev, card_mb * chunk_rule.MiB, str(getattr(spec, "architecture", "")))
                  if card_mb > 0 else None)
-        if ruled:
-            return ruled
+        if ruled or isinstance(ruled, chunk_rule.ThisRunOnly):   # a run-only answer (0: the driver segments) is the run's
+            return int(ruled)
         measured = (getattr(spec, "measured", None) or {}) if spec is not None else {}
         if "vmm_chunk_bytes" not in measured:
             raise RuntimeError(

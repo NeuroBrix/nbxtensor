@@ -63,6 +63,9 @@ sdpa_thresholds:
     num_warps: 4
 
 memory:
+  # The runtime's own context outside every allocator block: not measured on this class yet; null = the chunk
+  # rule reads it once at its first ask, said by name (memory/chunk_rule.py). A measured figure replaces null.
+  runtime_context_mb: null
   # SOURCE: https://docs.nvidia.com/cuda/cuda-programming-guide/05-appendices/compute-capabilities.html, read 2026-11-19, Table 34 "Memory Information per Compute Capability", column 8.0: "Maximum amount of shared memory per thread block: 163 KB" (with explicit
   # opt-in; 1 KB = 1024 bytes): 163 x 1024 = 166912. The value written here before, 167936, was the 164 KB the SAME
   # table gives per SM, not per block (corrected 2026-11-19, documentation only: no A100 on our machines).

@@ -61,6 +61,9 @@ sdpa_thresholds:
     num_warps: 4
 
 memory:
+  # The runtime's own context outside every allocator block: not measured on this class yet; null = the chunk
+  # rule reads it once at its first ask, said by name (memory/chunk_rule.py). A measured figure replaces null.
+  runtime_context_mb: null
   max_shared_memory_per_block: 65536   # 64 KB LDS per workgroup (CDNA3: Triton v3.8.0 TargetFeatures.cpp; 160 KB is CDNA4)
   max_registers_per_block: 65536
   # AMD schedules in 64-wide WAVEFRONTS where NVIDIA uses 32-wide warps.
