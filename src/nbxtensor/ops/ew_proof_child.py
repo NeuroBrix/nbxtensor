@@ -124,6 +124,11 @@ def run_candidates(where: str, cands) -> Tuple[Dict[tuple, tuple], Any]:
     return results, lambda a, b: first_difference(where, a, b)
 
 
+#: `_Worker.ask`'s code for a job the worker did not answer within its time (the worker killed): a TIMEOUT, told apart
+#: from the exit code of a worker that died on the job (a signal's is -1 to -64)
+TIMED_OUT = -1000
+
+
 class _Worker:
     """ONE child process that serves every proof of the run (orchestrator 23/11: a process and a device context per
     variant would put seconds times the variant count into a first launch). Started at the first proof; started
@@ -156,7 +161,7 @@ class _Worker:
         self.err.seek(mark)
         text = self.err.read()
         self.err.seek(0, 2)
-        return (code if reply is not None else -1), (text if reply is not None
+        return (code if reply is not None else TIMED_OUT), (text if reply is not None
                                                      else f"timed out after {limit:g} s: {text[-400:]}")
 
     def _start(self):

@@ -2204,7 +2204,7 @@ def _screen_configs(tuner, configs, key, meta=None, record_key=None):
 
     # -- run each candidate once, from the same starting state --------------
     results, unrun = [], []
-    from nbxtensor.backend.compile_bound import CompileUnbounded, precompile
+    from nbxtensor.backend.compile_bound import CompileUnbounded, CompileWorkerDied, precompile
     for config in configs:
         try:
             precompile(tuner.fn, args, {**meta, **config.all_kwargs()})     # under the profile's bound, in the worker
@@ -2214,6 +2214,8 @@ def _screen_configs(tuner, configs, key, meta=None, record_key=None):
         except CompileUnbounded as exc:
             # excluded for good: it goes neither to the vote nor to the timer, which would compile it again
             print(f"[AUTOTUNE_SCREEN] {kernel_name}: {exc}", file=sys.stderr)
+        except CompileWorkerDied:
+            raise                       # a fault of this library: an error with its text, never a lost candidate
         except Exception:
             # A config the backend refuses is not a screen failure — the
             # autotuner already handles one that will not compile. Counted,

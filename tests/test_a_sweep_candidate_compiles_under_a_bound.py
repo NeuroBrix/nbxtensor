@@ -16,7 +16,8 @@ class _Fn:
 def test_a_candidate_whose_compile_does_not_end_is_refused_by_name(monkeypatch):
     from nbxtensor.ops import ew_proof_child
     monkeypatch.setattr(CB, "bound_s", lambda: 2.0)
-    monkeypatch.setattr(ew_proof_child._WORKER, "ask", lambda job, timeout=None: (-1, f"timed out after {timeout:g} s"))
+    monkeypatch.setattr(CB, "_named", lambda k: True)            # the stand-in, as a kernel a worker can find
+    monkeypatch.setattr(ew_proof_child._WORKER, "ask", lambda job, timeout=None: (ew_proof_child.TIMED_OUT, f"timed out after {timeout:g} s"))
     with pytest.raises(CB.CompileUnbounded, match="did not end within 2 s"):
         CB.precompile(_Fn(), (), {"BLOCK_H": 64, "num_warps": 2})
 
@@ -25,6 +26,7 @@ def test_a_compile_that_ends_passes_and_no_bound_means_in_process(monkeypatch):
     from nbxtensor.ops import ew_proof_child
     seen = []
     monkeypatch.setattr(CB, "bound_s", lambda: 2.0)
+    monkeypatch.setattr(CB, "_named", lambda k: True)            # the stand-in, as a kernel a worker can find
     monkeypatch.setattr(ew_proof_child._WORKER, "ask", lambda job, timeout=None: seen.append(timeout) or (0, ""))
     CB.precompile(_Fn(), (), {"BLOCK_H": 16})
     assert seen == [2.0]
