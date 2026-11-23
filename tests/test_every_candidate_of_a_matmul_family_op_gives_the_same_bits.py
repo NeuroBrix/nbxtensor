@@ -23,7 +23,7 @@ from nbxtensor.memory.allocator import DeviceAllocator as DA  # noqa: E402
 from nbxtensor.ops import autotune_certified as CERT  # noqa: E402
 from nbxtensor.ops import linalg_wrappers as LW  # noqa: E402
 from nbxtensor.ops import matmul as MM  # noqa: E402
-from nbxtensor.ops._configs import matrix_unit  # noqa: E402
+from nbxtensor.ops.matrix_units import matrix_unit  # noqa: E402
 from nbxtensor.tensor import NBXTensor  # noqa: E402
 
 DTYPES = {"fp16": np.float16, "fp32": np.float32}

@@ -21,7 +21,8 @@ from nbxtensor.backend.faults import device_fault_buffer, device_fault_code_cach
 from nbxtensor.tensor import _upload_int64_array as _nbx_upload_int64, _saturating_cast as _nbx_saturating_cast
 from nbxtensor.ops._configs import sdpa_block_ceiling as _sdpa_block_ceiling
 from nbxtensor.ops._configs import sdpa_launch_meta as _sdpa_launch_meta
-from nbxtensor.ops._configs import matrix_unit as _matrix_unit, matrix_unit_mm_tile as _matrix_unit_mm_tile
+from nbxtensor.ops.matrix_units import matrix_unit as _matrix_unit
+from nbxtensor.ops._configs import matrix_unit_mm_tile as _matrix_unit_mm_tile
 from nbxtensor.ops._configs import largest_tile_within_smem as _largest_tile_within_smem
 from nbxtensor.backend import launcher as _nbx_launcher
 from nbxtensor.backend.launcher import install as _install_launcher

@@ -24,7 +24,7 @@ import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go throu
 from triton.experimental.gluon import language as gl
 
 #: What the instruction below takes, as a hardware profile's `matrix_unit` names it (checked by
-#: `_configs.matrix_unit`: a profile cannot declare dtypes this instruction does not compute in). `k` is the
+#: `matrix_units.matrix_unit`: a profile cannot declare dtypes this instruction does not compute in). `k` is the
 #: columns one instruction reduces: the split flash's `block_k` is a multiple of it (KSA/KSB count instructions).
 UNIT = {"shape": "m8n8k4", "operand_dtype": "float16", "accumulator_dtype": "float32", "k": 4}
 

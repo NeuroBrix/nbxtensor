@@ -23,7 +23,8 @@ from nbxtensor.backend.faults import device_fault_buffer, device_fault_code_cach
 from nbxtensor.tensor import _upload_int64_array as _nbx_upload_int64, _saturating_cast as _nbx_saturating_cast
 from nbxtensor.ops._configs import sdpa_block_ceiling as _sdpa_block_ceiling
 from nbxtensor.ops._configs import sdpa_launch_meta as _sdpa_launch_meta
-from nbxtensor.ops._configs import matrix_unit as _matrix_unit, matrix_unit_mm_tile as _matrix_unit_mm_tile
+from nbxtensor.ops.matrix_units import matrix_unit as _matrix_unit
+from nbxtensor.ops._configs import matrix_unit_mm_tile as _matrix_unit_mm_tile
 from nbxtensor.ops._configs import largest_tile_within_smem as _largest_tile_within_smem
 from nbxtensor.backend import launcher as _nbx_launcher
 from nbxtensor.backend.launcher import install as _install_launcher
@@ -1330,7 +1331,7 @@ def im2col_wrapper(x, kernel_size, dilation, padding, stride):
 # ---------------------------------------------------------------------------
 # The cost each convolution path declares (M3, nbxtensor/docs/design/COST.md): what it allocates, in its order, read from the
 # same decisions the wrappers take (`launch_keys.conv_dtypes`, `conv2d_route`, `matrix_unit_conv_operands`, the strided read
-# rule) — a planner prices the convolution by it instead of re-deriving it. Operands are `_cost.Spec`s; a returned
+# rule) — a planner prices the convolution by it instead of re-deriving it. Operands are `operand.Spec`s; a returned
 # buffer is the op's output.
 # ---------------------------------------------------------------------------
 
@@ -1345,7 +1346,7 @@ def _pair(v):
 
 def conv2d_cost(x, w, stride=1, padding=0, dilation=1, groups=1, bias=False, out_dtype=None, out_given=False,
                 krsc=False, unit=None, depthwise_enabled=True):
-    """`conv2d_wrapper` on an input `x` and a weight `w` (`_cost.Spec`s): the operands narrowed to the narrowest of the
+    """`conv2d_wrapper` on an input `x` and a weight `w` (`operand.Spec`s): the operands narrowed to the narrowest of the
     pair when they differ (a copy each), the input made contiguous unless the implicit GEMM reads it where it lies, a
     weight not stored KRSC made contiguous, then the route — depthwise (a contiguous input, its output), band (the whole
     output, each band's conv beside it), or the plain launch: its output (none when the caller hands `out_given`), and

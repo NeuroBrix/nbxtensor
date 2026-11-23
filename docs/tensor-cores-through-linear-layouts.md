@@ -21,7 +21,7 @@ matrix_unit:
       block_n: 32
 ```
 
-`kernels/ops/_configs.py` reads it (`matrix_unit()`, `matrix_unit_flash_tile(head_dim)`); the SDPA wrapper takes
+`nbxtensor.ops.matrix_units` reads it (`matrix_unit()`, `matrix_unit_flash_tile(head_dim)`); the SDPA wrapper takes
 the m8n8k4 flash when the profile declares the shape, a tile row covers the head dim and the operands are in the
 declared dtype. A profile without `matrix_unit` keeps the `tl.dot` kernels unchanged.
 

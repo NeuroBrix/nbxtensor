@@ -169,7 +169,7 @@ def matrix_unit_operands(a: NBXDtype, b: NBXDtype, M: int, unit: Optional[dict] 
     leaves the unit idle; the GEMV / batched kernels own those rows, and a row's reduction order then never
     depends on how many rows share its launch). The wrappers' `_gemm_unit_tile` asks this same function. `unit`: a
     matrix unit already read (a planner's, for the device it plans); the profile in force's when None."""
-    from nbxtensor.ops._configs import matrix_unit
+    from nbxtensor.ops.matrix_units import matrix_unit
     from nbxtensor.dtype.operands import matrix_unit_representation   # the library's operand rules
     mu = matrix_unit() if unit is None else unit
     ra, rb = matrix_unit_representation(a.name, mu), matrix_unit_representation(b.name, mu)
@@ -218,7 +218,7 @@ def matrix_unit_conv_operands(x: NBXDtype, w: NBXDtype, M: int, N: int, kh: int,
     the GEMM fills (M >= block_m, N >= block_n) — the split was measured faster than the FMA path only there (a 3x3 is
     slower at every tile: volta.yml). Native operands take the `mm` rows (rows None). The wrappers, their cost and the
     census ask this one function."""
-    from nbxtensor.ops._configs import matrix_unit
+    from nbxtensor.ops.matrix_units import matrix_unit
     reps = matrix_unit_operands(x, w, M, unit)
     if reps is None or "split" not in reps:
         return None if reps is None else (reps, None)
@@ -665,9 +665,10 @@ def unit_flash(D: int, q: NBXDtype, k: NBXDtype, v: NBXDtype,
     `matrix_unit_flash_representation` ("native": the three operands are the unit's operand dtype; "split": they are
     among `fp32_split.operands`, carried as hi + lo) and the first row of `matrix_unit.flash` — or of
     `matrix_unit.fp32_split.flash` for the split — holding head dim D. The wrapper launches with this function.
-    `unit`: a matrix unit already read (`_configs.matrix_unit(vendor_profile)`: Prism, for the device it plans); the
+    `unit`: a matrix unit already read (`matrix_units.matrix_unit(vendor_profile)`: Prism, for the device it plans); the
     profile in force's when None."""
-    from nbxtensor.ops._configs import matrix_unit, matrix_unit_flash_tile
+    from nbxtensor.ops.matrix_units import matrix_unit
+    from nbxtensor.ops._configs import matrix_unit_flash_tile
     from nbxtensor.dtype.operands import matrix_unit_flash_representation   # the library's operand rules
     mu = matrix_unit() if unit is None else unit
     rep = matrix_unit_flash_representation(q.name, k.name, v.name, mu)
@@ -1103,7 +1104,7 @@ def moe_align_launches(tokens: int, top_k: int, experts: int, w: NBXDtype) -> Li
     if tokens < 1:
         return []
     from nbxtensor.ops.moe_wrappers import _MOE_BM
-    from nbxtensor.ops._configs import matrix_unit
+    from nbxtensor.ops.matrix_units import matrix_unit
     be, nb = moe_align_classes(experts, int(tokens) * int(top_k))
     e, i64 = int(experts), tag(NBXDtype.int64)
     blocks = [_MOE_BM]

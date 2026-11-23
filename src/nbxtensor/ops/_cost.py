@@ -20,26 +20,11 @@ from dataclasses import dataclass
 from typing import Optional, Sequence, Tuple
 
 from nbxtensor.dtype.itemsize import itemsize
-from nbxtensor.shape import contiguous_strides, is_contiguous, numel
+from nbxtensor.ops.operand import Spec           # the operand every declaration here reads (public: nbxtensor.ops.operand)
+from nbxtensor.shape import is_contiguous, numel
 
-__all__ = ["Spec", "Buffer", "Cost", "elementwise_unary", "elementwise_binary", "softmax", "rms_norm",
+__all__ = ["Buffer", "Cost", "elementwise_unary", "elementwise_binary", "softmax", "rms_norm",
            "native_layer_norm", "reduction", "gated_delta_rule", "gated_delta_rule_chunked"]
-
-
-@dataclass(frozen=True)
-class Spec:
-    """An operand: its shape, its strides in elements, its dtype name."""
-    shape: Tuple[int, ...]
-    strides: Tuple[int, ...]
-    dtype: str
-
-    @staticmethod
-    def contiguous(shape: Sequence[int], dtype: str) -> "Spec":
-        return Spec(tuple(shape), contiguous_strides(tuple(shape)), dtype)
-
-    @property
-    def nbytes(self) -> int:
-        return numel(self.shape) * itemsize(self.dtype)
 
 
 @dataclass(frozen=True)

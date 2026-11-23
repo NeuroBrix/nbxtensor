@@ -347,7 +347,7 @@ def staged_shared_bytes(BM: int, BN: int, DA: int, DB: int, split: bool) -> int:
     """The shared memory the kernel above allocates by name for one program: the Q, K and V tiles of each head part
     (`sq_*`, `sk_*`, `sv_*`, fp16), doubled by the lo halves under SPLIT. The compiler's own scratch (layout
     conversions) comes on top, so a tile within this figure may still be refused by the compiler; a tile beyond it
-    never compiles. `_configs.matrix_unit` prices every profile row with it against the profile's budget."""
+    never compiles. `matrix_units.matrix_unit` prices every profile row with it against the profile's budget."""
     per_part = 2 * (BM + 2 * BN)                 # fp16: Q [D, BM], K [D, BN], V [BN, D]
     return (DA + DB) * per_part * (2 if split else 1)
 

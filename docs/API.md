@@ -893,15 +893,15 @@ def upsample_bilinear2d_wrapper(x, output_size, align_corners=False, scales_h=No
 def upsample_linear1d_wrapper(x, output_size, align_corners: bool=False, scales=None)
     # upsample_linear1d via bilinear2d
 def mm_cost(a, b, epilogue: int=0, native_bf16=None, force_accum=None, contract_half=None)
-    # `mm` on `a` [M, K] and `b` [K, N] (`_cost.Spec`s), in the wrapper's order
+    # `mm` on `a` [M, K] and `b` [K, N] (`operand.Spec`s), in the wrapper's order
 def matrix_unit_runs(tuner, args, kwargs)
     # (tile, run) for each matrix-unit tile the profile declares for a matmul_kernel / addmm_kernel launch the rule
     # gives to the unit: each run writes the launch's output on the unit, for a certifier to prove and time (the unit is
     # the rule's, never the faster of two routes)
 def addmm_cost(bias, a, b, epilogue: int=0, native_bf16=None, force_accum=None, contract_half=None)
-    # `addmm` on `bias` ([N], [1, N] or [M, N]), `a` [..., K] and `b` [K, N] (`_cost.Spec`s), in the wrapper's order
+    # `addmm` on `bias` ([N], [1, N] or [M, N]), `a` [..., K] and `b` [K, N] (`operand.Spec`s), in the wrapper's order
 def bmm_cost(a, b, allow_strided_b: bool=False, native_bf16=None, force_accum=None, contract_half=None, unit=None)
-    # `bmm` on `a` [B, M, K] and `b` [B, K, N] (`_cost.Spec`s)
+    # `bmm` on `a` [B, M, K] and `b` [B, K, N] (`operand.Spec`s)
 ```
 
 ### `nbxtensor.ops.conv_wrappers`
@@ -938,7 +938,7 @@ def unfold_backward_wrapper(grad_in, input_sizes, dim, size, step)
 def im2col_wrapper(x, kernel_size, dilation, padding, stride)
     # aten::im2col / nn.Unfold — sliding local blocks of an NCHW tensor.
 def conv2d_cost(x, w, stride=1, padding=0, dilation=1, groups=1, bias=False, out_dtype=None, out_given=False, krsc=False, unit=None, depthwise_enabled=True)
-    # `conv2d_wrapper` on an input `x` and a weight `w` (`_cost.Spec`s)
+    # `conv2d_wrapper` on an input `x` and a weight `w` (`operand.Spec`s)
 def conv3d_cost(x, w, stride=1, padding=0, dilation=1, groups=1, bias=False, out_dtype=None, unit=None)
     # `_conv3d_via_conv2d` on an input `x` [B, Cin, T, H, W] and a weight `w` [Cout, Cin_g, kt, kh, kw]
 ```
@@ -1309,7 +1309,7 @@ def merge_partials(parts)   # nbxtensor.ops.host_decode_partial
 def decode_reduce(opart, mpart, lpart, out)
     # The fixed-order combine of a split decode (`flash_decode_reduce_kernel`), one program per query row; its warps are the key's certified configuration
 def math_attention_cost(q, k, v, mask=None, is_causal=False, native_bf16=None, force_accum=None, contract_half=None, unit=None)
-    # `_math_attention` on q [B, H, Tq, D], k [B, Hk, Tk, D], v [B, Hk, Tk, Dv] and an optional additive `mask` (`_cost.Spec`s
+    # `_math_attention` on q [B, H, Tq, D], k [B, Hk, Tk, D], v [B, Hk, Tk, Dv] and an optional additive `mask` (`operand.Spec`s
 def chunked_math_attention_cost(q, k, v, chunk_rows: int, mask=None, is_causal=False, native_bf16=None, force_accum=None, contract_half=None, unit=None)
     # `_math_attention_chunked`
 def flash_route_heads(tq: int, tk: int, hd: int, q: str, k: str, v: str) -> int
@@ -1832,7 +1832,7 @@ def gated_delta_rule_chunked_wrapper(q, k, v, g, beta, state=None, *, qk_l2norm:
 ```
 
 Its cost: `nbxtensor.ops._cost.gated_delta_rule(q, k, v, g, beta, state, *, qk_l2norm, compute_dtype) -> Cost` on
-`_cost.Spec`s, refused where the wrapper refuses: the output and the state out (both returned, no workspace), every
+`operand.Spec`s, refused where the wrapper refuses: the output and the state out (both returned, no workspace), every
 operand read once, both outputs written once, the recurrence's flops at L tokens.
 The chunked form's: `nbxtensor.ops._cost.gated_delta_rule_chunked(q, k, v, g, beta, state, *, qk_l2norm,
 compute_dtype) -> Cost`, the same refusals: the output and the state out (returned), then the float32 workspace
@@ -2070,6 +2070,16 @@ def hi_lo(x, LO_SHIFT: gl.constexpr)
     # fp32 x (already scaled) as hi = fp16(x) and lo = fp16((x - hi) 2^LO_SHIFT)
 def mm_layouts(MB: int, NB: int, WM: int, WN: int, BK: int, b_k_contig: bool)
     # Every layout the kernel takes for a tile of 16 MB x 16 NB x BK over WM x WN warps.
+```
+
+`nbxtensor.ops.matrix_units` — the matrix unit a device declares, checked against the kernels the library builds
+
+```python
+def matrix_unit(vendor_profile: dict | None = None) -> dict
+    # The profile's `matrix_unit` (shape, operand and accumulator dtypes, measured tiles), `{}` when it declares none;
+    # a unit, dtype or tile the library has no kernel for is refused by name (ValueError). `vendor_profile`: a profile
+    # to read (a planner's, for a device that is not this process's); the profile in force when None.
+    # The one decision point: the wrappers, the launch keys and `_configs`' tile choices read it.
 ```
 
 `nbxtensor.ops.max_pool2d`
@@ -2346,6 +2356,16 @@ def conv2d_from_args(named: dict, to_f64)
     # The reference output for `conv2d_forward_kernel`, or None.
 def depthwise_from_args(named: dict, to_f64)
     # The reference output for `depthwise_conv2d_kernel`, or None.
+```
+
+`nbxtensor.ops.operand` — an operand as plain data, what a cost declaration (`ops._cost`, the wrappers' `*_cost`) reads
+
+```python
+@dataclass(frozen=True)
+class Spec(shape: tuple[int, ...], strides: tuple[int, ...], dtype: str)   # strides in elements, dtype a name
+    @staticmethod
+    def contiguous(shape, dtype: str) -> Spec      # the row-major operand
+    nbytes: int                                    # property: numel(shape) * itemsize(dtype)
 ```
 
 `nbxtensor.ops.pad_op`
@@ -3278,6 +3298,7 @@ def select(index: int) -> None           # make `index` current (allocations, co
 def select_for_launch(index: int) -> None    # current for the next kernel launch too (the launcher's context)
 def synchronize() -> None                # the current device finished, through the interceptor in force
 def drain(index: Optional[int] = None) -> None   # every stream of a device drained; the current device restored
+def apple_gpu_limits() -> dict             # the Apple GPU's working set and largest buffer, bytes, for detection; MetalUnavailableError
 def mem_info(index: Optional[int] = None) -> Tuple[int, int]   # (free, total) bytes, as the runtime reports them
 def most_free() -> int                   # the device with the most free memory; the current device restored
 def target_name() -> str                 # what the process compiles for, `<backend>-<arch>` (cuda-70); a driver's refusal raised
@@ -3777,6 +3798,12 @@ class MetalRuntime   # One Metal device, presented as the runtime object the sea
 class MetalUnavailableError   # Metal, or its Python bindings, are not usable on this machine.
 def declare_new_family_ownership() -> None   # Tell pyobjc that the `new*` Metal selectors return an already-retained object.
 def metal_device_available() -> bool   # True when a Metal device can actually be opened.
+def device_limits() -> dict[str, int]   # The Apple GPU's two memory limits in bytes, asked of the device; refused by name when it cannot be asked.
+    # {"working_set_bytes": recommendedMaxWorkingSetSize(), "max_buffer_bytes": maxBufferLength()}, from
+    # Metal.MTLCreateSystemDefaultDevice() alone: the library's Metal runtime is not opened (hardware detection, before
+    # any device is selected). No bindings, no device, a device that raises or a limit not positive: MetalUnavailableError,
+    # its text the reason alone ("MTLCreateSystemDefaultDevice() returned no device", "maxBufferLength() = 0", or the
+    # exception's "Type: text"). Never a guess.
 def reset_runtime_for_tests() -> None   # Drop the cached runtime — and everything compiled against it.
 ```
 

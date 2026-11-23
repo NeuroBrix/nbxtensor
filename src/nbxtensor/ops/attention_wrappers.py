@@ -22,7 +22,8 @@ from nbxtensor.backend.faults import device_fault_buffer, device_fault_code_cach
 from nbxtensor.tensor import _upload_int64_array as _nbx_upload_int64, _saturating_cast as _nbx_saturating_cast
 from nbxtensor.ops._configs import sdpa_block_ceiling as _sdpa_block_ceiling
 from nbxtensor.ops._configs import sdpa_launch_meta as _sdpa_launch_meta
-from nbxtensor.ops._configs import matrix_unit as _matrix_unit, matrix_unit_mm_tile as _matrix_unit_mm_tile
+from nbxtensor.ops.matrix_units import matrix_unit as _matrix_unit
+from nbxtensor.ops._configs import matrix_unit_mm_tile as _matrix_unit_mm_tile
 from nbxtensor.ops._configs import largest_tile_within_smem as _largest_tile_within_smem
 from nbxtensor.backend import launcher as _nbx_launcher
 from nbxtensor.backend.launcher import install as _install_launcher
@@ -1618,7 +1619,7 @@ def scaled_dot_product_attention_wrapper(q, k, v, attn_mask=None,
 def math_attention_cost(q, k, v, mask=None, is_causal=False, native_bf16=None, force_accum=None,
                         contract_half=None, unit=None):
     """`_math_attention` on q [B, H, Tq, D], k [B, Hk, Tk, D], v [B, Hk, Tk, Dv] and an optional additive `mask`
-    (`_cost.Spec`s; q as the wrapper hands it, contiguous): the scores' product (`bmm_cost`, k walked by its strides),
+    (`operand.Spec`s; q as the wrapper hands it, contiguous): the scores' product (`bmm_cost`, k walked by its strides),
     the scale (a new buffer, the product dropped), the bias added (a mask broadcast to the grouped scores and made
     dense at the scores' dtype, then the sum; the causal bias is the cached one), the softmax (`_cost.softmax`), the
     scores dropped, the probabilities cleaned in place, cast to the value's dtype when they differ, the output's

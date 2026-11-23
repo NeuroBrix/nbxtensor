@@ -1276,6 +1276,36 @@ def metal_device_available() -> bool:
         return False
 
 
+def device_limits() -> Dict[str, int]:
+    """The Apple GPU's two memory limits in bytes, asked of the device; refused by name when it cannot be asked.
+
+    `working_set_bytes`: `MTLDevice.recommendedMaxWorkingSetSize()`, how much this process's GPU work may hold in all
+    (the budget the allocator enforces, `MetalRuntime.budget_bytes`). `max_buffer_bytes`: `MTLDevice.maxBufferLength()`,
+    the largest SINGLE buffer the device grants, smaller than the working set (an M4 Pro, 2026-10-04: 14 302 248 960
+    against 19 069 665 280).
+
+    For hardware detection, before any device is selected: it asks `Metal.MTLCreateSystemDefaultDevice()` and nothing
+    else — the library's Metal runtime (`runtime()`) is not opened, no queue, no allocator. Never a guess: when the
+    bindings do not import, no device answers, the device raises, or a limit reads not positive, the refusal is
+    `MetalUnavailableError` and its text is the reason alone ("MTLCreateSystemDefaultDevice() returned no device",
+    "maxBufferLength() = 0", or the exception's type and text), for the caller to state in its own words."""
+    try:
+        import Metal                                    # pyobjc-framework-Metal
+        device = Metal.MTLCreateSystemDefaultDevice()
+        if device is None:
+            raise MetalUnavailableError("MTLCreateSystemDefaultDevice() returned no device")
+        limits = {"working_set_bytes": int(device.recommendedMaxWorkingSetSize()),
+                  "max_buffer_bytes": int(device.maxBufferLength())}
+    except MetalUnavailableError:
+        raise
+    except Exception as exc:                            # said, never swallowed
+        raise MetalUnavailableError(f"{type(exc).__name__}: {exc}") from exc
+    for key, call in (("working_set_bytes", "recommendedMaxWorkingSetSize()"), ("max_buffer_bytes", "maxBufferLength()")):
+        if limits[key] <= 0:
+            raise MetalUnavailableError(f"{call} = {limits[key]}")
+    return limits
+
+
 def reset_runtime_for_tests() -> None:
     """Drop the cached runtime — and everything compiled against it.
 

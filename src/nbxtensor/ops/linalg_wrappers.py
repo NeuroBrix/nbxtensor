@@ -21,7 +21,8 @@ from nbxtensor.backend.faults import device_fault_buffer, device_fault_code_cach
 from nbxtensor.tensor import _upload_int64_array as _nbx_upload_int64, _saturating_cast as _nbx_saturating_cast
 from nbxtensor.ops._configs import sdpa_block_ceiling as _sdpa_block_ceiling
 from nbxtensor.ops._configs import sdpa_launch_meta as _sdpa_launch_meta
-from nbxtensor.ops._configs import matrix_unit as _matrix_unit, matrix_unit_mm_tile as _matrix_unit_mm_tile
+from nbxtensor.ops.matrix_units import matrix_unit as _matrix_unit
+from nbxtensor.ops._configs import matrix_unit_mm_tile as _matrix_unit_mm_tile
 from nbxtensor.ops._configs import largest_tile_within_smem as _largest_tile_within_smem
 from nbxtensor.backend import launcher as _nbx_launcher
 from nbxtensor.backend.launcher import install as _install_launcher
@@ -1205,7 +1206,7 @@ def upsample_linear1d_wrapper(x, output_size, align_corners: bool = False,
 
 
 def mm_cost(a, b, epilogue: int = 0, native_bf16=None, force_accum=None, contract_half=None):
-    """`mm` on `a` [M, K] and `b` [K, N] (`_cost.Spec`s), in the wrapper's order: the operands cast to
+    """`mm` on `a` [M, K] and `b` [K, N] (`operand.Spec`s), in the wrapper's order: the operands cast to
     `launch_keys.mm_dtypes` (a dense copy each); then, at M <= 4, `a` made contiguous, the output [M, N] and, per row,
     the GEMV's own output (N at `matmul_out_dtype` for one row) only when that dtype is not the output's (else the row
     is written in place) — and a full copy of the weight when its rows are not
@@ -1266,7 +1267,7 @@ def mm_cost(a, b, epilogue: int = 0, native_bf16=None, force_accum=None, contrac
 
 
 def addmm_cost(bias, a, b, epilogue: int = 0, native_bf16=None, force_accum=None, contract_half=None):
-    """`addmm` on `bias` ([N], [1, N] or [M, N]), `a` [..., K] and `b` [K, N] (`_cost.Spec`s), in the wrapper's order:
+    """`addmm` on `bias` ([N], [1, N] or [M, N]), `a` [..., K] and `b` [K, N] (`operand.Spec`s), in the wrapper's order:
     the three operands cast to `launch_keys.addmm_dtypes` (a dense copy each); an `a` of more than two dims made
     contiguous and flattened, the product computed on the flat rows (its view returned); then, at M <= 4, `a` and the
     bias made contiguous, the output [M, N] at `matmul_out_dtype` and per row the GEMV's own output (N for one row) —
@@ -1342,7 +1343,7 @@ def addmm_cost(bias, a, b, epilogue: int = 0, native_bf16=None, force_accum=None
 
 def bmm_cost(a, b, allow_strided_b: bool = False, native_bf16=None, force_accum=None, contract_half=None,
              unit=None):
-    """`bmm` on `a` [B, M, K] and `b` [B, K, N] (`_cost.Spec`s): on the matrix unit (`launch_keys.matrix_unit_operands`)
+    """`bmm` on `a` [B, M, K] and `b` [B, K, N] (`operand.Spec`s): on the matrix unit (`launch_keys.matrix_unit_operands`)
     `a` made contiguous and `b` unless the caller lets it be walked by its strides, then the output; otherwise the
     operands at `launch_keys.bmm_dtypes` (a cast each, dense), made contiguous as above, then the output at
     `launch_keys.matmul_out_dtype` (fp32 for half inputs on hardware without native bf16 unless the component's precision

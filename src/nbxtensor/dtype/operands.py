@@ -1,7 +1,7 @@
 """The operand decisions of the kernels, as dtype names (DESIGN rule 12: the mechanism in the library): the dtype a
 contraction's partials are summed in, how a matrix unit carries an operand, how an attention's operands are aligned
 when they disagree, the scale of a split representation. Pure functions of dtype names and of a device's matrix unit
-(`ops._configs.matrix_unit`); the application decides which device and which policy, never these rules.
+(`ops.matrix_units.matrix_unit`); the application decides which device and which policy, never these rules.
 """
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ def contraction_accumulator_bytes(store_bytes: int) -> int:
 
 
 def matrix_unit_representation(dtype: str, unit: dict) -> Optional[str]:
-    """How the hardware profile's matrix unit (`matrix_unit`, nbxtensor.ops._configs.matrix_unit) carries one GEMM
+    """How the hardware profile's matrix unit (`matrix_unit`, nbxtensor.ops.matrix_units.matrix_unit) carries one GEMM
     operand whose dtype in memory is `dtype` (a name): "native" when it IS the unit's operand dtype (one MMA term
     per operand), "split" when the profile declares `matrix_unit.fp32_split` with this dtype among its `operands`
     (the value, widened to fp32, is carried as hi + lo of the operand dtype under a power-of-two scale, see
