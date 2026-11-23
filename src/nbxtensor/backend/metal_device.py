@@ -493,9 +493,16 @@ class MetalRuntime:
         return _OK
 
     def free_host(self, ptr) -> int:
+        """`cudaFreeHost(ptr)`: a pinned host buffer released after every committed command buffer retired.
+
+        A host buffer is a shared MTLBuffer registered like a device one (`_bases`), so a kernel binds it; releasing
+        it while a command buffer that reads or writes it is still running is the GPU use-after-free `free` waits
+        against, and it waits the same way (released without that wait until the library reopening of 23/11/2026).
+        """
         address = _as_int(ptr)
         if not address:
             return _OK
+        self.flush()
         with self._lock:
             entry = self._host_buffers.pop(address, None)
             if entry is not None:
