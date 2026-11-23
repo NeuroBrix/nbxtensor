@@ -91,6 +91,7 @@ from nbxtensor.ops.depthwise_conv2d import depthwise_conv2d_kernel
 from nbxtensor.ops.batch_norm import batch_norm_forward_kernel
 from nbxtensor.ops.cumsum import scan_part_sum_kernel, add_base_sum_kernel
 from nbxtensor.ops.scatter_op import scatter_kernel, scatter_add_kernel, scatter_reduce_amax_kernel, scatter_reduce_amin_kernel
+from nbxtensor.ops.scatter_op import collapsed_strides
 from nbxtensor.ops.gather_op import gather_kernel
 from nbxtensor.ops.avg_pool2d import avg_pool2d_forward_kernel
 from nbxtensor.ops.max_pool2d import max_pool2d_forward_kernel
@@ -824,12 +825,13 @@ def scatter_reduce_wrapper(input, dim: int, index,
         inner_size *= index.shape[i]
     dim_size = index.shape[dim]
 
+    out_outer, out_dim, out_inner = collapsed_strides(out, dim, index)
     stride_args = (
         src, index, out, N,
-        out.stride(dim),
-        src.stride(0) if dim > 0 else 0, src.stride(dim), src.stride(-1) if dim < src.ndim - 1 else 0,
-        index.stride(0) if dim > 0 else 0, index.stride(dim), index.stride(-1) if dim < index.ndim - 1 else 0,
-        out.stride(0) if dim > 0 else 0, out.stride(-1) if dim < out.ndim - 1 else 0,
+        out_dim,
+        *collapsed_strides(src, dim, index),
+        *collapsed_strides(index, dim, index),
+        out_outer, out_inner,
         outer_size, dim_size, inner_size,
     )
 

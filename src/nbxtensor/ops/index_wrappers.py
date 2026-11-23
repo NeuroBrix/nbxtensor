@@ -91,6 +91,7 @@ from nbxtensor.ops.depthwise_conv2d import depthwise_conv2d_kernel
 from nbxtensor.ops.batch_norm import batch_norm_forward_kernel
 from nbxtensor.ops.cumsum import scan_part_sum_kernel, add_base_sum_kernel
 from nbxtensor.ops.scatter_op import scatter_kernel, scatter_add_kernel, scatter_reduce_amax_kernel, scatter_reduce_amin_kernel
+from nbxtensor.ops.scatter_op import collapsed_strides
 from nbxtensor.ops.gather_op import gather_kernel
 from nbxtensor.ops.avg_pool2d import avg_pool2d_forward_kernel
 from nbxtensor.ops.max_pool2d import max_pool2d_forward_kernel
@@ -484,14 +485,15 @@ def scatter_wrapper(input, dim: int, index,
         inner_size *= index.shape[i]
     dim_size = index.shape[dim]
 
+    out_outer, out_dim, out_inner = collapsed_strides(out, dim, index)
     set_device(src)
     scatter_kernel[_ew._1d_grid(N)](
         src, index, out,
         N,
-        out.stride(dim),
-        src.stride(0) if dim > 0 else 0, src.stride(dim), src.stride(-1) if dim < src.ndim - 1 else 0,
-        index.stride(0) if dim > 0 else 0, index.stride(dim), index.stride(-1) if dim < index.ndim - 1 else 0,
-        out.stride(0) if dim > 0 else 0, out.stride(-1) if dim < out.ndim - 1 else 0,
+        out_dim,
+        *collapsed_strides(src, dim, index),
+        *collapsed_strides(index, dim, index),
+        out_outer, out_inner,
         outer_size, dim_size, inner_size,
         **_ew_meta(N),
     )
@@ -517,14 +519,15 @@ def scatter_add_wrapper(input, dim: int, index,
         inner_size *= index.shape[i]
     dim_size = index.shape[dim]
 
+    out_outer, out_dim, out_inner = collapsed_strides(out, dim, index)
     set_device(src)
     scatter_add_kernel[_ew._1d_grid(N)](
         src, index, out,
         N,
-        out.stride(dim),
-        src.stride(0) if dim > 0 else 0, src.stride(dim), src.stride(-1) if dim < src.ndim - 1 else 0,
-        index.stride(0) if dim > 0 else 0, index.stride(dim), index.stride(-1) if dim < index.ndim - 1 else 0,
-        out.stride(0) if dim > 0 else 0, out.stride(-1) if dim < out.ndim - 1 else 0,
+        out_dim,
+        *collapsed_strides(src, dim, index),
+        *collapsed_strides(index, dim, index),
+        out_outer, out_inner,
         outer_size, dim_size, inner_size,
         **_ew_meta(N),
     )
@@ -557,7 +560,7 @@ def index_add_wrapper(x, dim: int, index,
 
     out = NBXTensor.empty_like(x)
 
-    src_stride_outer = source.stride(0) if dim > 0 else 0
+    src_stride_outer = source.stride(dim - 1) if dim > 0 else 0     # the innermost outer dim's: stride(0) is right only at dim 1
     src_stride_dim = source.stride(dim)
     src_stride_inner = source.stride(-1) if dim < source.ndim - 1 else 0
 

@@ -19,6 +19,22 @@ from nbxtensor.ops.ew_tile import synthetic, tile_dependent, tile_independent  #
 
 
 
+def collapsed_strides(t, dim, index):
+    """The (outer, dim, inner) strides of the contiguous tensor `t` as the kernels of this file address it: the flat
+    position of `index` decomposed into outer (every dim before `dim`, flattened), dim, and inner (every dim after,
+    flattened). The outer stride is t.stride(dim - 1), the stride of the innermost outer dim (gather's value); stride(0)
+    is right only with one outer dim and, from dim 2 on, writes wrong places and reads and writes past `src` and `out`.
+    The collapse is exact only when `t` has `index`'s extent on every dim between the first and `dim`, and on every dim
+    past dim + 1: any other layout is refused by name, never addressed wrongly."""
+    n = index.ndim
+    if t.ndim != n or any(t.shape[d] != index.shape[d] for d in [*range(1, dim), *range(dim + 2, n)]):
+        raise RuntimeError(
+            f"ZERO FALLBACK: scatter along dim {dim} addresses a tensor of shape {tuple(t.shape)} through an index of "
+            f"shape {tuple(index.shape)}: the flattened (outer, dim, inner) addressing needs the same extents on dims "
+            f"1 .. {dim - 1} and {dim + 2} .. {n - 1}")
+    return (t.stride(dim - 1) if dim > 0 else 0), t.stride(dim), (t.stride(-1) if dim < n - 1 else 0)
+
+
 def _scatter_recipe(S):
     """The synthetic launch of the scatter kernels of this file — one signature: `scatter_kernel`, `scatter_add_kernel`,
     `scatter_reduce_amax_kernel`, `scatter_reduce_amin_kernel` (`ops/ew_synthetic.py`): N = the ladder's count
