@@ -156,6 +156,7 @@ def _ew_grid_of(*axes):
 
 
 def _per_tile(n: int, times: int = 1):
+    """`elementwise_launch.per_tile`, imported at use."""
     from nbxtensor.ops.elementwise_launch import per_tile
     return per_tile(n, times)
 

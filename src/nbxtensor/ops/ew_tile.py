@@ -31,26 +31,32 @@ class EwTile(int):
     # dict carries the class and the role
 
     def __new__(cls, value: int, ew_class: int, role: str):
+        """An int of `value` remembering its class and role."""
         self = super().__new__(cls, int(value))
         self.ew_class = int(ew_class)
         self.role = role
         return self
 
     def __hash__(self):
+        """Hashes apart from the plain int, so a launch carrying it keys its own launcher entry."""
         return int.__hash__(self) ^ _SALT
 
     def __eq__(self, other):
+        """Equal to the int of the same value."""
         return int.__eq__(self, other)
 
     def __ne__(self, other):
+        """Not equal as the int is not."""
         return int.__ne__(self, other)
 
     def __repr__(self):
+        """Prints as the int."""
         return int.__repr__(self)
 
     __str__ = __repr__
 
     def __reduce__(self):
+        """Pickles with its class and role."""
         return (EwTile, (int(self), self.ew_class, self.role))
 
 

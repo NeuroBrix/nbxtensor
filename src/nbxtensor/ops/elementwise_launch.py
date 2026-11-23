@@ -102,6 +102,7 @@ class per_tile:
     __slots__ = ("n", "times")
 
     def __init__(self, n: int, times: int = 1):
+        """An axis of `times` x cdiv(n, tile)."""
         self.n, self.times = int(n), int(times)
 
 
@@ -121,6 +122,7 @@ def ew_grid_of(*axes):
     the tile proof, or the class's moved setting (`ops/ew_proof.py`). A grid computed by the caller from the tile it
     was handed is wrong for every other tile (the token bitmask, 23/11/2026)."""
     def grid(meta):
+        """The grid at the tile this launch is given."""
         t = _tile_of(meta)
         return tuple(a.times * -(-a.n // t) if isinstance(a, per_tile) else int(a) for a in axes)
     return grid

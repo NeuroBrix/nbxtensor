@@ -34,15 +34,19 @@ class _View:
     """A pointer argument rebuilt in the child: what the launcher reads of a tensor (address, dtype, extent)."""
 
     def __init__(self, address, dtype, shape, strides, elem):
+        """A rebuilt pointer argument: address, dtype, shape, strides, element size."""
         self._address, self.dtype, self.shape, self._strides, self._elem = address, dtype, shape, strides, elem
 
     def data_ptr(self):
+        """The address."""
         return self._address
 
     def stride(self):
+        """The strides, in elements."""
         return self._strides
 
     def element_size(self):
+        """Bytes per element."""
         return self._elem
 
 
@@ -128,6 +132,7 @@ class _Worker:
     started = 0                      # children started in this run (the record's measure)
 
     def __init__(self):
+        """No process yet: it starts at the first job."""
         self.proc = None
         self.err = None
 
@@ -155,6 +160,7 @@ class _Worker:
                                                      else f"timed out after {limit:g} s: {text[-400:]}")
 
     def _start(self):
+        """Start the worker process, its stderr kept in a temporary file."""
         self.err = tempfile.TemporaryFile("w+")
         env = dict(os.environ, CUDA_LAUNCH_BLOCKING="1")
         self.proc = subprocess.Popen([sys.executable, "-m", "nbxtensor.ops.ew_proof_child", "serve"], env=env,
@@ -221,12 +227,14 @@ def time_copy_in_child(cls: int, tiles) -> Dict[tuple, float]:
 # child
 # ---------------------------------------------------------------------------
 def _device_buffer(nbytes: int):
+    """A device buffer of `nbytes` bytes (uint8), at least one."""
     from nbxtensor.dtype.nbx_dtype import NBXDtype
     from nbxtensor.tensor import NBXTensor
     return NBXTensor.empty((max(nbytes, 1),), dtype=NBXDtype.uint8, device="cuda")
 
 
 def _restore(buf, blob: bytes) -> None:
+    """Copy a snapshot's bytes back into its device buffer."""
     import ctypes
     from nbxtensor.memory.allocator import DeviceAllocator
     host = (ctypes.c_char * len(blob)).from_buffer_copy(blob)
@@ -234,6 +242,7 @@ def _restore(buf, blob: bytes) -> None:
 
 
 def _child_run(where: str, start: int) -> None:
+    """The worker's proof job: every candidate from `start` on the snapshot, each restored before, its buffers digested after."""
     import importlib
     from nbxtensor.backend.launcher import _snapshot_ranges, launch
     from nbxtensor.device import synchronize
@@ -267,6 +276,7 @@ def _child_run(where: str, start: int) -> None:
 
 
 def _kwargs(spec, bufs, block: int) -> Dict[str, Any]:
+    """The launch's keyword arguments rebuilt in the worker: pointers as views of the snapshot's buffers, the tile at the candidate's."""
     from nbxtensor.ops.ew_tile import EwTile
     kw = {}
     for name, p in spec["params"].items():
@@ -280,6 +290,7 @@ def _kwargs(spec, bufs, block: int) -> Dict[str, Any]:
 
 
 def _child_time(where: str) -> None:
+    """The worker's timing job: the copy kernel at each tile on the class floor, milliseconds per launch."""
     import triton
     from nbxtensor.backend.launcher import launch
     from nbxtensor.device import synchronize

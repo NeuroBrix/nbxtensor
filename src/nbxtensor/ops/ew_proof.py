@@ -81,6 +81,7 @@ def _assembler() -> str:
 
 
 def stamp_key(st: dict) -> str:
+    """A short stable key of a stamp dict: the hex sha256 of its sorted json, 16 characters."""
     return hashlib.sha256(json.dumps(st, sort_keys=True).encode()).hexdigest()[:16]
 
 
@@ -100,6 +101,7 @@ def variant_of(kernel, specialization, options, tiles) -> Tuple[str, Tuple[int, 
 
 
 def _is_tile(v) -> bool:
+    """Whether a value is an element-wise class tile (`ew_tile.EwTile`)."""
     from nbxtensor.ops.ew_tile import EwTile
     return isinstance(v, EwTile)
 
@@ -122,6 +124,7 @@ class _Table:
     """Shipped proofs and the proofs this machine made, both at this process's stamp."""
 
     def __init__(self):
+        """The shipped and kept proofs at this process's stamp, read once."""
         self.key = stamp_key(stamp())
         self.shipped = self._read(self._shipped_path()).get("variants", {})
         kept = self._read(self._kept_path())
@@ -131,12 +134,14 @@ class _Table:
 
     @staticmethod
     def _shipped_path():
+        """The shipped table's path: <certified directory>/<vendor>/<profile>/ew_tile_proof.json."""
         from nbxtensor.ops.autotune_certified import directory
         st = stamp()
         return directory() / st["vendor"] / st["profile"] / "ew_tile_proof.json"
 
     @staticmethod
     def _kept_path():
+        """The kept table's path: the replay cache's ew_tile_proof.json."""
         from nbxtensor.ops.autotune_cache import _dir
         return os.path.join(_dir(), "ew_tile_proof.json")
 
@@ -150,22 +155,27 @@ class _Table:
         return doc.get("stamps", {}).get(self.key) or {}
 
     def record(self, vid: str) -> Optional[dict]:
+        """The variant's record: kept first, else shipped, else None."""
         return self.kept.get(vid) or self.shipped.get(vid)
 
     def status(self, vid: str, tile) -> Optional[str]:
+        """"passed" / "failed" for a tile of a recorded variant, None when the variant has no record."""
         rec = self.record(vid)
         if rec is None:
             return None
         return "passed" if list(tile) in rec["passed"] else "failed"
 
     def keep(self, vid: str, rec: dict) -> None:
+        """Keep a variant's record and write the kept table."""
         self.kept[vid] = rec
         self._write()
 
     def keep_timing(self) -> None:
+        """Write the kept table after the copy's timing changed."""
         self._write()
 
     def _write(self) -> None:
+        """Write the kept table whole (beside it, renamed over it), this stamp's block updated."""
         path = self._kept_path()
         os.makedirs(os.path.dirname(path), exist_ok=True)
         try:
@@ -210,6 +220,7 @@ _TABLE: List[Optional[_Table]] = [None]
 
 
 def table() -> _Table:
+    """The process's proof table (`_Table`), built at its first use."""
     if _TABLE[0] is None:
         _TABLE[0] = _Table()
     return _TABLE[0]
@@ -326,6 +337,7 @@ def _count(seconds: float, nbytes: int) -> None:
 
 
 def _say_run() -> None:
+    """At exit: the run's proofs in one line (variants, seconds, worker processes, largest snapshot)."""
     from nbxtensor.ops.ew_proof_child import _Worker
     print(f"[ew-proof] this run proved {_RUN['variants']} element-wise variant(s) in {_RUN['seconds']:.1f} s with "
           f"{_Worker.started} child process(es); largest snapshot {_RUN['largest_snapshot']} bytes", file=sys.stderr)
@@ -336,12 +348,14 @@ class _outside_recordings:
     (`backend/frozen_plan`): the recorder is paused around them, and resumes as it was."""
 
     def __enter__(self):
+        """Pause the frozen-plan recorder."""
         from nbxtensor.backend import frozen_plan
         self.state = frozen_plan.STATE
         self.was = self.state.recording
         self.state.recording = False
 
     def __exit__(self, *exc):
+        """Resume the recorder as it was."""
         self.state.recording = self.was
         return False
 
