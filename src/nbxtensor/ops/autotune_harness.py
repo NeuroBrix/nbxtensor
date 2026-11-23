@@ -983,9 +983,11 @@ class LaunchUnderTest:
         """Every configuration run once, measured, its run timed: (accepted [(cfg, deviation, run_s)], excluded
         [{config, deviation, tolerance}] beyond `tolerance`, unrun [{config, error}] the backend refused)."""
         results, excluded, unrun = [], [], []
+        from nbxtensor.backend.compile_bound import precompile
         for cfg in configs:
             self.poison()
             try:
+                precompile(self.tuner.fn, self.args, {**self.kwargs, **cfg.all_kwargs()})    # bounded, in the worker
                 t_one = time.time()
                 self.launch(cfg)
                 _sync()

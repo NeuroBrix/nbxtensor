@@ -189,6 +189,9 @@ sdpa_thresholds:
 # GEMM, where powers of two lost up to 26.9 % and a 16-step ladder under 64 up to 16.7 %.
 # `default` serves every dimension that has no row of its own.
 autotune:
+  # a sweep candidate whose compile does not end within this bound is excluded and recorded, never a hang
+  # (backend/compile_bound.py): the Dell V100 23/11: moe_route's softmax-topk candidates compiled in 4.2-14.7 s, three never returned within 120 s (BLOCK_H/warps 32 and 64)
+  compile_bound_s: 120
   buckets:
     # M — the rows of a GEMM (a prefill's token count; the SDPA scores' batched GEMM): classes of EIGHT below the
     # matrix unit's 64-row tile, where the ladder measured on 2026-09-21 keyed every row exactly. Decision

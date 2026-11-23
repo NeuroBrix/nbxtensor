@@ -131,7 +131,7 @@ class _Worker:
         self.proc = None
         self.err = None
 
-    def ask(self, job: dict) -> Tuple[int, str]:
+    def ask(self, job: dict, timeout: float = None) -> Tuple[int, str]:
         """(0, '') when the job finished; (exit code, its stderr since the job began) when the child died on it."""
         import selectors
         if self.proc is None or self.proc.poll() is not None:
@@ -141,7 +141,8 @@ class _Worker:
         self.proc.stdin.flush()
         sel = selectors.DefaultSelector()
         sel.register(self.proc.stdout, selectors.EVENT_READ)
-        reply = self.proc.stdout.readline() if sel.select(timeout=_CHILD_SECONDS) else None
+        limit = _CHILD_SECONDS if timeout is None else timeout
+        reply = self.proc.stdout.readline() if sel.select(timeout=limit) else None
         if reply:
             return 0, ""
         if self.proc.poll() is None:
@@ -151,7 +152,7 @@ class _Worker:
         text = self.err.read()
         self.err.seek(0, 2)
         return (code if reply is not None else -1), (text if reply is not None
-                                                     else f"timed out after {_CHILD_SECONDS} s: {text[-400:]}")
+                                                     else f"timed out after {limit:g} s: {text[-400:]}")
 
     def _start(self):
         self.err = tempfile.TemporaryFile("w+")
@@ -314,6 +315,9 @@ def _serve() -> None:
             _child_run(job["where"], job["start"])
         elif job["mode"] == "time":
             _child_time(job["where"])
+        elif job["mode"] == "compile":
+            from nbxtensor.backend.compile_bound import compile_in_worker
+            compile_in_worker(job["where"])
         else:
             raise SystemExit(f"unknown job {job['mode']!r}")
         proto.write("{}\n")

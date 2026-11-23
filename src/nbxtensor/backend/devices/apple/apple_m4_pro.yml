@@ -166,6 +166,9 @@ dispatch:
   max_dispatches_per_command_buffer: 16
 
 autotune:
+  # a sweep candidate whose compile does not end within this bound is excluded and recorded, never a hang
+  # (backend/compile_bound.py): the Mac 23/11: the same moe_route sweep ends in 17 s over all its candidates; the bound is the Volta's, no Metal candidate known to come near it
+  compile_bound_s: 120
   buckets:
     # elements — an element-wise launch's element count (`kernels/ops/elementwise_launch.py`), NEVER the `default`
     # dimension ladder (`autotune_bucket.ladder_for` refuses it). MEASURED on THIS chip 2026-10-24 (apple_m4_pro, the

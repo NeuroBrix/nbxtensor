@@ -24,6 +24,7 @@ from __future__ import annotations
 import contextlib
 import ctypes
 import os
+import sys
 
 from nbxtensor.backend import cuda_profile as _profile
 from nbxtensor.backend import c_compiler as _c_compiler
@@ -2203,11 +2204,16 @@ def _screen_configs(tuner, configs, key, meta=None, record_key=None):
 
     # -- run each candidate once, from the same starting state --------------
     results, unrun = [], []
+    from nbxtensor.backend.compile_bound import CompileUnbounded, precompile
     for config in configs:
         try:
+            precompile(tuner.fn, args, {**meta, **config.all_kwargs()})     # under the profile's bound, in the worker
             _restore(buffers, before)
             tuner.fn.run(*args, **{**meta, **config.all_kwargs()})
             results.append((config, _snapshot(buffers)))
+        except CompileUnbounded as exc:
+            # excluded for good: it goes neither to the vote nor to the timer, which would compile it again
+            print(f"[AUTOTUNE_SCREEN] {kernel_name}: {exc}", file=sys.stderr)
         except Exception:
             # A config the backend refuses is not a screen failure — the
             # autotuner already handles one that will not compile. Counted,
