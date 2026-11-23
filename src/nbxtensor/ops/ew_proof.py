@@ -242,10 +242,20 @@ def settle(kernel, grid, bound: Dict[str, Any], specialization, options: Dict[st
                            f"(kept; stamp {tab.key})")
     if status == "passed":
         return None
-    return _moved(kernel, grid, bound, options, tiles, tab)
+    return _moved(kernel, grid, bound, options, tiles, tab, vid, tile)
 
 
-def _moved(kernel, grid, bound, options, tiles, tab):
+def _why_failed(rec: dict, tile) -> str:
+    """What the variant's record says of `tile`: its fault, its dissent, or the record's own word."""
+    for f in rec.get("faults", []):
+        if tuple(f["tile"]) == tuple(tile):
+            return f"faulted: {str(f['fault']).splitlines()[0][:160]}"
+    if any(tuple(d["tile"]) == tuple(tile) for d in rec.get("dissent", [])):
+        return "its bits differ from the agreeing candidates"
+    return rec.get("struck", {}).get(f"{tile[0]}x{tile[1]}", "not among the tiles its record passes")
+
+
+def _moved(kernel, grid, bound, options, tiles, tab, vid=None, tile=None):
     """The class's winner failed this variant: move the class to the best common candidate, and this launch."""
     cls = tiles["tile"].ew_class
     best = tab.class_winner(cls)
@@ -254,8 +264,9 @@ def _moved(kernel, grid, bound, options, tiles, tab):
                            f"({sorted(tab.seen_classes.get(str(cls), ()))})")
     from nbxtensor.ops.elementwise_launch import move_class_winner
     meta = move_class_winner(cls, best[0], best[1])
+    why = _why_failed(tab.record(vid) or {}, tile) if vid is not None else "not among the tiles its record passes"
     print(f"[ew-proof] class {cls}: {kernel.__name__} fails the class's tile "
-          f"{int(tiles['tile'])}x{int(tiles.get('warps', options.get('num_warps', 0)))}; the class moves to "
+          f"{int(tiles['tile'])}x{int(tiles.get('warps', options.get('num_warps', 0)))} ({why}); the class moves to "
           f"{best[0]}x{best[1]} (stages {best[2]}), the best candidate every proven variant passes", file=sys.stderr)
     return retiled(grid, bound, options, int(tiles["tile"]), meta, best[2])
 

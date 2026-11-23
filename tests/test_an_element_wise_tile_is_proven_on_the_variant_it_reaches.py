@@ -223,7 +223,9 @@ def test_the_token_bitmask_runs_at_2048x8_and_after_a_forced_move(vocab, monkeyp
     (vid, rec), = [(v, r) for v, r in tab.kept.items() if r["kernel"] == "_token_bitmask_kernel"]
     assert rec["refused"] is None and len(rec["passed"]) >= 3
     assert rec["dissent"] == [] and rec["faults"] == []
+    struck = [t for t in rec["passed"] if t[:2] == [2048, 8]]
     rec["passed"] = [t for t in rec["passed"] if t[:2] != [2048, 8]]      # force the move: the class tile fails
+    rec["struck"] = {f"{t[0]}x{t[1]}": "struck by the test (no fault: the move is forced)" for t in struck}
     from nbxtensor.backend import launcher
     launcher.reset_caches()
     check()

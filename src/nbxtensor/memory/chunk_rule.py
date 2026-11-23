@@ -93,14 +93,20 @@ def rule_chunk_bytes(card_bytes: int, granularity: int, room_bytes: int, archite
     return max(fit) * MiB if fit else None
 
 
-def vmm_chunk_bytes(device: int, card_bytes: int, architecture: str) -> Optional[int]:
+def vmm_chunk_bytes(device: int, card_bytes: int, architecture: Optional[str] = None) -> Optional[int]:
     """The rule's chunk for `device` (its VMM granularity and the room it leaves — its total less what the runtime
     holds outside the allocator's blocks — read from the driver), or None: no VMM, or no rule entry for its class and
-    architecture — the caller measures once (`trace_replay.chunk_by_replay`) and keeps the result."""
+    architecture — the caller measures once (`trace_replay.chunk_by_replay`) and keeps the result. `architecture`
+    is the caller's when it holds the device's spec (the allocator); else it is READ from the vendor profile in force
+    (its file stem: `volta`), the way the engine's first launch asks with the two arguments it always passed."""
     from nbxtensor.memory.trace_replay import vmm_granularity
     gran = vmm_granularity(device)
     if not gran:
         return None
+    if architecture is None:
+        from nbxtensor.ops.autotune_certified import active_profile
+        prof = active_profile()
+        architecture = prof[1] if prof else ""       # no profile in force: no rule answers, the caller measures
     from nbxtensor.memory.allocator import DeviceAllocator
     free_b, total_b = DeviceAllocator.mem_get_info(device)
     context = max(0, int(total_b) - int(free_b) - DeviceAllocator._cuda_live_bytes.get(device, 0))
