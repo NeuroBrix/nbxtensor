@@ -354,52 +354,36 @@ def index_select_wrapper(x, dim: int, index) :
 
 
 def gather_wrapper(input, dim: int, index) :
-    """Gather along dimension."""
+    """Gather along dimension: out[i0..][index[...]][..in] = input at the index's coordinates, `dim`'s replaced by
+    the index value. The INDEX's own extents define the walk (outer, dim, inner flattened over them); the input is
+    reached through its own strides at the index's coordinates (`scatter_op.collapsed_strides`), so an index smaller
+    than the input on a dim other than `dim` (aten's contract) reads exactly its positions."""
     input = input.contiguous()
     index = index.contiguous()
     dim = dim % input.ndim
 
-    # Decompose into (outer, dim, inner) strides
     outer_size = 1
     for i in range(dim):
-        outer_size *= input.shape[i]
+        outer_size *= index.shape[i]
     inner_size = 1
-    for i in range(dim + 1, input.ndim):
-        inner_size *= input.shape[i]
+    for i in range(dim + 1, index.ndim):
+        inner_size *= index.shape[i]
     dim_size = index.shape[dim]
 
     out = NBXTensor.empty_like(index, dtype=input.dtype)
     N = index.numel()
+    if N == 0:
+        return out
 
-    # Pre-compute strides for the kernel.
-    # gather_kernel's outer_idx is a ROW-MAJOR FLATTENING of every dim before
-    # `dim` (range [0, outer_size)). For a contiguous tensor that whole outer
-    # block collapses to a single stride = product of the sizes from `dim`
-    # onward = shape[dim] * inner_size (== stride(dim-1)). Using stride(0) is the
-    # stride of dim 0 = prod(shape[1:]); it equals the correct value ONLY when
-    # there is exactly one outer dim (dim == 1). With >= 2 outer dims it
-    # over-counts by prod(shape[1:dim]) and drives `outer_idx * stride` past the
-    # buffer end -> destructive OOB store/load -> CUDA 700 at the next sync
-    # (e.g. chatterbox s3gen T5 rel-pos gather [1,8,180,359] idx dim=3). input,
-    # index and out are all contiguous here, so the flat collapse is exact.
-    inp_dim_stride = input.stride(dim)
-    idx_stride_outer = dim_size * inner_size if dim > 0 else 0
-    idx_stride_dim = index.stride(dim)
-    idx_stride_inner = index.stride(-1) if dim < input.ndim - 1 else 0
-    inp_stride_outer = input.shape[dim] * inner_size if dim > 0 else 0
-    inp_stride_inner = input.stride(-1) if dim < input.ndim - 1 else 0
-    out_stride_outer = dim_size * inner_size if dim > 0 else 0
-    out_stride_dim = out.stride(dim)
-    out_stride_inner = out.stride(-1) if dim < input.ndim - 1 else 0
-
+    inp_outer, inp_dim, inp_inner = collapsed_strides(input, dim, index, "gather")
     set_device(input)
     gather_kernel[_ew._1d_grid(N)](
         input, index, out,
         N,
-        inp_dim_stride,
-        idx_stride_outer, idx_stride_dim, idx_stride_inner,
-        inp_stride_outer, inp_stride_inner,
-        out_stride_outer, out_stride_dim, out_stride_inner,
+        inp_dim,
+        *collapsed_strides(index, dim, index, "gather"),
+        inp_outer, inp_inner,
+        *collapsed_strides(out, dim, index, "gather"),
         outer_size, dim_size, inner_size,
         **_ew_meta(N),
     )
@@ -491,7 +475,7 @@ def scatter_wrapper(input, dim: int, index,
         src, index, out,
         N,
         out_dim,
-        *collapsed_strides(src, dim, index),
+        *collapsed_strides(src, dim, index, bounded_on_dim=True),
         *collapsed_strides(index, dim, index),
         out_outer, out_inner,
         outer_size, dim_size, inner_size,
@@ -519,14 +503,14 @@ def scatter_add_wrapper(input, dim: int, index,
         inner_size *= index.shape[i]
     dim_size = index.shape[dim]
 
-    out_outer, out_dim, out_inner = collapsed_strides(out, dim, index)
+    out_outer, out_dim, out_inner = collapsed_strides(out, dim, index, "scatter_add")
     set_device(src)
     scatter_add_kernel[_ew._1d_grid(N)](
         src, index, out,
         N,
         out_dim,
-        *collapsed_strides(src, dim, index),
-        *collapsed_strides(index, dim, index),
+        *collapsed_strides(src, dim, index, "scatter_add", bounded_on_dim=True),
+        *collapsed_strides(index, dim, index, "scatter_add"),
         out_outer, out_inner,
         outer_size, dim_size, inner_size,
         **_ew_meta(N),

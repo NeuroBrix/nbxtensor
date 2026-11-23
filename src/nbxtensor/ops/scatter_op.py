@@ -19,20 +19,49 @@ from nbxtensor.ops.ew_tile import synthetic, tile_dependent, tile_independent  #
 
 
 
-def collapsed_strides(t, dim, index):
-    """The (outer, dim, inner) strides of the contiguous tensor `t` as the kernels of this file address it: the flat
-    position of `index` decomposed into outer (every dim before `dim`, flattened), dim, and inner (every dim after,
-    flattened). The outer stride is t.stride(dim - 1), the stride of the innermost outer dim (gather's value); stride(0)
-    is right only with one outer dim and, from dim 2 on, writes wrong places and reads and writes past `src` and `out`.
-    The collapse is exact only when `t` has `index`'s extent on every dim between the first and `dim`, and on every dim
-    past dim + 1: any other layout is refused by name, never addressed wrongly."""
+def collapsed_strides(t, dim, index, op="scatter", bounded_on_dim=False):
+    """The (outer, dim, inner) strides of the operand `t` as the kernels of this file (and gather's) address it: the
+    walk is the INDEX's own positions, its flat position decomposed into outer (every dim before `dim`, flattened over
+    the index's extents), dim, and inner (every dim after, flattened over the index's extents), and `t` is reached
+    through its own strides at the index's coordinates. aten's contract: index.size(d) <= t.size(d) on every d other
+    than `dim` (on `dim` too when `bounded_on_dim`, scatter's src). A collapsed group of dims is addressed by one stride
+    exactly when `t`'s offset over it is linear in the flattened index position: an index dim of extent 1 always sits
+    at 0 and costs nothing, so the group's stride is `t`'s stride on its innermost dim of index extent > 1, and every
+    other such dim must step `t` by that stride times the index extents inside it. On a contiguous `t` that means: the
+    same extent as the index on every dim after the group's outermost dim of index extent > 1, up to its innermost one.
+    A layout breaking it (for example dim 2, index (2, 2, 1, 2) of (2, 3, 3, 2)) cannot be walked by the merged
+    arithmetic and is refused by name, never addressed wrongly."""
     n = index.ndim
-    if t.ndim != n or any(t.shape[d] != index.shape[d] for d in [*range(1, dim), *range(dim + 2, n)]):
+    shape, ishape = tuple(t.shape), tuple(index.shape)
+    if t.ndim != n or any(ishape[d] > shape[d] for d in range(n) if d != dim or bounded_on_dim):
         raise RuntimeError(
-            f"ZERO FALLBACK: scatter along dim {dim} addresses a tensor of shape {tuple(t.shape)} through an index of "
-            f"shape {tuple(index.shape)}: the flattened (outer, dim, inner) addressing needs the same extents on dims "
-            f"1 .. {dim - 1} and {dim + 2} .. {n - 1}")
-    return (t.stride(dim - 1) if dim > 0 else 0), t.stride(dim), (t.stride(-1) if dim < n - 1 else 0)
+            f"ZERO FALLBACK: {op} along dim {dim} reaches a tensor of shape {shape} through an index of shape {ishape}:"
+            f" the index must have the tensor's rank and no larger an extent on any dim"
+            f"{'' if bounded_on_dim else f' other than {dim}'}")
+
+    def merged(dims):
+        """The one stride walking `dims` (flattened over the index's extents) through `t`, or None when none does."""
+        live = [d for d in dims if ishape[d] > 1]
+        if not live:
+            return 0
+        step = t.stride(live[-1])
+        for d in live:
+            inside = 1
+            for e in range(d + 1, live[-1] + 1):
+                inside *= ishape[e]
+            if t.stride(d) != step * inside:
+                return None
+        return step
+
+    outer, inner = merged(range(dim)), merged(range(dim + 1, n))
+    if outer is None or inner is None:
+        group = "before" if outer is None else "after"
+        raise RuntimeError(
+            f"ZERO FALLBACK: {op} along dim {dim} cannot walk a tensor of shape {shape} (strides "
+            f"{tuple(t.stride(d) for d in range(n))}) through an index of shape {ishape}: on the dims {group} {dim} "
+            f"the tensor's extent differs from the index's after the group's outermost dim of index extent > 1, so no "
+            f"single (outer, dim, inner) stride addresses it exactly")
+    return outer, t.stride(dim), inner
 
 
 def _scatter_recipe(S):

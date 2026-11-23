@@ -825,12 +825,12 @@ def scatter_reduce_wrapper(input, dim: int, index,
         inner_size *= index.shape[i]
     dim_size = index.shape[dim]
 
-    out_outer, out_dim, out_inner = collapsed_strides(out, dim, index)
+    out_outer, out_dim, out_inner = collapsed_strides(out, dim, index, "scatter_reduce")
     stride_args = (
         src, index, out, N,
         out_dim,
-        *collapsed_strides(src, dim, index),
-        *collapsed_strides(index, dim, index),
+        *collapsed_strides(src, dim, index, "scatter_reduce", bounded_on_dim=True),
+        *collapsed_strides(index, dim, index, "scatter_reduce"),
         out_outer, out_inner,
         outer_size, dim_size, inner_size,
     )
