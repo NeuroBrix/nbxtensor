@@ -23,6 +23,16 @@ tile passes (`verdict`): "RED FOUND". Otherwise "NOT FOUND" (the bad tile passed
 "COULD NOT RUN" (the proof was refused: it reached no verdict), exit 1. A fault in a record is always a device fault
 (`ops/ew_proof_child.run_candidates`: anything else refuses the proof). `--case NAME`: one case, exit 0 when its
 variant is proven.
+
+`--layout FILE`: a DIAGNOSTIC door, no proof. The file (`tools/layouts/*.json`) writes out ONE real launch: the kernel
+(module and name), each pointer operand's dtype, shape, strides and storage extent in elements (an int64 shape or
+stride array with its values), the scalars, the constexprs and the count. Every candidate of the class runs EXACTLY that
+launch in the proof's own worker (`ops/ew_proof_child`: its job, its guard, its classification), each buffer against
+the guard as the proof places it (its storage extent ends at the guard), filled as the proof fills it. Per tile:
+pass, device fault (a kernel fault status only), or could not run (anything else). One line ends it: "LAYOUT FAULTS
+AT <tiles>", "LAYOUT CLEAN <n>/<n>" or "COULD NOT RUN"; exit 0 always. No proof table is read or written.
+
+    PYTHONPATH=$PWD/src python tools/prove_an_element_wise_variant.py --layout tools/layouts/flex_t5_position_bias_add.json
 """
 import argparse
 import json
@@ -73,12 +83,147 @@ def prove_case(name: str) -> dict:
     return rec
 
 
+_LAYOUT_KEYS = ("kernel", "count", "pointers")
+
+
+def read_layout(path: str) -> dict:
+    """The layout file at `path`, checked: the kernel named, the count given, every pointer with its dtype, shape,
+    strides and a storage extent that holds every element its shape and strides address (an array's values fill it
+    exactly). Raises ValueError naming what is wrong."""
+    with open(path) as fh:
+        lay = json.load(fh)
+    for key in _LAYOUT_KEYS:
+        if key not in lay:
+            raise ValueError(f"layout {path}: no {key!r}")
+    for name, p in lay["pointers"].items():
+        for key in ("dtype", "shape", "strides", "extent"):
+            if key not in p:
+                raise ValueError(f"layout {path}: pointer {name} has no {key!r}")
+        if not str(p["dtype"]).startswith("*") or len(p["shape"]) != len(p["strides"]):
+            raise ValueError(f"layout {path}: pointer {name}: a pointer dtype and one stride per dimension")
+        reach = 1 + sum((int(d) - 1) * int(st) for d, st in zip(p["shape"], p["strides"]))
+        if int(p["extent"]) < reach:
+            raise ValueError(f"layout {path}: pointer {name}: extent {p['extent']} below the {reach} elements its "
+                             f"shape and strides address")
+        if "values" in p and len(p["values"]) != int(p["extent"]):
+            raise ValueError(f"layout {path}: pointer {name}: {len(p['values'])} values for extent {p['extent']}")
+    return lay
+
+
+def layout_launch(lay: dict, cands):
+    """(kernel, specialization, options, synthetic launch) of a layout file: every parameter in the kernel's order,
+    each pointer a buffer of its storage extent (its values, or data filled as the proof fills), the class tile at
+    the largest candidate; the specialization as the launcher's binder reads those arguments."""
+    import importlib
+    from nbxtensor.backend.launcher import _param_table, nbx_binder
+    from nbxtensor.ops.elementwise_launch import per_tile
+    from nbxtensor.ops.ew_synthetic import Buf, Launch, _Fake, dtype_of
+    from nbxtensor.ops.ew_tile import EwTile
+    kernel = getattr(importlib.import_module(lay["kernel"]["module"]), lay["kernel"]["name"])
+    n = int(lay["count"]["value"])
+    qual = f"{lay['kernel']['module']}.{lay['kernel']['name']}"
+    tile = EwTile(max(c[0] for c in cands), 0, "tile")
+    args, fakes, base = {}, [], 0x100000
+    for name, is_constexpr, *_r in _param_table(kernel):
+        if name == lay["count"]["name"]:
+            args[name] = n
+        elif name in lay["pointers"]:
+            p = lay["pointers"][name]
+            d, elem = dtype_of(p["dtype"])
+            fill = ("values", tuple(int(v) for v in p["values"])) if "values" in p else ("data",)
+            args[name] = Buf(name, p["dtype"], int(p["extent"]), elem, p.get("aligned", True), fill,
+                             f"{qual}:{name}:{n}:layout")
+            base += 1 << 20
+            fakes.append(_Fake(base if args[name].aligned else base + elem, d, args[name].elements, elem))
+            continue
+        elif name in lay.get("scalars", {}):
+            args[name] = lay["scalars"][name]
+        elif name in lay.get("constexprs", {}):
+            args[name] = lay["constexprs"][name]
+        elif is_constexpr:
+            args[name] = tile
+        else:
+            raise ValueError(f"layout: the kernel's parameter {name} is not in the file")
+        fakes.append(args[name])
+    _bound, spec, _o = nbx_binder(kernel, tuple(fakes), {})
+    return kernel, list(spec), dict(lay.get("options", {})), Launch(args, (per_tile(n),), n, "layout")
+
+
+def layout_verdict(outcomes: dict, total: int) -> str:
+    """The one-line verdict of a layout run from {tile: 'pass' | 'device fault' | 'could not run'}: the faulting
+    tiles when any faulted, CLEAN when every one of the `total` candidates passed, else COULD NOT RUN."""
+    faulted = [t for t, o in outcomes.items() if o == "device fault"]
+    unrun = sum(1 for o in outcomes.values() if o == "could not run")
+    if faulted:
+        return "LAYOUT FAULTS AT " + ", ".join(str(tuple(t)) for t in faulted) + (
+            f" ({unrun} could not run)" if unrun else "")
+    passed = sum(1 for o in outcomes.values() if o == "pass")
+    return f"LAYOUT CLEAN {passed}/{total}" if total and passed == total else "COULD NOT RUN"
+
+
+def prove_layout(path: str) -> str:
+    """Run every candidate of the class on the ONE launch a layout file writes out, in the proof's worker against
+    its guard, one job per candidate (a host error on one tile is that tile's 'could not run', never the next
+    tile's); print each tile's outcome and the verdict line; the verdict. Writes no proof table."""
+    import shutil
+    from nbxtensor.memory.guarded import guard_kind
+    from nbxtensor.ops import ew_proof, ew_proof_child
+    from nbxtensor.ops.elementwise_launch import class_candidates
+    cands = class_candidates()
+    try:
+        lay = read_layout(path)
+        kernel, spec, options, launch = layout_launch(lay, cands)
+        vid, _t = ew_proof.variant_of(kernel, spec, options, {"tile": next(v for t, v in spec if ew_proof._is_tile(v))})
+        key = ew_proof.stamp_key({"v": vid})
+        want = lay.get("variant")
+        print(f"== layout {path}: {kernel.__name__} variant {key}"
+              + (f" (the file's {want}: {'the same' if key == want else 'NOT THE SAME'})" if want else "")
+              + f"\n   {vid}\n   n {launch.count}, buffers "
+              + ", ".join(f"{b.name} {b.elements}x{b.elem} B" for b in launch.bufs()), flush=True)
+        if want and key != want:
+            raise ValueError(f"the launch specialises as variant {key}, not the file's {want}: another binary")
+        guard = guard_kind()
+        if guard is None:
+            raise ValueError("unguarded: no guard can be made on this device")
+        unseen = ew_proof.canary(guard)
+        if unseen:
+            raise ValueError(f"unguarded: {unseen}")
+    except Exception as why:                         # noqa: BLE001  a refusal before any tile ran
+        print(f"   refused: {type(why).__name__}: {why}")
+        print("COULD NOT RUN")
+        return "COULD NOT RUN"
+    outcomes, digests = {}, {}
+    for c in cands:
+        where, nbytes = ew_proof_child.write_job(kernel, [launch], [c], options, guard)
+        try:
+            results, _differ = ew_proof_child.run_candidates(where, [c])
+            res = results[tuple(c)]
+            outcomes[tuple(c)] = "device fault" if res[0] == "fault" else "pass"
+            text = str(res[1]).strip().splitlines()[-1][:300] if res[0] == "fault" else ""
+            if res[0] == "ran":
+                digests.setdefault(tuple(res[1]), []).append(tuple(c))
+        except ew_proof_child.ProofCouldNotRun as why:
+            outcomes[tuple(c)] = "could not run"
+            text = str(why)[:300]
+        finally:
+            shutil.rmtree(where, ignore_errors=True)
+        print(f"   {tuple(c)}: {outcomes[tuple(c)]}" + (f": {text}" if text else ""), flush=True)
+    print(f"   guard {guard}, {nbytes} bytes per job; the passing tiles leave {len(digests)} distinct byte set(s)")
+    v = layout_verdict(outcomes, len(cands))
+    print(v)
+    return v
+
+
 def main(argv=None) -> int:
     """Prove the asked case(s), print the records, answer by the exit code."""
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--red", action="store_true", help="both cases, each expecting its red cell")
     ap.add_argument("--case", choices=sorted(CASES), default="mul_scalar_strided_nd")
+    ap.add_argument("--layout", metavar="FILE", help="diagnose ONE real launch written out in FILE (no proof)")
     args = ap.parse_args(argv)
+    if args.layout:
+        prove_layout(args.layout)
+        return 0
     if args.red:
         verdicts = []
         for name in ("mul_scalar_strided_nd", "add_strided_nd"):

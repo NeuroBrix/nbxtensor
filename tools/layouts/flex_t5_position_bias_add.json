@@ -1,0 +1,17 @@
+{
+ "about": "Flex.1-alpha, graph text_encoder_2, op aten.add::5: T5's attention scores (x, contiguous) plus its relative position bias (y = embedding(...) of shape (512, 512, 64) contiguous, permute([2, 0, 1]), unsqueeze(0): a permuted view), out contiguous. The library's add wrapper (elementwise_wrappers.add -> wrappers._prepare_binary_strided) takes add_strided_nd_kernel because y is not contiguous; both shapes are already the output's, so nothing is expanded, and it uploads the output shape and EACH operand's own strides as int64 arrays, NDIM = 4.",
+ "kernel": {"module": "nbxtensor.ops.binary_strided", "name": "add_strided_nd_kernel"},
+ "variant": "6859212e3972bf7a",
+ "options": {"debug": false},
+ "count": {"name": "n_elements", "value": 16777216},
+ "scalars": {"alpha": 1.0},
+ "constexprs": {"NDIM": 4},
+ "pointers": {
+  "x_ptr":        {"dtype": "*fp16", "shape": [1, 64, 512, 512], "strides": [16777216, 262144, 512, 1], "extent": 16777216},
+  "y_ptr":        {"dtype": "*fp16", "shape": [1, 64, 512, 512], "strides": [16777216, 1, 32768, 64], "extent": 16777216},
+  "output_ptr":   {"dtype": "*fp16", "shape": [1, 64, 512, 512], "strides": [16777216, 262144, 512, 1], "extent": 16777216},
+  "shape_ptr":    {"dtype": "*i64", "shape": [4], "strides": [1], "extent": 4, "values": [1, 64, 512, 512]},
+  "x_stride_ptr": {"dtype": "*i64", "shape": [4], "strides": [1], "extent": 4, "values": [16777216, 262144, 512, 1]},
+  "y_stride_ptr": {"dtype": "*i64", "shape": [4], "strides": [1], "extent": 4, "values": [16777216, 1, 32768, 64]}
+ }
+}
