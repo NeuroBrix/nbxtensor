@@ -10,8 +10,8 @@ worker (`ops/ew_proof_child`, one process for the whole run, started again only 
 Triton's on-disk cache, the parent's own compile is then a cache hit; a worker that does not answer within the bound is
 killed and the candidate excluded.
 
-The bound is the vendor profile's `autotune.compile_bound_s` (a value of the device file, never chosen here). A profile
-that declares none compiles in-process as before, said once.
+The bound is the device file's `autotune.compile_bound_s` (a value of the device file, never chosen here), stated in
+every device file (C20); a file that states none is refused by name; `null` is a class's explicit "unbounded".
 
 Three answers, never confused (C16, the Dell leg of 23/11: every "did not end within 120 s" of moe_route_kernel was a
 worker that died at once on an AttributeError, read as a timeout): a compile that ENDS is a cache hit for the parent;
@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import os
 import pickle
+import shutil
 import sys
 import tempfile
 from typing import Any, Dict, Optional, Tuple
@@ -50,17 +51,27 @@ _REFUSED = "refused.txt"
 _SAID = [False]
 
 
+class CompileBoundUndeclared(RuntimeError):
+    """The device file in force states no `autotune.compile_bound_s`: a missing value is added at its source, never
+    read as "no bound"."""
+
+
 def bound_s() -> Optional[float]:
-    """The profile's compile bound in seconds, None when it declares none (said once)."""
+    """The device file's compile bound in seconds. Every device file states it at its source (C20, qa 1278-2 and
+    C12-2); an explicit `compile_bound_s: null` is a class's own statement that it compiles in-process, unbounded
+    (said once). A file that states nothing, or no file in force, is refused by name; a read error is raised as it is,
+    never read as "no bound" (qa C12-1)."""
     from nbxtensor.ops._configs import active_vendor_profile
-    try:
-        value = (active_vendor_profile().get("autotune") or {}).get("compile_bound_s")
-    except Exception:
-        value = None
+    autotune = active_vendor_profile().get("autotune")
+    if not isinstance(autotune, dict) or "compile_bound_s" not in autotune:
+        raise CompileBoundUndeclared(
+            "ZERO FALLBACK: the device file in force states no autotune.compile_bound_s (backend/devices/<vendor>/"
+            "<class>.yml): a sweep candidate's compile bound is a value of the device file, added at its source")
+    value = autotune["compile_bound_s"]
     if value is None and not _SAID[0]:
         _SAID[0] = True
-        print("[autotune] this device profile declares no autotune.compile_bound_s: sweep candidates compile "
-              "in-process, unbounded", file=sys.stderr)
+        print("[autotune] this device file declares compile_bound_s: null: sweep candidates compile in-process, "
+              "unbounded", file=sys.stderr)
     return float(value) if value is not None else None
 
 
@@ -125,6 +136,14 @@ def precompile(kernel, args: tuple, kwargs: Dict[str, Any]) -> None:
         return
     from nbxtensor.ops import ew_proof_child
     where = tempfile.mkdtemp(prefix="nbx_compile_")
+    try:
+        _compile_in(where, kernel, args, kwargs, bound, ew_proof_child)
+    finally:
+        shutil.rmtree(where, ignore_errors=True)        # the spec directory is removed on success and on failure (C6-1)
+
+
+def _compile_in(where, kernel, args: tuple, kwargs: Dict[str, Any], bound: float, ew_proof_child) -> None:
+    """`precompile`'s work inside its spec directory `where`: the spec written, the worker asked, its answer read."""
     launch_only = _launch_only(kernel)
     spec = {"module": kernel.fn.__module__, "name": kernel.__name__, "args": [_describe(a) for a in args],
             "kwargs": {k: _describe(v) for k, v in kwargs.items() if k not in launch_only}}

@@ -312,7 +312,11 @@ def prove(kernel, grid, bound, options, tiles, vid) -> dict:
     with _outside_recordings():
         spec, nbytes = ew_proof_child.snapshot_launch(kernel, grids, bound, options)
     independent = declared_independence(kernel)
-    results, differ = ew_proof_child.run_candidates(spec, cands)
+    try:
+        results, differ = ew_proof_child.run_candidates(spec, cands)
+    finally:
+        import shutil
+        shutil.rmtree(spec, ignore_errors=True)        # the snapshot (gigabytes): removed on success and on failure (C6-1)
     rec = judge(independent, cands, results, differ)
     rec.update(seconds=round(time.time() - t0, 2), snapshot_bytes=nbytes, kernel=kernel.__name__)
     _count(rec["seconds"], nbytes)

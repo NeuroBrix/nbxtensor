@@ -194,6 +194,10 @@ autotune_screen_rtol:
 autotune_screen_max_bytes: 33554432
 
 autotune:
+  # a sweep candidate whose compile does not end within this bound is excluded and kept, never a hang
+  # (backend/compile_bound.py): every class that compiles Triton kernels states it at its source;
+  # 120 s, the bound measured against on the V100 (moe_route candidates 4.2-14.7 s, three never returned)
+  compile_bound_s: 120
   buckets:
     # elements — an element-wise launch's element count (`kernels/ops/elementwise_launch.py`), NEVER the `default`
     # dimension ladder (`autotune_bucket.ladder_for` refuses it). NOT measured on this architecture (no such device on

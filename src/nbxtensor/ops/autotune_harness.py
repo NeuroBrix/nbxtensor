@@ -981,9 +981,12 @@ class LaunchUnderTest:
 
     def sweep(self, configs, oracle, tolerance: float):
         """Every configuration run once, measured, its run timed: (accepted [(cfg, deviation, run_s)], excluded
-        [{config, deviation, tolerance}] beyond `tolerance`, unrun [{config, error}] the backend refused)."""
+        [{config, deviation, tolerance}] beyond `tolerance`, unrun [{config, kind, error}] that could not run, each with
+        its KIND: "compile did not end" (the profile's bound), "compiler refused" (Triton's own error), "launch
+        refused" (the backend at launch). A compile worker that DIES is an error of this library: raised, never
+        written into a certificate as a candidate that could not run (qa C16-1)."""
         results, excluded, unrun = [], [], []
-        from nbxtensor.backend.compile_bound import precompile
+        from nbxtensor.backend.compile_bound import CompileRefused, CompileUnbounded, CompileWorkerDied, precompile
         for cfg in configs:
             self.poison()
             try:
@@ -993,8 +996,12 @@ class LaunchUnderTest:
                 _sync()
                 run_s = time.time() - t_one
                 dev = F.deviation_against(self.out, oracle)
-            except Exception as exc:                     # a config the backend refuses: counted, never trusted
-                unrun.append({"config": config_dict(cfg), "error": str(exc)[:200]})
+            except CompileWorkerDied:
+                raise                                    # a fault of this library: never certified around
+            except Exception as exc:                     # a config that cannot run: counted with its kind, never trusted
+                kind = ("compile did not end" if isinstance(exc, CompileUnbounded) else
+                        "compiler refused" if isinstance(exc, CompileRefused) else "launch refused")
+                unrun.append({"config": config_dict(cfg), "kind": kind, "error": f"{kind}: {exc}"[:300]})
                 continue
             if not (dev <= tolerance):
                 excluded.append({"config": config_dict(cfg), "deviation": dev, "tolerance": tolerance})

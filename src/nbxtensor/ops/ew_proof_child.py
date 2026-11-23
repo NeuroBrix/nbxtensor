@@ -55,7 +55,7 @@ class _View:
 # ---------------------------------------------------------------------------
 def snapshot_launch(kernel, grids, bound: Dict[str, Any], options: Dict[str, Any]) -> Tuple[str, int]:
     """(spec directory, bytes snapshotted) of this launch."""
-    from nbxtensor.backend.launcher import _addressable_extent, _snapshot_ranges
+    from nbxtensor.backend.launcher import _addressable_extent
     spans = {}
     for name, v in bound.items():
         if hasattr(v, "data_ptr") and hasattr(v, "stride"):
@@ -67,6 +67,18 @@ def snapshot_launch(kernel, grids, bound: Dict[str, Any], options: Dict[str, Any
             spans[name] = (int(v.data_ptr()), int(v.data_ptr()) + max(int(ext), 1))
     groups = _merge(sorted(spans.values()))
     where = tempfile.mkdtemp(prefix="nbx_ew_proof_")
+    try:
+        return where, _write_snapshot(where, kernel, grids, bound, options, spans, groups)
+    except BaseException:
+        import shutil
+        shutil.rmtree(where, ignore_errors=True)       # a snapshot that failed half-way leaves nothing (C6-1)
+        raise
+
+
+def _write_snapshot(where, kernel, grids, bound, options, spans, groups) -> int:
+    """The snapshot's files in `where`: each merged byte range, then the spec the worker rebuilds the launch from;
+    the bytes written."""
+    from nbxtensor.backend.launcher import _snapshot_ranges
     params, total = {}, 0
     for gi, (lo, hi) in enumerate(groups):
         blob = _snapshot_ranges(lo, [(0, hi - lo)])
@@ -85,7 +97,7 @@ def snapshot_launch(kernel, grids, bound: Dict[str, Any], options: Dict[str, Any
             "options": {k: v for k, v in options.items() if k not in ("num_warps", "num_stages")}}
     with open(os.path.join(where, "spec.pkl"), "wb") as fh:
         pickle.dump(spec, fh)
-    return where, total
+    return total
 
 
 def _merge(spans):
@@ -220,11 +232,15 @@ def time_copy_in_child(cls: int, tiles) -> Dict[tuple, float]:
     where = tempfile.mkdtemp(prefix="nbx_ew_time_")
     with open(os.path.join(where, "time.json"), "w") as fh:
         json.dump({"cls": int(cls), "tiles": [list(t) for t in tiles]}, fh)
-    rc, err = _child(["time", where])
-    if rc != 0:
-        from nbxtensor.ops.ew_proof import TileUnproven
-        raise TileUnproven(f"ZERO FALLBACK: the copy's timing child failed for class {cls}: {err[-800:]}")
-    got = json.load(open(os.path.join(where, "timing.json")))
+    try:
+        rc, err = _child(["time", where])
+        if rc != 0:
+            from nbxtensor.ops.ew_proof import TileUnproven
+            raise TileUnproven(f"ZERO FALLBACK: the copy's timing child failed for class {cls}: {err[-800:]}")
+        got = json.load(open(os.path.join(where, "timing.json")))
+    finally:
+        import shutil
+        shutil.rmtree(where, ignore_errors=True)       # removed on success and on failure (C6-1)
     return {tuple(t): ms for t, ms in got}
 
 
