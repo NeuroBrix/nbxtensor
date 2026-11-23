@@ -27,7 +27,8 @@ _SALT = 0x5EED_E11E
 class EwTile(int):
     """An element-wise class's tile or warps: `int(value)`, plus the class (`ew_class`) and the role
     (`'tile'` | `'warps'`) it was resolved for."""
-    __slots__ = ("ew_class", "role")
+    # no __slots__: CPython refuses a nonempty one on a subtype of int (a variable-size builtin); the instance
+    # dict carries the class and the role
 
     def __new__(cls, value: int, ew_class: int, role: str):
         self = super().__new__(cls, int(value))
