@@ -1081,7 +1081,7 @@ def invoke_silu_and_mul(input_tensor, M, N):
         input_tensor.stride(0), input_tensor.stride(1),
         output.stride(0), output.stride(1),
         BLOCK_M=BLOCK_M, BLOCK_N=BLOCK_N,
-        num_warps=4,
+        num_warps=4, enable_fp_fusion=False,      # the chain rounds silu, then the product: no fma
     )
     return output
 

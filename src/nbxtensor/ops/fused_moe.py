@@ -378,10 +378,12 @@ def silu_and_mul_kernel(
     gate_ptrs = input_ptr + offs_m[:, None] * stride_im + offs_n[None, :] * stride_in
     up_ptrs = input_ptr + offs_m[:, None] * stride_im + (offs_n[None, :] + N) * stride_in
 
-    gate = tl.load(gate_ptrs, mask=mask, other=0.0).to(tl.float32)
+    gate_raw = tl.load(gate_ptrs, mask=mask, other=0.0)
     up = tl.load(up_ptrs, mask=mask, other=0.0).to(tl.float32)
 
-    silu_gate = gate * tl.sigmoid(gate)
+    # the chain's roundings, as silu_mul_split_kernel below (a fusion computes what its chain computes)
+    g = gate_raw.to(tl.float32)
+    silu_gate = (g * sigmoid(g)).to(gate_raw.dtype).to(tl.float32)
     result = silu_gate * up
 
     out_ptrs = output_ptr + offs_m[:, None] * stride_om + offs_n[None, :] * stride_on
