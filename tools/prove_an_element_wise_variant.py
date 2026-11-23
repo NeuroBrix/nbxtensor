@@ -4,10 +4,11 @@ Each case is ONE variant, its specialization written out below so its id matches
 
   mul_scalar_strided_nd  `binary_strided.mul_scalar_strided_nd_kernel` (*fp32 D, *fp32 D, i32 D, fp32, *i64 D,
                          *i64 D, tile, constexpr NDIM 3), debug False — variant 6be93ab046480f3a; the red cell of a
-                         V100 is a fault at tile (4096, 2, 3).
+                         V100: (4096, 2, 3) FAULTS and (256, 2, 3) PASSES (the register's records).
   add_strided_nd         `binary_strided.add_strided_nd_kernel` (*fp16 D, *fp16 D, *fp16 D, i32 D, fp32, *i64 D,
-                         *i64 D, *i64 D, tile, constexpr NDIM 4), debug False — variant 6859212e3972bf7a; the red cell
-                         of a V100 is a fault at two of its tiles (the register names which).
+                         *i64 D, *i64 D, tile, constexpr NDIM 4), debug False — variant 6859212e3972bf7a; the register
+                         says 2 of its 15 tiles faulted in Flex.1-alpha's launch without naming them: its red cell is
+                         SOME tile faulting and (256, 2, 3) PASSING (the passing tile derived here, the smallest).
 
 The proof runs every candidate of the element-wise class on the variant's synthetic launches (`ops/ew_synthetic.py`:
 the ladder of counts with masked tails, contiguous and permuted layouts), every buffer against a guard
@@ -17,9 +18,11 @@ text, the ladder, the guard and the synthetic bytes.
     PYTHONPATH=$PWD/src python tools/prove_an_element_wise_variant.py --red
     PYTHONPATH=$PWD/src python tools/prove_an_element_wise_variant.py --case add_strided_nd
 
-`--red`: both cases, exit 0 only when mul_scalar_strided_nd faults at (4096, 2, 3) AND add_strided_nd faults at
-some tile (the red cells found from the ladder alone), 1 otherwise. `--case NAME [--expect-fault B,W,S]`: one case;
-exit 0 when the named fault is found, or, without it, when the variant is proven.
+`--red`: both cases; exit 0 only when, for EACH, its known-bad tile faults with a DEVICE fault and its known-good
+tile passes (`verdict`): "RED FOUND". Otherwise "NOT FOUND" (the bad tile passed, or the good one did not) or
+"COULD NOT RUN" (the proof was refused: it reached no verdict), exit 1. A fault in a record is always a device fault
+(`ops/ew_proof_child.run_candidates`: anything else refuses the proof). `--case NAME`: one case, exit 0 when its
+variant is proven.
 """
 import argparse
 import json
@@ -32,6 +35,20 @@ CASES = {
                        ["*fp16", "*fp16", "*fp16", ("i32", "D"), ("fp32", None), "*i64", "*i64", "*i64"], 4,
                        "6859212e3972bf7a"),
 }
+#: each case's red cell: (the tile that must fault, or None for "some tile"; the tile that must pass)
+RED = {"mul_scalar_strided_nd": ((4096, 2, 3), (256, 2, 3)), "add_strided_nd": (None, (256, 2, 3))}
+
+
+def verdict(rec: dict, bad, good) -> str:
+    """The red cell's verdict on a variant's record: 'COULD NOT RUN' when the proof was refused before any verdict
+    on a tile (unkept: unguarded, no recipe, a worker that could not run), 'RED FOUND' when the bad tile (or, None,
+    some tile) faulted AND the good tile passed, 'NOT FOUND' otherwise."""
+    if rec.get("unkept"):
+        return "COULD NOT RUN"
+    faulted = {tuple(f["tile"]) for f in rec.get("faults", [])}
+    passed = {tuple(t) for t in rec.get("passed", [])}
+    bad_seen = bool(faulted) if bad is None else tuple(bad) in faulted
+    return "RED FOUND" if bad_seen and tuple(good) in passed else "NOT FOUND"
 
 
 def prove_case(name: str) -> dict:
@@ -61,23 +78,17 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--red", action="store_true", help="both cases, each expecting its red cell")
     ap.add_argument("--case", choices=sorted(CASES), default="mul_scalar_strided_nd")
-    ap.add_argument("--expect-fault", default=None, help="block,warps,stages a fault is expected at")
     args = ap.parse_args(argv)
     if args.red:
-        mul = prove_case("mul_scalar_strided_nd")
-        add = prove_case("add_strided_nd")
-        found_mul = any(f["tile"] == [4096, 2, 3] for f in mul["faults"])
-        found_add = bool(add["faults"])
-        print(("RED FOUND" if found_mul else "NOT FOUND") + ": mul_scalar_strided_nd fault at (4096, 2, 3)")
-        print(("RED FOUND" if found_add else "NOT FOUND") + ": add_strided_nd faults at "
-              f"{[tuple(f['tile']) for f in add['faults']]}")
-        return 0 if found_mul and found_add else 1
+        verdicts = []
+        for name in ("mul_scalar_strided_nd", "add_strided_nd"):
+            bad, good = RED[name]
+            v = verdict(prove_case(name), bad, good)
+            verdicts.append(v)
+            print(f"{v}: {name}: " + (f"{bad} must fault" if bad else "some tile must fault")
+                  + f" with a device fault and {good} must pass")
+        return 0 if all(v == "RED FOUND" for v in verdicts) else 1
     rec = prove_case(args.case)
-    if args.expect_fault:
-        want = [int(x) for x in args.expect_fault.split(",")]
-        found = any(f["tile"] == want for f in rec["faults"])
-        print(("RED FOUND: " if found else "NOT FOUND: ") + f"a fault at {tuple(want)} on the synthetic ladder alone")
-        return 0 if found else 1
     return 0 if not rec["refused"] else 1
 
 

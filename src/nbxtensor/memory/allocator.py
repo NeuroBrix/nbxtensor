@@ -1516,10 +1516,11 @@ class DeviceAllocator:
         if sync_name:
             _rc = getattr(rt, sync_name)()
             if _rc not in (None, 0):
-                raise RuntimeError(
+                from nbxtensor.backend.faults import DeviceStatusError
+                raise DeviceStatusError(
                     f"deviceSynchronize failed rc={_rc} on current device "
                     f"{DeviceAllocator.get_device()} — sticky async error "
-                    f"surfaced at this sync; the fault is at or before it.")
+                    f"surfaced at this sync; the fault is at or before it.", sync_name, int(_rc))
         # The portable half of the same contract: a backend that does not
         # honour `tl.device_assert` reports through the fault channel, and
         # this is where it is observed. The sync above has retired the work

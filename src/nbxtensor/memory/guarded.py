@@ -22,8 +22,15 @@ What each backend offers:
     says so and proves nothing there.
 
 The guard's resolution is the alignment unit: a buffer whose start keeps a residue modulo 16 (Triton's 'D' pointer
-attribute, or its absence) is placed at most 15 bytes before the guard (`place`); an access inside that slack is not
-seen. Bytes before the buffer's start are not guarded (an underflow is not what this is for).
+attribute, or its absence) is placed at most 15 bytes before the guard (`place`): an overrun INSIDE that slack is NOT
+seen. So the proof's ladder holds sizes with ZERO slack (`ops/ew_synthetic.ladder`): with a count specialised 'D'
+every rung's count-sized buffers end exactly at the guard; with a count specialised '' the rung L + 8 does, for every
+element of 2 bytes or more. An aligned buffer of 1-byte elements and a '' count always keeps slack (its bytes are
+not a multiple of 16): an overrun of less than one 16-byte unit there is not seen. Bytes before the buffer's start are
+not guarded (an underflow is not what this is for).
+
+A device where no guard can be made (`guard_kind()` None) proves nothing: the proof refuses by name there. That is a
+census question to answer when such a device arrives (what guard it offers), never a default taken for it.
 
 Torch-free, numpy-free.
 """

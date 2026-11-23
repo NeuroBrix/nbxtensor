@@ -19,7 +19,13 @@ The proof (orchestrator rulings 23/11/2026 12:5x-13:1x; the synthetic cure, the 
     range whose next granule is unmapped (an access past the extent is an illegal address, every time); on Metal its
     end at the end of a dedicated MTLBuffer, in a worker with shader validation on (an access past it is reported).
     A device where no guard can be made proves NOTHING: the variant is refused by name ("unguarded") — nothing says
-    proven for a tail no run met;
+    proven for a tail no run met; what guard such a device offers is a census question when it arrives, never a
+    default. Before a run's first proof a CANARY (`canary`: one deliberate overrun) must be seen by the guard, or the
+    device is unguarded the same way;
+  * a tile FAULTS only on a DEVICE fault in the worker: a kernel fault status at its launch or at the synchronize
+    after it on CUDA (`backend.faults.KERNEL_FAULTS`: the 700 and its kin), a shader-validation report on Metal. Any
+    other end — a refusal of the launcher, an exception before the launch, a signal, a timeout, an unexplained exit —
+    means the proof COULD NOT RUN: the variant is refused by name and nothing is written;
   * the candidates run in a CHILD process (`ops/ew_proof_child.py`; one worker serves a burst of proofs, empties
     its pool back to the driver after each job and EXITS after `ew_proof_child.IDLE_SECONDS` (2 s) without a job, so
     it holds nothing on the card while the parent runs): an illegal address is sticky and ends the process that
@@ -345,11 +351,17 @@ def prove(kernel, specialization, options, tiles, vid) -> dict:
         launches = ew_synthetic.synthesise(kernel, specialization, cands)
     except ew_synthetic.NotSynthesisable as why:
         return _unkept(kernel, guard, str(why))
+    unseen = canary(guard)
+    if unseen:
+        return _unkept(kernel, "unguarded", f"unguarded: {unseen}")
     where, nbytes = ew_proof_child.write_job(kernel, launches, cands, options, guard)
     independent = declared_independence(kernel)
     try:
         results, differ = ew_proof_child.run_candidates(where, cands)
         rec = judge(independent, cands, results, differ)
+    except ew_proof_child.ProofCouldNotRun as why:
+        return _unkept(kernel, guard, f"ZERO FALLBACK: the proof of {kernel.__name__} (variant "
+                       f"{stamp_key({'v': vid})}) could not run: {why}")
     finally:
         import shutil
         shutil.rmtree(where, ignore_errors=True)        # the job's files: removed on success and on failure (C6-1)
@@ -364,6 +376,36 @@ def prove(kernel, specialization, options, tiles, vid) -> dict:
           + ("" if independent else " — proven by fault only (" + ("declares itself tile-dependent"
              if independent is False else "declares no tile independence") + ")"), file=sys.stderr)
     return rec              # a refused one too: kept, said once, raised by `settle` at every launch
+
+
+_CANARY: Dict[str, str] = {}
+
+
+def canary(guard: str) -> str:
+    """'' when the guard is SEEN on this device, else why not — once per process, before its first proof: the
+    canary kernel (`ops/ew_canary.py`), which writes one element past its output, runs on its synthetic launches
+    against the guard in the worker, and must end as a device fault (a 700 on CUDA, a validation report on Metal).
+    Once per process and not per worker: a fault ends the worker that meets it (a CUDA fault is sticky), and what is
+    proven is the device's and the library's guard, the same for every worker of the run."""
+    if guard not in _CANARY:
+        from nbxtensor.ops import ew_proof_child, ew_synthetic
+        from nbxtensor.ops.ew_canary import CANARY_SPEC, ew_canary_kernel
+        cand = [(256, 4, 3)]
+        launches = ew_synthetic.synthesise(ew_canary_kernel, CANARY_SPEC, cand)[:1]
+        where, _n = ew_proof_child.write_job(ew_canary_kernel, launches, cand, {}, guard)
+        try:
+            results, _d = ew_proof_child.run_candidates(where, cand)
+            seen = results[cand[0]][0] == "fault"
+            _CANARY[guard] = "" if seen else ("the canary's overrun one element past its buffer was NOT seen by the "
+                                              f"guard ({guard}): it does not guard on this device")
+        except ew_proof_child.ProofCouldNotRun as why:
+            _CANARY[guard] = f"the guard's canary could not run ({why})"
+        finally:
+            import shutil
+            shutil.rmtree(where, ignore_errors=True)
+        print(f"[ew-proof] the guard's canary ({guard}): " + ("seen" if not _CANARY[guard] else _CANARY[guard]),
+              file=sys.stderr)
+    return _CANARY[guard]
 
 
 def _unkept(kernel, guard: str, why: str) -> dict:

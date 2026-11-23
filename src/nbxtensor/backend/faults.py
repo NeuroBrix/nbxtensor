@@ -10,6 +10,27 @@ import threading
 from nbxtensor.backend import capabilities as _caps
 
 
+#: the driver statuses a KERNEL's own execution raises (CUDA's sticky launch faults: an illegal address, a hardware
+#: stack error, an illegal or misaligned instruction or address, an invalid address space or program counter, a
+#: launch failure) — what the element-wise tile proof counts as a device fault of a tile, and nothing else
+KERNEL_FAULTS = frozenset({700, 714, 715, 716, 717, 718, 719})
+
+
+class DeviceStatusError(RuntimeError):
+    """A device runtime or driver call that answered a non-zero status: the call's name (`call`) and the status
+    (`status`) kept as values, so a caller tells a kernel's fault (`KERNEL_FAULTS`) from any other refusal without
+    reading the text."""
+
+    def __init__(self, message: str, call: str, status: int):
+        """The error of `call` answering `status`, said as `message`."""
+        super().__init__(message)
+        self.call, self.status = call, int(status)
+
+    def kernel_fault(self) -> bool:
+        """Whether the status is one a kernel's own execution raises (`KERNEL_FAULTS`)."""
+        return self.status in KERNEL_FAULTS
+
+
 # Whether this backend's device memory is directly readable at its own
 # `data_ptr()` from the host. The fault channel below reads its status word
 # that way — after a flush that has already happened, so no copy and no

@@ -41,6 +41,22 @@ _CHILD_SECONDS = 600         # a candidate that hangs this long is recorded as a
 IDLE_SECONDS = 2.0
 #: the exit code of a worker that ended on its idle bound: it read no job, so the job the parent sent is sent again
 IDLE_EXIT = 75
+#: the exit code of a worker that met a DEVICE fault (a kernel fault status at the launch or the synchronize after it,
+#: `backend.faults.KERNEL_FAULTS`; a shader-validation report on Metal): the candidate's fault, recorded
+DEVICE_EXIT = 76
+#: the exit code of a worker whose job could not run (any other exception): the proof could not run, never a fault
+UNRUN_EXIT = 77
+
+
+class ProofCouldNotRun(RuntimeError):
+    """The proof's worker did not reach a verdict on a candidate: an exception that is no device fault (a refusal of
+    the launcher, a recipe error, anything raised before the launch), a signal, a timeout, an unexplained exit. The
+    variant is refused by name; nothing is recorded of the candidate."""
+
+
+class DeviceFault(RuntimeError):
+    """In the worker: a device fault of the candidate running (a kernel fault status at its launch or at the
+    synchronize after it, or a shader-validation report on Metal) — the one outcome recorded as a tile's fault."""
 
 
 class _View:
@@ -98,23 +114,30 @@ def write_job(kernel, launches, cands, options: Dict[str, Any], guard: str) -> T
 # parent: the children
 # ---------------------------------------------------------------------------
 def run_candidates(where: str, cands) -> Tuple[Dict[tuple, tuple], Any]:
-    """{tile: ('fault', text) | ('ran', digests)} over every candidate, and the differ of two digest tuples."""
+    """{tile: ('fault', text) | ('ran', digests)} over every candidate, and the differ of two digest tuples. A
+    candidate is a FAULT only when its worker recorded a device fault (`DeviceFault`, exit DEVICE_EXIT); any other end
+    of a worker on a candidate — an exception it recorded as not run, a signal, a timeout, an exit with nothing
+    recorded — raises ProofCouldNotRun naming it: no verdict on the tile."""
     results: Dict[tuple, tuple] = {}
     start = 0
     while start < len(cands):
         with open(os.path.join(where, "cands.json"), "w") as fh:
             json.dump([list(c) for c in cands], fh)
         rc, err = _child(["run", where, str(start)])
-        opened, any_started = _read_out(where, start, results, cands)
-        if len(results) == len(cands):
+        ended = _read_out(where, start, results, cands)
+        if len(results) == len(cands) and rc == 0:
             break
-        if not any_started:
-            from nbxtensor.ops.ew_proof import TileUnproven
-            raise TileUnproven("ZERO FALLBACK: the tile proof's child process could not start (no device context "
-                               f"beside the loaded model?); the unproven tile is not used. Child said: {err[-800:]}")
-        at = opened if opened is not None else len(results)
-        results[tuple(cands[at])] = ("fault", err[-1200:].strip() or f"child exit {rc}")
-        start = at + 1
+        if ended is not None and ended[0] == "fault" and rc == DEVICE_EXIT:
+            at = ended[1]
+            results[tuple(cands[at])] = ("fault", ended[2])
+            start = at + 1
+            continue
+        why = (ended[2] if ended is not None and ended[0] == "unrun" else
+               ("timed out" if rc == TIMED_OUT else f"signal {-rc}" if rc < 0 else f"exit {rc}")
+               + f", nothing recorded: {err[-600:].strip()}")
+        at = ended[1] if ended is not None else start
+        raise ProofCouldNotRun(f"candidate {tuple(cands[at]) if at is not None and at < len(cands) else '?'}: "
+                               f"{why}")
     return results, lambda a, b: first_difference(where, a, b)
 
 
@@ -194,21 +217,26 @@ def _child(argv) -> Tuple[int, str]:
 
 
 def _read_out(where, start, results, cands):
-    """(the candidate this child started and did not finish, or None; whether it started any), its finished
-    candidates entered in `results`."""
-    open_one, any_started = None, False
+    """The worker's record of a job begun at `start`: its finished candidates entered in `results`, and how it ended
+    on a candidate it did not finish — ('fault', index, text) for a device fault, ('unrun', index, text) for any
+    other exception it caught, ('open', index, '') for one it began and recorded nothing of; None when it began none."""
     path = os.path.join(where, f"out{start}.jsonl")
+    ended = None
     if not os.path.exists(path):
-        return None, False
+        return None
     with open(path) as fh:
         for line in fh:
             ev = json.loads(line)
             if "start" in ev:
-                open_one, any_started = ev["start"], True
-            else:
+                ended = ("open", ev["start"], "")
+            elif "done" in ev:
                 results[tuple(cands[ev["done"]])] = ("ran", tuple(ev["digests"]))
-                open_one = None
-    return open_one, any_started
+                ended = None
+            elif "fault" in ev:
+                ended = ("fault", ev["fault"], ev["text"])
+            elif "unrun" in ev:
+                ended = ("unrun", ev["unrun"], ev["text"])
+    return ended
 
 
 def first_difference(where: str, a, b) -> dict:
@@ -245,42 +273,78 @@ def _metal() -> bool:
 # ---------------------------------------------------------------------------
 def _child_run(where: str, start: int) -> None:
     """The worker's proof job: every candidate from `start`, each running every synthetic launch on freshly guarded
-    buffers (allocated, filled, launched, waited, digested, freed); a validation report (Metal) ends the worker on that
-    candidate as a fault ends it on CUDA."""
-    import importlib
-    from nbxtensor.backend.launcher import _snapshot_ranges, launch
-    from nbxtensor.device import synchronize
-    from nbxtensor.ops.ew_synthetic import Buf, fill_bytes
-    spec = pickle.load(open(os.path.join(where, "spec.pkl"), "rb"))
-    cands = json.load(open(os.path.join(where, "cands.json")))
-    kernel = getattr(importlib.import_module(spec["module"]), spec["name"])
-    blobs = [[fill_bytes(Buf("", b[0], b[1], b[2], b[3], b[4], b[5])) for b in ln["bufs"]] for ln in spec["launches"]]
+    buffers (allocated, filled, launched, waited, digested, freed). Its end on a candidate is RECORDED before the
+    worker exits: a device fault (`DeviceFault`) as the candidate's fault (exit DEVICE_EXIT), any other exception as
+    "not run" (exit UNRUN_EXIT) — the parent never reads a host error as a fault."""
+    import traceback
     out = open(os.path.join(where, f"out{start}.jsonl"), "a")
-    for i in range(start, len(cands)):
-        block, warps, stages = cands[i]
-        out.write(json.dumps({"start": i}) + "\n")
+    at = None
+    try:
+        import importlib
+        from nbxtensor.ops.ew_synthetic import Buf, fill_bytes
+        spec = pickle.load(open(os.path.join(where, "spec.pkl"), "rb"))
+        cands = json.load(open(os.path.join(where, "cands.json")))
+        kernel = getattr(importlib.import_module(spec["module"]), spec["name"])
+        blobs = [[fill_bytes(Buf("", *b)) for b in ln["bufs"]] for ln in spec["launches"]]
+        for i in range(start, len(cands)):
+            at = i
+            out.write(json.dumps({"start": i}) + "\n")
+            out.flush()
+            digests = _candidate(where, spec, kernel, blobs, cands[i], i)
+            out.write(json.dumps({"done": i, "digests": digests}) + "\n")
+            out.flush()
+    except DeviceFault as fault:
+        out.write(json.dumps({"fault": at, "text": str(fault)[-1200:]}) + "\n")
         out.flush()
-        digests: List[str] = []
-        for li, ln in enumerate(spec["launches"]):
-            held = _guarded(spec["guard"], ln["bufs"], blobs[li])
-            try:
-                kw = _kwargs(ln, held, block)
-                launch(kernel, tuple(ln["grids"][i]), **kw, **spec["options"], num_warps=warps, num_stages=stages)
-                synchronize()
-                _raise_reported(spec["guard"], spec["name"], ln, cands[i])
-                for (ty, elements, elem, *_r), g in zip(ln["bufs"], held):
-                    data = _snapshot_ranges(int(g.address), [(0, max(elements, 1) * elem)])
-                    d = hashlib.sha256(data).hexdigest()[:24]
-                    path = os.path.join(where, f"r{len(digests)}_{d}.bin")
-                    if not os.path.exists(path):
-                        with open(path, "wb") as fh:
-                            fh.write(data)
-                    digests.append(d)
-            finally:
-                for g in held:
-                    g.free()
-        out.write(json.dumps({"done": i, "digests": digests}) + "\n")
+        os._exit(DEVICE_EXIT)                   # a CUDA fault is sticky: this worker launches nothing more
+    except BaseException as exc:                # noqa: BLE001  every other end is "could not run", recorded so
+        out.write(json.dumps({"unrun": at, "text": f"{type(exc).__name__}: {exc}"[:600] + " | "
+                              + traceback.format_exc()[-600:]}) + "\n")
         out.flush()
+        os._exit(UNRUN_EXIT)
+
+
+def _candidate(where: str, spec: dict, kernel, blobs, cand, i: int) -> List[str]:
+    """One candidate over every synthetic launch of the job: each buffer guarded and filled, the launch made and
+    waited (`_launch_waited`: its device faults raised as `DeviceFault`), every buffer digested, then freed; the
+    digests."""
+    from nbxtensor.backend.launcher import _snapshot_ranges
+    block, warps, stages = cand
+    digests: List[str] = []
+    for li, ln in enumerate(spec["launches"]):
+        held = _guarded(spec["guard"], ln["bufs"], blobs[li])
+        try:
+            kw = _kwargs(ln, held, block)
+            _launch_waited(kernel, tuple(ln["grids"][i]), kw, spec, warps, stages)
+            _raise_reported(spec["guard"], spec["name"], ln, cand)
+            for (ty, elements, elem, *_r), g in zip(ln["bufs"], held):
+                data = _snapshot_ranges(int(g.address), [(0, max(elements, 1) * elem)])
+                d = hashlib.sha256(data).hexdigest()[:24]
+                path = os.path.join(where, f"r{len(digests)}_{d}.bin")
+                if not os.path.exists(path):
+                    with open(path, "wb") as fh:
+                        fh.write(data)
+                digests.append(d)
+        finally:
+            for g in held:
+                g.free()
+    return digests
+
+
+def _launch_waited(kernel, grid, kw: dict, spec: dict, warps: int, stages: int) -> None:
+    """The launch and the synchronize after it; a kernel fault status of either (`faults.KERNEL_FAULTS`: the 700 and
+    its kin) raised as `DeviceFault`. Every other exception — the launcher refusing an argument, a compile error —
+    goes up as it is: not a device fault."""
+    from nbxtensor.backend.faults import DeviceStatusError
+    from nbxtensor.backend.launcher import launch
+    from nbxtensor.device import synchronize
+    try:
+        launch(kernel, grid, **kw, **spec["options"], num_warps=warps, num_stages=stages)
+        synchronize()
+    except DeviceStatusError as err:
+        if err.kernel_fault():
+            raise DeviceFault(f"{type(err).__name__} at {err.call}: {err}") from err
+        raise
 
 
 def _guarded(kind: str, bufs, blobs) -> list:
@@ -312,7 +376,7 @@ def _raise_reported(kind: str, name: str, ln: dict, cand) -> None:
     from nbxtensor.backend.metal_device import runtime
     reports = runtime().take_validation_reports()
     if reports:
-        raise RuntimeError(f"shader validation: {name} at tile {tuple(cand)} touched past an extent (synthetic launch "
+        raise DeviceFault(f"shader validation: {name} at tile {tuple(cand)} touched past an extent (synthetic launch "
                            f"count {ln['count']}, {ln['layout']}): {reports[0][:600]}")
 
 

@@ -47,7 +47,7 @@ def _spec_of(v):
 @pytest.mark.parametrize("attr", ["D", ""])
 def test_the_ladder_holds_masked_tails_in_the_counts_own_specialization(attr):
     counts = ew_synthetic.ladder(attr, CANDS)
-    want = {"D": [16, 240, 4080, 4112, 8240], "": [2, 255, 4095, 4097, 8195]}[attr]
+    want = {"D": [16, 240, 4080, 4112, 8240], "": [2, 255, 4095, 4097, 4104, 8195]}[attr]
     assert counts == want
     assert all(_spec_of(n) == ("i32", attr) for n in counts)            # the same binary at every count
     for block in {c[0] for c in CANDS}:
@@ -198,6 +198,7 @@ def test_two_launches_of_different_counts_give_one_proof_and_the_same_record(mon
     variant alone, the second launch served by the record."""
     from nbxtensor.ops.mul import mul_scalar_kernel as k
     monkeypatch.setattr("nbxtensor.memory.guarded.guard_kind", lambda: "vmm")
+    monkeypatch.setattr(ew_proof, "canary", lambda guard: "")
     monkeypatch.setattr("nbxtensor.ops.elementwise_launch.class_candidates", lambda: list(CANDS))
     jobs = []
 
@@ -246,7 +247,7 @@ def test_a_kernel_its_signature_does_not_determine_is_refused_by_name_until_it_d
         return {"n": S.n, "width": w, "x_ptr": S.buf("x_ptr", w)}, None
     recipe.count = "n"
     launches = ew_synthetic.synthesise(synthetic(recipe)(two_counts_kernel), spec, CANDS)
-    assert [ln.count for ln in launches] == [2, 255, 4095, 4097, 8195]
+    assert [ln.count for ln in launches] == [2, 255, 4095, 4097, 4104, 8195]
     assert all(ln.args["x_ptr"].elements == 32 and ln.args["y_ptr"].elements == ln.count for ln in launches)
 
 
@@ -373,6 +374,7 @@ def test_a_lane_past_its_extent_is_caught_at_exactly_its_tile(_own_worker):
     bad = ew_proof.prove(K.overrun_at_4096_kernel, spec, opts, {}, "bad")
     assert bad["guard"] == kind and bad["refused"] is None
     assert sorted(tuple(f["tile"]) for f in bad["faults"]) == sorted(c for c in cands if c[0] == 4096)
+    assert all(f["fault"].startswith(("shader validation", "DeviceStatusError")) for f in bad["faults"])   # device
     assert sorted(map(tuple, bad["passed"])) == sorted(c for c in cands if c[0] != 4096)
     good = ew_proof.prove(K.masked_copy_kernel, spec, opts, {}, "good")
     assert good["faults"] == [] and good["dissent"] == [] and len(good["passed"]) == len(cands)
@@ -444,3 +446,134 @@ def test_the_worker_exits_on_its_idle_bound_and_a_later_job_starts_a_fresh_one()
             w.proc.kill()
         import shutil
         shutil.rmtree(job, ignore_errors=True)
+
+
+# --- 8. only a DEVICE fault is a tile's fault; anything else: the proof could not run -----------------------------
+def _fake_child(tmp_path, monkeypatch, lines, rc, err=""):
+    """A worker that wrote `lines` to its record of the job and ended with `rc` and stderr `err`."""
+    where = str(tmp_path)
+
+    def child(argv):
+        with open(os.path.join(where, f"out{argv[2]}.jsonl"), "a") as fh:
+            for ln in lines:
+                fh.write(json.dumps(ln) + "\n")
+        return rc, err
+    monkeypatch.setattr(ew_proof_child, "_child", child)
+    return where
+
+
+def test_a_child_that_raises_before_the_launch_is_no_fault_but_a_proof_that_could_not_run(tmp_path, monkeypatch):
+    """The 1308 false green (V100, head f6bd82e): every candidate ended on the launcher's host-side refusal
+    (ValueError: an address not handed out by the allocator) before any launch, and each was recorded as a FAULT."""
+    err = ("Traceback ...\nValueError: NeuroBrix launcher: device address 0x7fabe7bfffc0 (parameter 'x_ptr') was not "
+           "handed out by the allocator — refused, not launched")
+    where = _fake_child(tmp_path, monkeypatch, [{"start": 0}], 1, err)
+    with pytest.raises(ew_proof_child.ProofCouldNotRun, match="refused, not launched"):
+        ew_proof_child.run_candidates(where, [(4096, 2, 3)])
+
+
+@pytest.mark.parametrize("lines,rc,err,why", [
+    ([{"start": 0}], -9, "", "signal 9"),                                                     # killed by a signal
+    ([{"start": 0}], ew_proof_child.TIMED_OUT, "timed out after 0.1 s", "timed out"),         # past the bound
+    ([{"start": 0}], 3, "", "exit 3"),                                                        # a non-zero exit
+    ([{"start": 0}, {"unrun": 0, "text": "ValueError: a recipe error"}], getattr(ew_proof_child, "UNRUN_EXIT", 77), "",
+     "ValueError: a recipe error"),                                                           # a Python exception
+    ([], 1, "ModuleNotFoundError: no kernel", "nothing recorded"),                            # died before any start
+])
+def test_no_end_but_a_device_fault_is_a_fault(tmp_path, monkeypatch, lines, rc, err, why):
+    where = _fake_child(tmp_path, monkeypatch, lines, rc, err)
+    with pytest.raises(ew_proof_child.ProofCouldNotRun, match=why):
+        ew_proof_child.run_candidates(where, [(4096, 2, 3), (256, 2, 3)])
+
+
+def test_a_device_fault_recorded_by_the_worker_is_the_tiles_fault(tmp_path, monkeypatch):
+    cands = [(4096, 2, 3), (256, 2, 3)]
+    calls = []
+
+    def child(argv):
+        start = int(argv[2])
+        calls.append(start)
+        with open(os.path.join(str(tmp_path), f"out{start}.jsonl"), "a") as fh:
+            if start == 0:
+                fh.write(json.dumps({"start": 0}) + "\n")
+                fh.write(json.dumps({"fault": 0, "text": "DeviceStatusError at cuLaunchKernel: 700"}) + "\n")
+                return ew_proof_child.DEVICE_EXIT, ""
+            fh.write(json.dumps({"start": 1}) + "\n")
+            fh.write(json.dumps({"done": 1, "digests": ["a"]}) + "\n")
+            return 0, ""
+    monkeypatch.setattr(ew_proof_child, "_child", child)
+    results, _d = ew_proof_child.run_candidates(str(tmp_path), cands)
+    assert results[(4096, 2, 3)] == ("fault", "DeviceStatusError at cuLaunchKernel: 700")
+    assert results[(256, 2, 3)] == ("ran", ("a",)) and calls == [0, 1]
+
+
+def test_a_proof_that_could_not_run_is_refused_by_name_and_nothing_is_written(monkeypatch):
+    from nbxtensor.ops.mul import mul_scalar_kernel as k
+    monkeypatch.setattr("nbxtensor.memory.guarded.guard_kind", lambda: "vmm")
+    monkeypatch.setattr(ew_proof, "canary", lambda guard: "")
+
+    def cannot(where, cands):
+        raise ew_proof_child.ProofCouldNotRun("candidate (256, 2, 3): ValueError: refused, not launched")
+    monkeypatch.setattr(ew_proof_child, "run_candidates", cannot)
+    tab = _MemTable()
+    monkeypatch.setattr(ew_proof, "table", lambda: tab)
+    warps = EwTile(2, 65536, "warps")
+    spec = [("*fp32", "D"), ("*fp32", "D"), ("i32", "D"), ("fp32", None), ("constexpr", TILE)]
+    with pytest.raises(ew_proof.TileUnproven, match="ZERO FALLBACK: the proof of mul_scalar_kernel .* could not run"):
+        ew_proof.settle(k, lambda m: (1,), {}, spec, {"num_warps": warps, "num_stages": 3},
+                        {"tile": TILE, "warps": warps})
+    assert tab.written == {} and next(iter(tab.unkept.values()))["faults"] == []
+
+
+def test_a_canary_the_guard_does_not_see_makes_the_device_unguarded(monkeypatch):
+    monkeypatch.setattr(ew_proof, "_CANARY", {})
+    monkeypatch.setattr(ew_proof_child, "run_candidates",
+                        lambda where, cands: ({tuple(c): ("ran", ("x",)) for c in cands}, None))
+    assert "NOT seen" in ew_proof.canary("vmm")
+    from nbxtensor.ops.binary_strided import mul_scalar_strided_nd_kernel as k
+    monkeypatch.setattr("nbxtensor.memory.guarded.guard_kind", lambda: "vmm")
+    rec = ew_proof.prove(k, RED, {"num_warps": 2, "num_stages": 3}, {"tile": TILE}, "v")
+    assert rec["unkept"] and rec["refused"].startswith("unguarded: the canary's overrun")
+    monkeypatch.setattr(ew_proof, "_CANARY", {})
+    monkeypatch.setattr(ew_proof_child, "run_candidates",
+                        lambda where, cands: ({tuple(c): ("fault", "700") for c in cands}, None))
+    assert ew_proof.canary("vmm") == ""
+
+
+def test_the_red_first_verdict_needs_the_bad_tile_to_fault_and_the_good_one_to_pass():
+    import importlib.util
+    import pathlib
+    tool = pathlib.Path(__file__).resolve().parents[1] / "tools" / "prove_an_element_wise_variant.py"
+    spec = importlib.util.spec_from_file_location("prove_an_element_wise_variant", tool)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    bad, good = (4096, 2, 3), (256, 2, 3)
+    all_fault = {"faults": [{"tile": list(c), "fault": "x"} for c in CANDS], "passed": [], "refused": "0 ran"}
+    assert mod.verdict(all_fault, bad, good) == "NOT FOUND"                  # the 1308 record: never a green
+    red = {"faults": [{"tile": list(bad), "fault": "700"}], "passed": [list(c) for c in CANDS if c != bad]}
+    assert mod.verdict(red, bad, good) == "RED FOUND" and mod.verdict(red, None, good) == "RED FOUND"
+    assert mod.verdict({"faults": [], "passed": [list(c) for c in CANDS]}, bad, good) == "NOT FOUND"
+    assert mod.verdict({"unkept": True, "refused": "could not run", "faults": [], "passed": []}, bad, good) \
+        == "COULD NOT RUN"
+
+
+# --- 9. the slack, and the launcher's one door --------------------------------------------------------------------
+@pytest.mark.parametrize("elem", [2, 4, 8])
+@pytest.mark.parametrize("attr", ["D", ""])
+def test_each_ladder_holds_a_count_whose_aligned_buffer_has_no_slack_before_the_guard(attr, elem):
+    from nbxtensor.memory.guarded import place
+    end = 0x7F0000200000
+    zero = [n for n in ew_synthetic.ladder(attr, CANDS) if place(end, n * elem, elem, True) == end - n * elem]
+    assert zero, f"no rung of the {attr!r} ladder ends a {elem}-byte buffer exactly at the guard"
+
+
+def test_a_guarded_range_is_an_address_the_launcher_accepts_while_it_lives():
+    from nbxtensor.memory.allocator import DeviceAllocator as DA
+    from nbxtensor.memory.vmm import GuardedRange
+    g = GuardedRange(_FakeVmm(), 4080 * 4, 4, True)
+    try:
+        assert DA.holds(g.address) and DA.holds(g.address + 4080 * 4 - 1) and DA.holds(g.base)
+        assert not DA.holds(g.guard)                                     # the guard granule is no allocation
+    finally:
+        g.free()
+    assert not DA.holds(g.address)

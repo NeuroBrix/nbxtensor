@@ -108,6 +108,7 @@ def test_no_proof_job_is_left_behind_when_the_proof_fails(tmp_path, monkeypatch)
     monkeypatch.setattr("tempfile.tempdir", str(tmp_path))
     monkeypatch.setattr("nbxtensor.ops.elementwise_launch.class_candidates", lambda: [(64, 2, 3)])
     monkeypatch.setattr("nbxtensor.memory.guarded.guard_kind", lambda: "vmm")
+    monkeypatch.setattr(ew_proof, "canary", lambda guard: "")
     monkeypatch.setattr(ew_synthetic, "synthesise", lambda *a: [])
     monkeypatch.setattr(ew_proof_child, "write_job", lambda *a: (tempfile.mkdtemp(prefix="nbx_ew_proof_"), 8))
 

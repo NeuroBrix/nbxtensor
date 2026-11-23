@@ -8,7 +8,8 @@ made of is drawn from that and from the kernel's signature:
   * THE LADDER of counts, fixed, every one holding masked tails (`ladder`): with s and L the smallest and the largest
     tile of the class, n = 1, s - 1, L - 1, L + 1, 2L + 3 — each kept in the count's own specialization: a count
     specialised divisible by 16 ('D') walks 16, s - 16, L - 16, L + 16, 2L + 48; one specialised not divisible by 16
-    walks 2 (1 is Triton's constant 1, another binary), s - 1, L - 1, L + 1, 2L + 3; a count the variant fixed (its
+    walks 2 (1 is Triton's constant 1, another binary), s - 1, L - 1, L + 1, L + 8 (its buffers of 2-byte elements
+    and wider end exactly at the guard: no slack), 2L + 3; a count the variant fixed (its
     constant 1) is that count alone. A count the variant has 64-bit (a launch past 2^31 elements) walks the same
     small counts as 64-bit integers (`Int64`): the same wide binary, met in kilobytes.
   * LAYOUTS drawn from the rank: contiguous, and a permuted one (the operand's memory in the reverse dimension order:
@@ -39,7 +40,7 @@ import struct
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 #: the proof method: part of the proof table's stamp (`ew_proof.stamp`), so a table made by another method is not read
-METHOD = "synthetic-guarded-1"
+METHOD = "synthetic-guarded-2"
 UNIT = 16                                  # Triton's divisibility unit ('D')
 LAYOUTS = ("contiguous", "permuted")
 _INT_TYPES = ("i32", "i64", "u64", "i8", "i16", "u8", "u16", "u32")
@@ -77,14 +78,16 @@ class NotSynthesisable(RuntimeError):
 def ladder(attr, cands) -> List[int]:
     """The counts a variant's count parameter walks, from its specialization `attr` ('D', '', or ('constexpr', v))
     and the class's candidates (block, warps, stages): every one holds a masked tail for some tile, the first below
-    every tile, the last past two of the largest."""
+    every tile, the last past two of the largest. Each layout meets a count-sized buffer with ZERO slack before its
+    guard (`memory.guarded`): every 'D' count does; for a '' count the rung L + 8 does (a multiple of 8, not of 16:
+    its bytes are a multiple of 16 for every element of 2 bytes or more)."""
     blocks = sorted({int(c[0]) for c in cands})
     s, big = blocks[0], blocks[-1]
     if isinstance(attr, tuple):
         return [int(attr[1])]
     if attr == "D":
         return [UNIT, s - UNIT, big - UNIT, big + UNIT, 2 * big + 3 * UNIT]
-    return [2, s - 1, big - 1, big + 1, 2 * big + 3]
+    return [2, s - 1, big - 1, big + 1, big + UNIT // 2, 2 * big + 3]
 
 
 def fit(attr, near: int) -> int:

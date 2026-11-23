@@ -521,11 +521,14 @@ class CudaDriver(ModuleDriver):
         self._arg_buffers: Dict[Tuple[int, tuple], tuple] = {}
 
     def _check(self, ret: int, what: str) -> None:
+        """Raise a driver call's non-zero status by name, as a `faults.DeviceStatusError` carrying the call and the
+        status."""
         if ret != 0:
+            from nbxtensor.backend.faults import DeviceStatusError
             msg = ctypes.c_char_p()
             self.lib.cuGetErrorString(ret, ctypes.byref(msg))
-            raise RuntimeError(f"NeuroBrix launcher: {what} failed ({ret}: "
-                               f"{(msg.value or b'?').decode()})")
+            raise DeviceStatusError(f"NeuroBrix launcher: {what} failed ({ret}: "
+                                    f"{(msg.value or b'?').decode()})", what, ret)
 
     def _ensure_context(self) -> None:
         ctx = ctypes.c_void_p()

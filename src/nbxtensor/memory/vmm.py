@@ -173,7 +173,11 @@ class GuardedRange:
     The first byte past the buffer (past the slack) is unmapped: a load or a store there is an illegal address
     (CUDA 700), sticky for the context, so the proof meets it in a child process. Bytes BEFORE the buffer's start
     are mapped (the granule's head): an underflow is not what this guards. `free()` unmaps, releases and gives the
-    range back. Every failed call is refused by name."""
+    range back. Every failed call is refused by name.
+
+    For its lifetime the mapped span is one of the allocator's live ranges (`DeviceAllocator._range_add`, the door
+    `DeviceAllocator.holds` reads): the launcher accepts its addresses as it accepts any allocation's, through the
+    same check, and refuses them again once it is freed."""
 
     def __init__(self, vmm: "Vmm", nbytes: int, elem: int, aligned: bool) -> None:
         """Reserve, map and place a guarded buffer of `nbytes` bytes of elements of `elem` bytes; `aligned`: its
@@ -196,6 +200,8 @@ class GuardedRange:
             vmm.unreserve(self.base, self.reserved)
             self._check("cuMemMap/cuMemSetAccess", rc)
         self.address = place(self.base + self.mapped, self.nbytes, int(elem), bool(aligned))
+        from nbxtensor.memory.allocator import DeviceAllocator
+        DeviceAllocator._range_add(self.base, self.mapped)    # a device range the launcher accepts (`holds`)
 
     def _check(self, call: str, rc: int) -> None:
         """Refuse, by name, a VMM call the guard is built from when it fails."""
@@ -209,7 +215,10 @@ class GuardedRange:
         return self.base + self.mapped
 
     def free(self) -> None:
-        """Unmap the buffer, release its physical allocation, give its virtual range back."""
+        """Unregister the mapped span from the allocator's live ranges, unmap the buffer, release its physical
+        allocation, give its virtual range back."""
+        from nbxtensor.memory.allocator import DeviceAllocator
+        DeviceAllocator._range_del(self.base)
         self.vmm.unmap(self.base, self.mapped)
         self.vmm.release(self.handle)
         self.vmm.unreserve(self.base, self.reserved)
