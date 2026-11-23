@@ -38,7 +38,7 @@ class _View:
         self._address, self.dtype, self.shape, self._strides, self._elem = address, dtype, shape, strides, elem
 
     def data_ptr(self):
-        """The address."""
+        """The rebuilt pointer address, aligned as the original."""
         return self._address
 
     def stride(self):
@@ -46,7 +46,7 @@ class _View:
         return self._strides
 
     def element_size(self):
-        """Bytes per element."""
+        """The bytes one element of the argument takes."""
         return self._elem
 
 
