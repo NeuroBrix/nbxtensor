@@ -11,6 +11,8 @@ import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go throu
 import triton.language as tl
 
 from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+from nbxtensor.ops.ew_tile import synthetic  # noqa: E402  the tile proof's synthetic recipe (ops/ew_synthetic.py)
+from nbxtensor.ops.ew_synthetic import flat  # noqa: E402
 
 
 @tile_independent
@@ -28,6 +30,7 @@ def le_forward_kernel(
     y = tl.load(y_ptr + offset, mask=mask)
     tl.store(output_ptr + offset, (x.to(tl.float32) <= y.to(tl.float32)).to(tl.int1), mask=mask)
 
+@synthetic(flat("n_elements"))
 @tile_independent
 @triton.jit
 def le_scalar_kernel(

@@ -161,8 +161,9 @@ def _cuda():
 @pytest.mark.skipif(not _cuda(), reason="the 700 is a CUDA assembler's fault (V100, ptxas -O3)")
 def test_the_pixart_multiply_runs_where_the_class_tile_faults(monkeypatch, tmp_path):
     """The red cell: x = column 0 of a (64, 576) fp32 tensor viewed (64, 1, 1), strides (576, 1, 1), times 0.0,
-    at the class setting 4096 / 2 warps. On the base it faults (700); with the proof the variant is proven in a child
-    process, the class moves, and the product is zeros."""
+    at the class setting 4096 / 2 warps. Without the proof it faults (700); with it the variant is proven on its
+    synthetic launches in the worker process (nothing of this launch enters the proof), the class moves, and the
+    product is zeros."""
     monkeypatch.setenv("NEUROBRIX_REPLAY_CACHE", str(tmp_path))
     from nbxtensor.tensor import NBXTensor
     from nbxtensor.ops import elementwise_wrappers as EW

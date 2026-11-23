@@ -22,7 +22,7 @@ import triton
 import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
-from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+from nbxtensor.ops.ew_tile import synthetic, tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
 
 
 #: The contract this kernel enforces. Triton forbids reading a module global
@@ -31,6 +31,27 @@ from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401
 INDEX_PUT_OOB = "index_put: index out of range"
 
 
+def _index_put_recipe(S):
+    """The synthetic launch of `index_put_kernel` (`ops/ew_synthetic.py`): N = the ladder's count values written into
+    an `out` of R rows of T (both small, honouring their specialization): `idx_ptr` holds cdiv(N, T) row indices in
+    [0, R) (every one in range: no fault is reported), `out_ptr` is (R - 1) * T + min(N, T) elements (the furthest
+    element an in-range row and a tail position below min(N, T) reach), `val_ptr` N values, or the one value
+    VAL_SCALAR broadcasts; `fault_ptr` the call site's one-word channel (`backend/faults.fault_channel`), zeroed. The
+    grid is the call site's: cdiv(N, tile) on one axis."""
+    n = S.n
+    t = S.int("T", 3)
+    r = S.int("R", 4)
+    scalar = bool(S.attr("VAL_SCALAR")[1])
+    return ({"N": n, "T": t, "R": r, "idx_ptr": S.index("idx_ptr", -(-n // t), r),
+             "out_ptr": S.buf("out_ptr", (r - 1) * t + min(n, t)), "val_ptr": S.buf("val_ptr", 1 if scalar else n),
+             "fault_ptr": S.values("fault_ptr", [0])}, None)
+
+
+_index_put_recipe.count = "N"
+_index_put_recipe.description = "index_put(N values into R rows of T, in-range rows)"
+
+
+@synthetic(_index_put_recipe)
 @tile_dependent("duplicate indices write one address (an accumulate, or the last writer)")
 @triton.jit(debug=True)
 def index_put_kernel(

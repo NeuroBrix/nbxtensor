@@ -1,0 +1,85 @@
+"""Prove element-wise variants on the synthetic ladder alone — no model, no launch of a caller (`ops/ew_proof.py`).
+
+Each case is ONE variant, its specialization written out below so its id matches a proof table's record:
+
+  mul_scalar_strided_nd  `binary_strided.mul_scalar_strided_nd_kernel` (*fp32 D, *fp32 D, i32 D, fp32, *i64 D,
+                         *i64 D, tile, constexpr NDIM 3), debug False — variant 6be93ab046480f3a; the red cell of a
+                         V100 is a fault at tile (4096, 2, 3).
+  add_strided_nd         `binary_strided.add_strided_nd_kernel` (*fp16 D, *fp16 D, *fp16 D, i32 D, fp32, *i64 D,
+                         *i64 D, *i64 D, tile, constexpr NDIM 4), debug False — variant 6859212e3972bf7a; the red cell
+                         of a V100 is a fault at two of its tiles (the register names which).
+
+The proof runs every candidate of the element-wise class on the variant's synthetic launches (`ops/ew_synthetic.py`:
+the ladder of counts with masked tails, contiguous and permuted layouts), every buffer against a guard
+(`memory.guarded`), in the proof's worker process, and prints the record: the tiles that pass, every fault with its
+text, the ladder, the guard and the synthetic bytes.
+
+    PYTHONPATH=$PWD/src python tools/prove_an_element_wise_variant.py --red
+    PYTHONPATH=$PWD/src python tools/prove_an_element_wise_variant.py --case add_strided_nd
+
+`--red`: both cases, exit 0 only when mul_scalar_strided_nd faults at (4096, 2, 3) AND add_strided_nd faults at
+some tile (the red cells found from the ladder alone), 1 otherwise. `--case NAME [--expect-fault B,W,S]`: one case;
+exit 0 when the named fault is found, or, without it, when the variant is proven.
+"""
+import argparse
+import json
+import sys
+
+CASES = {
+    "mul_scalar_strided_nd": ("mul_scalar_strided_nd_kernel",
+                              ["*fp32", "*fp32", ("i32", "D"), ("fp32", None), "*i64", "*i64"], 3, "6be93ab046480f3a"),
+    "add_strided_nd": ("add_strided_nd_kernel",
+                       ["*fp16", "*fp16", "*fp16", ("i32", "D"), ("fp32", None), "*i64", "*i64", "*i64"], 4,
+                       "6859212e3972bf7a"),
+}
+
+
+def prove_case(name: str) -> dict:
+    """Prove one case's variant and print its record; the record."""
+    from nbxtensor.ops import binary_strided, ew_proof
+    from nbxtensor.ops.elementwise_launch import class_candidates
+    from nbxtensor.ops.ew_tile import EwTile
+    kname, params, ndim, want_id = CASES[name]
+    kernel = getattr(binary_strided, kname)
+    tile = EwTile(max(c[0] for c in class_candidates()), 0, "tile")
+    spec = [(p, "D") if isinstance(p, str) else p for p in params] + [("constexpr", tile), ("constexpr", ndim)]
+    options = {"num_warps": 2, "num_stages": 3, "debug": False}
+    vid, _t = ew_proof.variant_of(kernel, spec, options, {"tile": tile})
+    key = ew_proof.stamp_key({"v": vid})
+    print(f"== {name}: variant {key} (the register's {want_id}: {'the same' if key == want_id else 'NOT THE SAME'})"
+          f"\n   {vid}", flush=True)
+    rec = ew_proof.prove(kernel, spec, options, {"tile": tile}, vid)
+    print(json.dumps({k: rec.get(k) for k in ("kernel", "method", "guard", "recipe", "ladder", "synthetic_bytes",
+                                                 "refused", "passed", "dissent", "seconds")}))
+    for f in rec["faults"]:
+        print(f"   FAULT at {tuple(f['tile'])}: {str(f['fault']).strip().splitlines()[-1][:300]}")
+    return rec
+
+
+def main(argv=None) -> int:
+    """Prove the asked case(s), print the records, answer by the exit code."""
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--red", action="store_true", help="both cases, each expecting its red cell")
+    ap.add_argument("--case", choices=sorted(CASES), default="mul_scalar_strided_nd")
+    ap.add_argument("--expect-fault", default=None, help="block,warps,stages a fault is expected at")
+    args = ap.parse_args(argv)
+    if args.red:
+        mul = prove_case("mul_scalar_strided_nd")
+        add = prove_case("add_strided_nd")
+        found_mul = any(f["tile"] == [4096, 2, 3] for f in mul["faults"])
+        found_add = bool(add["faults"])
+        print(("RED FOUND" if found_mul else "NOT FOUND") + ": mul_scalar_strided_nd fault at (4096, 2, 3)")
+        print(("RED FOUND" if found_add else "NOT FOUND") + ": add_strided_nd faults at "
+              f"{[tuple(f['tile']) for f in add['faults']]}")
+        return 0 if found_mul and found_add else 1
+    rec = prove_case(args.case)
+    if args.expect_fault:
+        want = [int(x) for x in args.expect_fault.split(",")]
+        found = any(f["tile"] == want for f in rec["faults"])
+        print(("RED FOUND: " if found else "NOT FOUND: ") + f"a fault at {tuple(want)} on the synthetic ladder alone")
+        return 0 if found else 1
+    return 0 if not rec["refused"] else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

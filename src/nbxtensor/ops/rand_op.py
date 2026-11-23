@@ -10,9 +10,16 @@ import triton
 import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
-from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+from nbxtensor.ops.ew_tile import synthetic, tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+from nbxtensor.ops.ew_synthetic import flat
+
+# The synthetic launches of both kernels (`ops/ew_synthetic.py`): flat over `n_elements`, the output buffer of the
+# count, the grid cdiv(n_elements, tile) as every call site's `_1d_grid(n)`; `seed` a drawn small scalar of the
+# variant's specialization (any seed reaches the same addresses).
+_RAND_RECIPE = flat("n_elements")
 
 
+@synthetic(_RAND_RECIPE)
 @tile_independent
 @triton.jit
 def rand_kernel(
@@ -35,6 +42,7 @@ def rand_kernel(
     r = tl.rand(seed, offset)
     tl.store(output_ptr + offset, r, mask=mask)
 
+@synthetic(_RAND_RECIPE)
 @tile_independent
 @triton.jit
 def randn_kernel(

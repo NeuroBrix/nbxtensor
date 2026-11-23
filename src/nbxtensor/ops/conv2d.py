@@ -22,7 +22,7 @@ import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go throu
 from nbxtensor.ops._configs import fits_shared_memory, nbx_autotune
 import triton.language as tl
 
-from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+from nbxtensor.ops.ew_tile import synthetic, tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
 
 
 from nbxtensor.ops._autotune_policy import maybe_pin_single, is_conv2d_pinned
@@ -284,6 +284,20 @@ def conv2d_forward_kernel(
         tl.store(out_ptr, accum, mask=out_mask)
 
 
+def _bias_inplace_recipe(S):
+    """The synthetic launch of `conv2d_bias_inplace_kernel` (`ops/ew_synthetic.py`), as `_conv_bias_inplace` launches
+    it: flat over `n` = the ladder's count, the output buffer of n elements; HW and C the smallest values of the
+    variant's specialization (1, 3 or 16 / 1, 2 or 16); the bias exactly C elements (lane i reads bias[(i // HW) % C],
+    an index below C whatever n is). Grid cdiv(n, tile), the call site's `_ew_grid(n)`."""
+    C = S.int("C", 2)
+    return {"n": S.n, "HW": S.int("HW", 3), "C": C, "bias_ptr": S.buf("bias_ptr", int(C))}, None
+
+
+_bias_inplace_recipe.count = "n"
+_bias_inplace_recipe.description = "conv bias in place: flat over n, bias of C elements"
+
+
+@synthetic(_bias_inplace_recipe)
 @tile_independent
 @triton.jit
 def conv2d_bias_inplace_kernel(out_ptr, bias_ptr, n, HW, C, BLOCK: tl.constexpr):

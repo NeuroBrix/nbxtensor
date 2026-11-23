@@ -5,8 +5,11 @@ import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go throu
 import triton.language as tl
 
 from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+from nbxtensor.ops.ew_tile import synthetic  # noqa: E402  the tile proof's synthetic recipe (ops/ew_synthetic.py)
+from nbxtensor.ops.ew_synthetic import flat  # noqa: E402
 
 
+@synthetic(flat("n_elements"))
 @tile_independent
 @triton.jit
 def add_forward_kernel(
@@ -24,6 +27,7 @@ def add_forward_kernel(
     y = tl.load(y_ptr + offset, mask=mask)
     tl.store(output_ptr + offset, x + alpha * y, mask=mask)
 
+@synthetic(flat("n_elements"))
 @tile_independent
 @triton.jit
 def add_scalar_kernel(
@@ -41,6 +45,7 @@ def add_scalar_kernel(
     tl.store(output_ptr + offset, x + scalar, mask=mask)
 
 
+@synthetic(flat("n_elements", s_ptr=1))
 @tile_independent
 @triton.jit
 def add_scalar_dev_kernel(
@@ -72,6 +77,18 @@ def add_scalar_dev_kernel(
     tl.store(output_ptr + offset, x + s, mask=mask)
 
 
+def _bias_recipe(S):
+    """The synthetic launch of `add_bias_broadcast_kernel` (`ops/ew_synthetic.py`): x and out of the ladder's count,
+    a bias of `feat_dim` elements (a small width honouring its specialization) — the kernel reads bias[i % feat_dim]."""
+    feat = S.int("feat_dim", 7)
+    return {"n_elements": S.n, "feat_dim": feat, "bias_ptr": S.buf("bias_ptr", feat)}, None
+
+
+_bias_recipe.count = "n_elements"
+_bias_recipe.description = "flat(n_elements, bias_ptr=feat_dim)"
+
+
+@synthetic(_bias_recipe)
 @tile_independent
 @triton.jit
 def add_bias_broadcast_kernel(

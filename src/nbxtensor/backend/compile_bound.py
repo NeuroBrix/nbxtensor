@@ -6,7 +6,7 @@ make_llir for three of its twelve candidates (BLOCK_H 64 at 2 warps, 128 at 2 an
 each doubling of BLOCK_H / warps (4.2 s at 2, 4.6-5.1 at 4, 6.9-7.3 at 8, 13.9-14.7 at 16) and left the scale at 32
 and 64 — the lanes each thread carries, the quantity of the PixArt-XL fault the same day (4096 lanes over 2 warps).
 Triton's compile runs in-process and cannot be interrupted, so each candidate is compiled FIRST in the run's proof
-worker (`ops/ew_proof_child`, one process for the whole run, started again only after it is killed): the worker writes
+worker (`ops/ew_proof_child`, one process for a burst of jobs, gone after its idle bound or a kill): the worker writes
 Triton's on-disk cache, the parent's own compile is then a cache hit; a worker that does not answer within the bound is
 killed and the candidate excluded.
 

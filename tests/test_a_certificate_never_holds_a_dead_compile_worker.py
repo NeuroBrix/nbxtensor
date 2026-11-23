@@ -7,7 +7,8 @@ What this test does if the code is wrong:
 1. a dying compile worker in the sweep is counted as a candidate that could not run instead of raised;
 2. a timeout and a compiler refusal are not told apart in the sweep's record (their `kind`);
 3. a device file in force that states no compile bound, or a profile read error, is read as "no bound";
-4. a compile spec directory or an element-wise proof snapshot is left in TMPDIR after its run, on success or failure.
+4. a compile spec directory or an element-wise proof's job directory is left in TMPDIR after its run, on success or
+   failure.
 Device-free.
 Run: python -m pytest tests/test_a_certificate_never_holds_a_dead_compile_worker.py
 """
@@ -101,17 +102,18 @@ def test_no_compile_spec_directory_is_left_behind(tmp_path, monkeypatch, code):
     assert _left(tmp_path) == []
 
 
-def test_no_proof_snapshot_is_left_behind_when_the_proof_fails(tmp_path, monkeypatch):
+def test_no_proof_job_is_left_behind_when_the_proof_fails(tmp_path, monkeypatch):
     import tempfile
-    from nbxtensor.ops import ew_proof
+    from nbxtensor.ops import ew_proof, ew_synthetic
     monkeypatch.setattr("tempfile.tempdir", str(tmp_path))
     monkeypatch.setattr("nbxtensor.ops.elementwise_launch.class_candidates", lambda: [(64, 2, 3)])
-    monkeypatch.setattr(ew_proof, "at_tile", lambda bound, block: bound)
-    monkeypatch.setattr(ew_proof_child, "snapshot_launch", lambda *a: (tempfile.mkdtemp(prefix="nbx_ew_proof_"), 8))
+    monkeypatch.setattr("nbxtensor.memory.guarded.guard_kind", lambda: "vmm")
+    monkeypatch.setattr(ew_synthetic, "synthesise", lambda *a: [])
+    monkeypatch.setattr(ew_proof_child, "write_job", lambda *a: (tempfile.mkdtemp(prefix="nbx_ew_proof_"), 8))
 
     def dies(spec, cands):
         raise RuntimeError("the proof's worker died")
     monkeypatch.setattr(ew_proof_child, "run_candidates", dies)
     with pytest.raises(RuntimeError, match="worker died"):
-        ew_proof.prove(_K(), lambda meta: (1,), {}, {}, {}, "vid")
+        ew_proof.prove(_K(), [], {}, {}, "vid")
     assert _left(tmp_path) == []

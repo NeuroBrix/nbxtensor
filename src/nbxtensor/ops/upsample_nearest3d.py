@@ -9,9 +9,39 @@ import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go throu
 import triton.language as tl
 
 
-from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+from nbxtensor.ops.ew_tile import synthetic, tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
 
 
+def _upsample_nearest3d_recipe(S):
+    """The synthetic launch of `upsample_nearest3d_kernel`, whose tiled axis is the output volume OD*OH*OW (no count
+    parameter; the lanes past the volume wrap inside it, unmasked): the ladder walks OW's specialization, OW the
+    smallest in it with OD*OH*OW at least the ladder's count, OD = 2*ID and OH = 2*IH below 16 (else equal: a
+    divisible-by-16 depth or height kept at its smallest), IW about OW/2, N, C small (N*C above 4: the channel loop
+    strides across programs); the scales ID/OD, IH/OH, IW/OW as the call site computes them. A contiguous input (the
+    call site's) of 1 + the largest offset the nearest map reaches, the output N*C*OD*OH*OW elements; grid
+    (cdiv(OD*OH*OW, tile), cdiv(N*C, 4)) as the call site."""
+    from nbxtensor.ops.elementwise_launch import per_tile
+    from nbxtensor.ops.upsample_nearest2d import _nearest_index
+    N, C, ID, IH = S.int("N", 1), S.int("C", 5), S.int("ID", 2), S.int("IH", 2)
+    OD = S.int("OD", 2 * ID if ID < 16 else ID)
+    OH = S.int("OH", 2 * IH if IH < 16 else IH)
+    OW = S.int("OW", -(-S.n // (OD * OH)))
+    IW = S.int("IW", max(2, OW // 2))
+    id_, rd = _nearest_index(OD, ID)
+    ih, rh = _nearest_index(OH, IH)
+    iw, rw = _nearest_index(OW, IW)
+    ext = (((N * C - 1) * ID + id_) * IH + ih) * IW + iw + 1
+    return ({"N": N, "C": C, "OD": OD, "OH": OH, "OW": OW, "ID": ID, "IH": IH, "IW": IW,
+             "reciprocal_scale_d": rd, "reciprocal_scale_h": rh, "reciprocal_scale_w": rw,
+             "ptr_o": S.buf("ptr_o", N * C * OD * OH * OW), "ptr_i": S.buf("ptr_i", ext)},
+            (per_tile(OD * OH * OW), -(-(N * C) // 4)))
+
+
+_upsample_nearest3d_recipe.count = "OW"
+_upsample_nearest3d_recipe.description = "upsample nearest 3d: volume OD*OH*OW ~ ladder (OW's spec), grid (per_tile, cdiv(NC,4))"
+
+
+@synthetic(_upsample_nearest3d_recipe)
 @tile_independent
 @triton.jit
 def upsample_nearest3d_kernel(

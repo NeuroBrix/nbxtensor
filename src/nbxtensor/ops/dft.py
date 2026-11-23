@@ -15,9 +15,49 @@ import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go throu
 import triton.language as tl
 
 
-from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+from nbxtensor.ops.ew_tile import synthetic, tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
 
 
+def _basis_launch(S):
+    """The synthetic launch of a DFT basis kernel (`ops/ew_synthetic.py`), as `spectral_wrappers` launches it: an
+    [N_bins, N] pair of matrices, N the ladder's count (the row the lanes walk: k = offs // N, n = offs % N), N_bins
+    the fewest bins of the variant's specialization (1, 2 or 16: the matrices stay kilobytes to a few hundred, the
+    tails are the rows'). Every lane below N_bins x N writes its own element of the two matrices: each is exactly
+    N_bins x N elements. Grid cdiv(N_bins x N, tile), the call site's `_1d_grid(total)`."""
+    from nbxtensor.ops.elementwise_launch import per_tile
+    bins = S.int("N_bins", 2)
+    total = int(bins) * int(S.n)
+    ptrs = [p for p in S.names if S.ty(p).startswith("*")]
+    args = {"N_bins": bins, "N": S.n}
+    for p in ptrs:
+        args[p] = S.buf(p, total)
+    return args, (per_tile(total),)
+
+
+_basis_launch.count = "N"
+_basis_launch.description = "dft basis: N = count, N_bins 1/2/16, two [N_bins, N] matrices, grid per_tile(N_bins x N)"
+
+
+def _idft_basis_launch(S):
+    """The synthetic launch of `idft_c2r_matrix_kernel`: the DFT basis launch (`_basis_launch`) and the Nyquist flag
+    `n_even` as the call site passes it, 1 (the variant's constant 1) or 0 (the variant's 'D')."""
+    from nbxtensor.ops.ew_synthetic import NotSynthesisable
+    args, axes = _basis_launch(S)
+    a = S.attr("n_even")
+    if a == "D":
+        args["n_even"] = 0
+    elif isinstance(a, tuple):
+        args["n_even"] = a[1]
+    else:
+        raise NotSynthesisable(f"idft_c2r_matrix_kernel: n_even specialised {a!r}: the call site passes 0 or 1")
+    return args, axes
+
+
+_idft_basis_launch.count = "N"
+_idft_basis_launch.description = "idft basis: as dft basis, n_even 0 / 1 as the variant"
+
+
+@synthetic(_basis_launch)
 @tile_independent
 @triton.jit
 def dft_rfft_matrix_kernel(
@@ -43,6 +83,7 @@ def dft_rfft_matrix_kernel(
     tl.store(nsin_ptr + offs, -tl.sin(angle), mask=mask)
 
 
+@synthetic(_idft_basis_launch)
 @tile_independent
 @triton.jit
 def idft_c2r_matrix_kernel(

@@ -13,7 +13,7 @@ import triton
 import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
-from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+from nbxtensor.ops.ew_tile import synthetic, tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
 
 
 @tile_independent
@@ -32,6 +32,25 @@ def flip_1d_kernel(
     data = tl.load(src_ptr + src_idx, mask=mask)
     tl.store(dst_ptr + offset, data, mask=mask)
 
+def _flip_strided_recipe(S):
+    """The synthetic launch of `flip_strided_kernel`: `n_elements` = the ladder's count elements of a contiguous
+    [pre, dim_size, post] (pre implicit in the count, its last block possibly partial), dim_size and post
+    (`stride_dim`, and `stride_post` the same value as the call site passes) small in their specialization. The
+    output `n_elements` elements, the source 1 + the largest mirrored offset a lane below the count reads (a partial
+    last block reads its mirror past the count); grid `cdiv(n_elements, tile)`."""
+    import numpy as np
+    dim, post = S.int("dim_size", 3), S.int("stride_dim", 1)
+    off = np.arange(S.n, dtype=np.int64)
+    src = (off // (dim * post)) * (dim * post) + (dim - 1 - (off // post) % dim) * post + off % post
+    return ({"n_elements": S.n, "dim_size": dim, "stride_dim": post, "stride_post": S.int("stride_post", post),
+             "src_ptr": S.buf("src_ptr", int(src.max()) + 1), "dst_ptr": S.buf("dst_ptr", S.n)}, None)
+
+
+_flip_strided_recipe.count = "n_elements"
+_flip_strided_recipe.description = "flip strided: n_elements of [pre, dim_size, post], source = 1 + largest mirrored offset"
+
+
+@synthetic(_flip_strided_recipe)
 @tile_independent
 @triton.jit
 def flip_strided_kernel(

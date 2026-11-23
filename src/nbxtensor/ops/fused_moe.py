@@ -11,7 +11,7 @@ import triton
 import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
-from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+from nbxtensor.ops.ew_tile import synthetic, tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
 
 
 from nbxtensor.ops._configs import nbx_autotune
@@ -390,6 +390,31 @@ def silu_and_mul_kernel(
     tl.store(out_ptrs, result, mask=mask)
 
 
+def _silu_mul_split_recipe(S):
+    """The synthetic launch of `silu_mul_split_kernel` (`ops/ew_synthetic.py`), as `silu_mul_split_wrapper` launches
+    it: an [M, N] element-wise launch, N the ladder's count (the row the lanes walk: row = offs // N, col = offs % N),
+    M the fewest rows of the variant's specialization (1, 2 or 16). Each operand's column stride is the smallest of
+    its specialization (1 for a unit-stride row), its row stride the smallest at or above N x the column stride (rows
+    that do not overlap, as `_row_matrix` and the contiguous output give). Lane offs < M x N addresses row x
+    stride_m + col x stride_n: each buffer is exactly (M - 1) x stride_m + (N - 1) x stride_n + 1 elements. Grid
+    cdiv(M x N, tile), the call site's `_1d_grid(M * N)`."""
+    from nbxtensor.ops.elementwise_launch import per_tile
+    M, N = S.int("M", 2), S.n
+    args = {"M": M, "N": N}
+    for ptr, sm, sn in (("gate_ptr", "stride_gm", "stride_gn"), ("up_ptr", "stride_um", "stride_un"),
+                        ("output_ptr", "stride_om", "stride_on")):
+        col = S.int(sn, 1)
+        row = S.int(sm, int(N) * int(col))
+        args[sn], args[sm] = col, row
+        args[ptr] = S.buf(ptr, (int(M) - 1) * int(row) + (int(N) - 1) * int(col) + 1)
+    return args, (per_tile(int(M) * int(N)),)
+
+
+_silu_mul_split_recipe.count = "N"
+_silu_mul_split_recipe.description = "silu*up split: [M, N], N = count, M 1/2/16, strided rows, grid per_tile(M x N)"
+
+
+@synthetic(_silu_mul_split_recipe)
 @tile_independent
 @triton.jit
 def silu_mul_split_kernel(

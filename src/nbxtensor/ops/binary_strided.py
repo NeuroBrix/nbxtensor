@@ -18,8 +18,12 @@ import triton.language as tl
 
 
 from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+from nbxtensor.ops.ew_tile import synthetic  # noqa: E402  (ops/ew_synthetic.py: the recipe of the tile proof)
+from nbxtensor.ops.ew_synthetic import strided_nd  # noqa: E402
 
 
+
+@synthetic(strided_nd("n_elements", "shape_ptr", {"x_ptr": "x_stride_ptr", "y_ptr": "y_stride_ptr"}))
 @tile_independent
 @triton.jit
 def add_strided_nd_kernel(
@@ -53,6 +57,7 @@ def add_strided_nd_kernel(
     tl.store(output_ptr + offsets, x + alpha * y, mask=mask)
 
 
+@synthetic(strided_nd("n_elements", "shape_ptr", {"x_ptr": "x_stride_ptr", "y_ptr": "y_stride_ptr"}))
 @tile_independent
 @triton.jit
 def mul_strided_nd_kernel(
@@ -85,6 +90,7 @@ def mul_strided_nd_kernel(
     tl.store(output_ptr + offsets, x * y, mask=mask)
 
 
+@synthetic(strided_nd("n_elements", "shape_ptr", {"x_ptr": "x_stride_ptr", "y_ptr": "y_stride_ptr"}))
 @tile_independent
 @triton.jit
 def sub_strided_nd_kernel(
@@ -118,6 +124,7 @@ def sub_strided_nd_kernel(
     tl.store(output_ptr + offsets, x - alpha * y, mask=mask)
 
 
+@synthetic(strided_nd("n_elements", "shape_ptr", {"x_ptr": "x_stride_ptr", "y_ptr": "y_stride_ptr"}))
 @tile_independent
 @triton.jit
 def div_strided_nd_kernel(
@@ -150,6 +157,7 @@ def div_strided_nd_kernel(
     tl.store(output_ptr + offsets, x / y, mask=mask)
 
 
+@synthetic(strided_nd("n_elements", "shape_ptr", {"x_ptr": "x_stride_ptr"}))
 @tile_independent
 @triton.jit
 def add_scalar_strided_nd_kernel(
@@ -178,6 +186,7 @@ def add_scalar_strided_nd_kernel(
     tl.store(output_ptr + offsets, x + scalar, mask=mask)
 
 
+@synthetic(strided_nd("n_elements", "shape_ptr", {"x_ptr": "x_stride_ptr"}))
 @tile_independent
 @triton.jit
 def mul_scalar_strided_nd_kernel(

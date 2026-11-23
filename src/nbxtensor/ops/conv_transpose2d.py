@@ -19,7 +19,8 @@ import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go throu
 import triton.language as tl
 
 
-from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+from nbxtensor.ops.ew_tile import synthetic, tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+from nbxtensor.ops.ew_synthetic import holds  # noqa: E402  helpers of the synthetic recipes
 
 
 @triton.jit
@@ -131,6 +132,61 @@ def conv_transpose2d_kernel(
     tl.store(output_ptr + out_offset, acc, mask=out_mask)
 
 
+def _col2im1d_recipe(S):
+    """The synthetic launch of `col2im1d_kernel` (`ops/ew_synthetic.py`), as `_conv_transpose1d_gemm` launches it:
+    C_out the fewest channels of its specialization (1, 2 or 16); stride, K and pad the smallest of their
+    specializations (pad 0 for 'D') with ceil(K / stride) = the variant's TAPS; L_in the input positions whose output
+    length L_out = (L_in - 1) x stride - 2 x pad + K (the transposed convolution's own relation) comes nearest the
+    ladder's count (a rung just below or past a tile stays on its side), both in their specializations. A variant
+    whose flags admit no such geometry within 2 x stride + 16 of the count (an L_in fixed at its constant 1, say)
+    gets L_out = the count and L_in the largest of its specialization not past the relation's (the smallest
+    otherwise): the kernel's masks (i < L_in, k < K) keep its reads in the same matrix.
+    A lane of channel c < C_out at o < L_out reads Y[i, c x K + k] with i < L_in, k < K and writes out[c, o]: Y is
+    exactly L_in x C_out x K elements (the GEMM's [L_in, C_out x K]), the output exactly C_out x L_out. Grid
+    (C_out, cdiv(L_out, tile)), the call site's `ew_grid_of(C_out, per_tile(L_out))`."""
+    from nbxtensor.ops.elementwise_launch import per_tile
+    from nbxtensor.ops.ew_synthetic import NotSynthesisable, width
+    taps = int(S.attr("TAPS")[1])
+    C_out = int(S.int("C_out", 2))
+    strides = [v for v in range(1, 400) if holds(S.attr("stride"), v)][:20]
+    pads = [v for v in range(0, 64) if holds(S.attr("pad"), v)][:16]
+    geoms = [(st, k) for st in strides for k in range((taps - 1) * st + 1, taps * st + 1) if holds(S.attr("K"), k)]
+    if not geoms or not pads:
+        raise NotSynthesisable(f"col2im1d_kernel: no (stride, K, pad) of TAPS {taps} specialises as the variant "
+                               f"({ {n: S.attr(n) for n in ('stride', 'K', 'pad')} })")
+
+    def launch(stride, K, pad, L_in, L_out):
+        """The launch of that geometry."""
+        args = {name: width(S.ty(name), v) for name, v in
+                (("C_out", C_out), ("K", K), ("L_in", L_in), ("L_out", L_out), ("stride", stride), ("pad", pad))}
+        args["y_ptr"] = S.buf("y_ptr", L_in * C_out * K)
+        args["out_ptr"] = S.buf("out_ptr", C_out * L_out)
+        return args, (C_out, per_tile(L_out))
+
+    n = int(S.n)
+    for stride, K in geoms:
+        for pad in pads:
+            rel = (n + 2 * pad - K) // stride + 1
+            fits = [(abs(L_out - n), L_out, L_in) for L_in in range(max(1, rel - 32), rel + 33)
+                    for L_out in ((L_in - 1) * stride - 2 * pad + K,)
+                    if L_out >= 1 and abs(L_out - n) <= 2 * stride + 16 and holds(S.attr("L_in"), L_in)
+                    and holds(S.attr("L_out"), L_out)]
+            if fits:
+                _d, L_out, L_in = min(fits)
+                return launch(stride, K, pad, L_in, L_out)
+    (stride, K), pad = geoms[0], pads[0]
+    rel = max(1, (n + 2 * pad - K) // stride + 1)
+    below = [v for v in range(rel, 0, -1) if holds(S.attr("L_in"), v)][:1]
+    L_in = below[0] if below else next(v for v in range(rel, rel + 64) if holds(S.attr("L_in"), v))
+    return launch(stride, K, pad, L_in, n)
+
+
+_col2im1d_recipe.count = "L_out"
+_col2im1d_recipe.description = ("col2im1d: L_out nearest the count by the transposed-conv relation (else = count), "
+                                "Y [L_in, C_out x K], grid (C_out, per_tile(L_out))")
+
+
+@synthetic(_col2im1d_recipe)
 @tile_independent
 @triton.jit
 def col2im1d_kernel(y_ptr, out_ptr, C_out, K, L_in, L_out, stride, pad,

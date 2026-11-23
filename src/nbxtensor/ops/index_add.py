@@ -40,9 +40,40 @@ import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go throu
 import triton.language as tl
 
 
-from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+from nbxtensor.ops.ew_tile import synthetic, tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
 
 
+#: the outer extent of a synthetic launch of `index_add_gather_kernel` (not an argument of the kernel: the grid's)
+SYNTH_OUTER = 2
+
+
+def _index_add_recipe(S):
+    """The synthetic launch of `index_add_gather_kernel` (`ops/ew_synthetic.py`): inner_size = the ladder's count,
+    SYNTH_OUTER outer slabs, dim_size source rows and inp_shape_dim destination rows (small, honouring their
+    specialization). `x` and `out` are the contiguous (outer, inp_shape_dim, inner_size) the kernel addresses,
+    outer * inp_shape_dim * inner_size elements; `index` holds dim_size destinations in [0, inp_shape_dim) (every
+    source row is then read by the program of its destination); `src` is laid out over (outer, dim_size, inner_size)
+    through its stride parameters (`gather_op.radix_strides`), its extent 1 + the largest offset the kernel forms.
+    The grid is the call site's: outer * inp_shape_dim x cdiv(inner_size, tile) on one axis."""
+    from nbxtensor.ops.elementwise_launch import per_tile
+    from nbxtensor.ops.gather_op import radix_strides
+    inner, outer = S.n, SYNTH_OUTER
+    dim = S.int("dim_size", 3)
+    rows = S.int("inp_shape_dim", 2)
+    so, sd, si = radix_strides(S, ["src_stride_outer", "src_stride_dim", "src_stride_inner"], [outer, dim, inner])
+    args = {"inner_size": inner, "dim_size": dim, "inp_shape_dim": rows,
+            "src_stride_outer": so, "src_stride_dim": sd, "src_stride_inner": si,
+            "x": S.buf("x", outer * rows * inner), "out": S.buf("out", outer * rows * inner),
+            "index": S.index("index", dim, rows),
+            "src": S.buf("src", (outer - 1) * so + (dim - 1) * sd + (inner - 1) * si + 1)}
+    return args, (per_tile(inner, times=outer * rows),)
+
+
+_index_add_recipe.count = "inner_size"
+_index_add_recipe.description = "index_add(inner_size, outer 2 x inp_shape_dim rows, dim_size sources)"
+
+
+@synthetic(_index_add_recipe)
 @tile_independent
 @triton.jit
 def index_add_gather_kernel(

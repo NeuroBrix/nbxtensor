@@ -943,7 +943,8 @@ def specialize_arg(arg, specialize: bool = True, align: bool = True):
     """(type, attr) of one runtime argument, exactly as Triton's binder:
     a pointer is `*<dtype>` with 'D' when 16-byte aligned; an int is i32 /
     i64 / u64 by range, 'D' when divisible by 16, the constant 1 when
-    specialised; a float is fp32; a bool is u1; None is a constexpr. The attr
+    specialised (an integer that declares itself 64-bit, `nbx_int64`, is i64 at any value); a float is fp32; a
+    bool is u1; None is a constexpr. The attr
     is None when the parameter is not specialised at all."""
     if arg is None:
         return ("constexpr", None)
@@ -964,7 +965,9 @@ def specialize_arg(arg, specialize: bool = True, align: bool = True):
     if isinstance(arg, int):
         if specialize and arg == 1:
             return ("constexpr", 1)
-        if _INT32_MIN <= arg < _INT32_MAX:
+        if type(arg) is not int and getattr(arg, "nbx_int64", False):
+            ty = "i64"          # an integer its maker declares 64-bit (`ops/ew_synthetic.Int64`): a small value of a wide binary
+        elif _INT32_MIN <= arg < _INT32_MAX:
             ty = "i32"
         elif _INT64_MIN <= arg < _INT64_MAX:
             ty = "i64"

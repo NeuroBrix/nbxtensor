@@ -12,7 +12,7 @@ import triton
 import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
-from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+from nbxtensor.ops.ew_tile import synthetic, tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
 
 
 from nbxtensor.backend.launcher import install as _install_launcher
@@ -22,6 +22,20 @@ from nbxtensor.dtype.nbx_dtype import NBXDtype
 # without it reaches the backend's own driver and refuses the NBXTensor arguments (the gathered KV copies, 2026-11-09)
 _install_launcher()
 
+def _bitmask_recipe(S):
+    """The synthetic launch of `_token_bitmask_kernel` (`ops/ew_synthetic.py`): two rows of `vocab` = the ladder's
+    count logits, each row's mask `words` int32 words (at least ceil(vocab / 32): the mask's row stride), the grid
+    (rows, cdiv(vocab, tile))."""
+    from nbxtensor.ops.elementwise_launch import per_tile
+    rows, words = 2, S.int("words", -(-S.n // 32))
+    return ({"vocab": S.n, "words": words, "logits_ptr": S.buf("logits_ptr", rows * S.n),
+             "mask_ptr": S.buf("mask_ptr", rows * words)}, (rows, per_tile(S.n)))
+
+
+_bitmask_recipe.count = "vocab"
+
+
+@synthetic(_bitmask_recipe)
 @tile_independent
 @triton.jit
 def _token_bitmask_kernel(logits_ptr, mask_ptr, vocab, words, BLOCK: tl.constexpr):

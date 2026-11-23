@@ -12,9 +12,49 @@ import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go throu
 import triton.language as tl
 
 
-from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+from nbxtensor.ops.ew_tile import synthetic, tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
 
 
+def _nearest_index(out_extent, in_extent):
+    """The largest input index the kernel's nearest map reaches over [0, out_extent): min(trunc(o * fp32(in / out)),
+    in - 1), in fp32 as the kernel computes it (the scale passed as the call site passes it, in / out)."""
+    import numpy as np
+    scale = np.float32(in_extent / out_extent)
+    o = np.arange(out_extent, dtype=np.int64).astype(np.float32)
+    return int(np.minimum((o * scale).astype(np.int32), in_extent - 1).max()), float(in_extent / out_extent)
+
+
+def _upsample_nearest2d_recipe(S):
+    """The synthetic launch of `upsample_nearest2d_kernel`, whose tiled axis is the output plane OH*OW (no count
+    parameter; the lanes past the plane wrap inside it, unmasked): the ladder walks OW's specialization, OW the
+    smallest in it with OH*OW at least the ladder's count, OH = 2*IH, IW about OW/2 (an upsample), N, C small (N*C
+    above 4: the channel loop strides across programs), the input read through strides of a non-overlapping layout;
+    the scales IH/OH, IW/OW as the call site computes them. The output N*C*OH*OW elements (contiguous), the input 1
+    + the largest offset the nearest map reaches; grid (cdiv(OH*OW, tile), cdiv(N*C, 4)) as the call site."""
+    from nbxtensor.ops.elementwise_launch import per_tile
+    N, C, IH = S.int("N", 1), S.int("C", 5), S.int("IH", 2)
+    OH = S.int("OH", 2 * IH)
+    OW = S.int("OW", -(-S.n // OH))
+    IW = S.int("IW", max(2, OW // 2))
+    s_w = S.int("s_w", 1)
+    s_h = S.int("s_h", (IW - 1) * s_w + 1)
+    plane = (IH - 1) * s_h + (IW - 1) * s_w + 1
+    s_c = S.int("s_c", plane)
+    s_n = S.int("s_n", (C - 1) * s_c + plane)
+    ih, rh = _nearest_index(OH, IH)
+    iw, rw = _nearest_index(OW, IW)
+    ext = (N - 1) * s_n + (C - 1) * s_c + ih * s_h + iw * s_w + 1
+    return ({"N": N, "C": C, "OH": OH, "OW": OW, "IH": IH, "IW": IW, "s_n": s_n, "s_c": s_c, "s_h": s_h, "s_w": s_w,
+             "reciprocal_scale_h": rh, "reciprocal_scale_w": rw,
+             "ptr_o": S.buf("ptr_o", N * C * OH * OW), "ptr_i": S.buf("ptr_i", ext)},
+            (per_tile(OH * OW), -(-(N * C) // 4)))
+
+
+_upsample_nearest2d_recipe.count = "OW"
+_upsample_nearest2d_recipe.description = "upsample nearest 2d: plane OH*OW ~ ladder (OW's spec), grid (per_tile(OH*OW), cdiv(NC,4))"
+
+
+@synthetic(_upsample_nearest2d_recipe)
 @tile_independent
 @triton.jit
 def upsample_nearest2d_kernel(

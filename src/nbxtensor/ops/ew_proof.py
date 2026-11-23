@@ -1,39 +1,59 @@
-"""The proof of an element-wise class's TILE on each compiled variant it reaches.
+"""The proof of an element-wise class's TILE on each compiled variant it reaches — a function of the VARIANT alone.
 
 A class setting (`elementwise_launch.ew_meta`) is swept on a copy and handed to every element-wise kernel of its
-class. It is proven on a VARIANT — one binary: the kernel, its specialization (pointer dtypes and alignment, every
-constexpr), its options — before that binary runs on it: the launcher hands every first resolution of a variant
-carrying a class tile (`ops/ew_tile.EwTile`) to `settle`, once per compiled variant, never per launch.
+class. It is proven on a VARIANT — one binary: the kernel, its specialization (pointer dtypes and alignment, integer
+widths and divisibility, every constexpr), its options — before that binary runs on it: the launcher hands every
+first resolution of a variant carrying a class tile (`ops/ew_tile.EwTile`) to `settle`, once per compiled variant,
+never per launch.
 
-The proof (orchestrator rulings 23/11/2026 12:5x-13:1x):
-  * every candidate of the class runs the variant on the SAME inputs — a snapshot of the real launch, each pointer
-    argument's addressable bytes, overlapping arguments kept overlapping — in a CHILD process with
-    CUDA_LAUNCH_BLOCKING=1 (ONE worker serves every proof of the run): an illegal address is sticky and ends the process that meets it. A fault ends the worker;
-    it is recorded (kernel, variant, tile, the fault's text) and a fresh worker resumes at the next candidate;
+The proof (orchestrator rulings 23/11/2026 12:5x-13:1x; the synthetic cure, the project lead 23/11/2026 evening):
+  * every candidate of the class runs the variant on the SAME SYNTHETIC launches, made from the variant alone
+    (`ops/ew_synthetic.py`): a fixed ladder of counts that always holds masked tails (n = 1, s - 1, L - 1, L + 1,
+    2L + 3 for the class's smallest tile s and largest L, each kept in the count's own specialization), layouts drawn
+    from the rank (contiguous and permuted), buffers of each pointer's dtype and alignment filled deterministically,
+    scalars drawn deterministically. NOTHING of the launch that first met the variant enters the proof — not its
+    count, its grid, its shapes nor what memory lay after its buffers — so the record, keyed by the variant, holds
+    for every launch of it. A kernel whose signature does not determine its synthetic launch declares its recipe
+    where it is defined (`ew_tile.synthetic`), or is refused by name;
+  * EVERY BUFFER lies against a GUARD (`memory.guarded`): on CUDA its end at the end of the mapped pages of a VMM
+    range whose next granule is unmapped (an access past the extent is an illegal address, every time); on Metal its
+    end at the end of a dedicated MTLBuffer, in a worker with shader validation on (an access past it is reported).
+    A device where no guard can be made proves NOTHING: the variant is refused by name ("unguarded") — nothing says
+    proven for a tail no run met;
+  * the candidates run in a CHILD process (`ops/ew_proof_child.py`; one worker serves a burst of proofs, empties
+    its pool back to the driver after each job and EXITS after `ew_proof_child.IDLE_SECONDS` (2 s) without a job, so
+    it holds nothing on the card while the parent runs): an illegal address is sticky and ends the process that
+    meets it. A fault ends the worker; it is recorded (kernel,
+    variant, tile, the fault's text) and a fresh worker resumes at the next candidate;
   * a candidate PASSES when it does not fault and, for a kernel that declares itself tile-independent
-    (`ew_tile.tile_independent`), every byte it leaves in the launch's buffers is identical (NaN payloads included)
-    to the agreeing set: more than half of the non-faulting candidates AND at least three. A candidate outside that
-    set is recorded with its first differing element and both values. A kernel that declares itself tile-dependent
-    is proven by the absence of a fault alone, and the record names it;
+    (`ew_tile.tile_independent`), every byte it leaves in the synthetic buffers is identical (NaN payloads included)
+    to the agreeing set: more than half of the non-faulting candidates AND at least three (FLOOR). A candidate outside
+    that set is recorded with its first differing element and both values. A kernel that declares itself
+    tile-dependent is proven by the absence of a fault alone, and the record names it;
   * fewer than three non-faulting candidates, or no agreeing set: the variant is not proven — a named error, never a
     silent use of the unproven setting.
 
-WHAT THIS CANNOT SEE: a defect every candidate shares (in the source, or emitted the same for every tile) passes it.
-It is a proof of the TILE, not of the kernel; the kernel's own tests are the proof of its values. It is no oracle.
+The cost is the synthetic buffers' bytes — kilobytes to megabytes, the same for every launch of a variant, never the
+launch's bytes.
+
+WHAT THIS CANNOT SEE: a defect every candidate shares (in the source, or emitted the same for every tile) passes it;
+an access inside the guard's alignment slack (at most 15 bytes) or before a buffer's start. It is a proof of the TILE,
+not of the kernel; the kernel's own tests are the proof of its values. It is no oracle.
 
 The table names what it was proven with: the device class (as the certified directory: vendor / profile), the
-compiler (`autotune_certified.generator_identity`) and the assembler build (ptxas's version on CUDA; the Metal
-backend's hash is in the generator identity). A proof made with another assembler is not read — the fault this
-exists for was the assembler's. Shipped proofs: `<certified directory>/<vendor>/<profile>/ew_tile_proof.json`;
+compiler (`autotune_certified.generator_identity`), the assembler build (ptxas's version on CUDA; the Metal backend's
+hash is in the generator identity) and the proof METHOD (`ew_synthetic.METHOD`). A proof made with another assembler
+or another method is not read — the fault this exists for was the assembler's, and a proof of another method is
+another fact. Shipped proofs: `<certified directory>/<vendor>/<profile>/ew_tile_proof.json`;
 proofs a run made: the replay cache's `ew_tile_proof.json`, kept per stamp.
 
 At run time a variant no table holds is proven ONCE at its first launch, one printed line saying so (kernel,
-variant, bytes snapshotted, seconds), and kept. If the class's winner fails on it, the class moves to the candidate
-NEAREST the winner on the class's own ordered ladder (`elementwise_launch.class_candidates`, the copy's configs in
-order; a tie to the earlier one) among those every proven variant of the class passes: read, never timed, so two
-homes pick the same tile (C17: a timing measured per fresh replay cache re-picked 512x8, 2048x8 or 1024x4 run to run
-on the Dell, a search the owner's reset forbids). A confirmation run
-(`--certified-only`) proves nothing: an unproven variant is refused by name there.
+variant, the ladder, synthetic bytes, seconds), and kept. If the class's winner fails on it, the class moves to the
+candidate NEAREST the winner on the class's own ordered ladder (`elementwise_launch.class_candidates`, the copy's
+configs in order; a tie to the earlier one) among those every proven variant of the class passes: read, never timed,
+so two homes pick the same tile (C17: a timing measured per fresh replay cache re-picked 512x8, 2048x8 or 1024x4 run
+to run on the Dell, a search the owner's reset forbids). A confirmation run (`--certified-only`) proves nothing: an
+unproven variant is refused by name there.
 """
 from __future__ import annotations
 
@@ -61,15 +81,17 @@ _STAMP: List[Optional[dict]] = [None]
 
 
 def stamp() -> dict:
-    """Device class, compiler and assembler of this process, read once."""
+    """Device class, compiler, assembler and proof method of this process, read once: a table made under another
+    stamp is not read."""
     if _STAMP[0] is None:
         from nbxtensor.ops.autotune_certified import active_profile, generator_identity
         prof = active_profile()
         if prof is None:
             raise TileUnproven("ZERO FALLBACK: the element-wise tile proof names its device class, and no vendor "
                                "profile is in force")
+        from nbxtensor.ops.ew_synthetic import METHOD
         _STAMP[0] = {"vendor": prof[0], "profile": prof[1], "generator": generator_identity(),
-                     "assembler": _assembler()}
+                     "assembler": _assembler(), "method": METHOD}
     return _STAMP[0]
 
 
@@ -132,6 +154,7 @@ class _Table:
         self.shipped = self._read(self._shipped_path()).get("variants", {})
         kept = self._read(self._kept_path())
         self.kept = dict(kept.get("variants", {}))
+        self.unkept: Dict[str, dict] = {}       # refusals that are no measurement (unguarded, no recipe): this run's
         self.seen_classes: Dict[str, set] = {}
 
     @staticmethod
@@ -157,8 +180,8 @@ class _Table:
         return doc.get("stamps", {}).get(self.key) or {}
 
     def record(self, vid: str) -> Optional[dict]:
-        """The variant's record: kept first, else shipped, else None."""
-        return self.kept.get(vid) or self.shipped.get(vid)
+        """The variant's record: this run's unkept refusal, else kept, else shipped, else None."""
+        return self.unkept.get(vid) or self.kept.get(vid) or self.shipped.get(vid)
 
     def status(self, vid: str, tile) -> Optional[str]:
         """"passed" / "failed" for a tile of a recorded variant, None when the variant has no record."""
@@ -194,7 +217,8 @@ class _Table:
         the class's `winner` (block, warps) on the class's ordered ladder (`elementwise_launch.class_candidates`), a
         tie to the earlier; None when no candidate passes every variant. Read from the ladder and the proofs, never
         timed."""
-        sets = [set(map(tuple, self.record(v)["passed"])) for v in self.seen_classes.get(str(cls), ())]
+        sets = [set(map(tuple, self.record(v)["passed"])) for v in self.seen_classes.get(str(cls), ())
+                if self.record(v) is not None]
         if not sets:
             return None
         common = set.intersection(*sets)
@@ -223,7 +247,10 @@ def table() -> _Table:
 # ---------------------------------------------------------------------------
 def settle(kernel, grid, bound: Dict[str, Any], specialization, options: Dict[str, Any], tiles: dict):
     """None: this launch runs as asked (its tile is proven on its variant). Else (grid, kwargs) of the same launch at
-    the class's moved setting. Raises TileUnproven by name where no proven setting exists."""
+    the class's moved setting. Raises TileUnproven by name where no proven setting exists — a variant refused (fewer
+    than three candidates ran, no agreeing set, no guard on this device, no synthetic recipe) is refused at every
+    launch. The proof itself reads nothing of this launch but its variant (`specialization`, `options`); `grid` and
+    `bound` serve only the moved launch."""
     if not callable(grid):
         raise TileUnproven(f"ZERO FALLBACK: {kernel.__name__} carries an element-wise class tile and its grid is fixed "
                            f"by the caller ({tuple(grid)}): a grid computed from the tile it was handed is wrong for "
@@ -237,12 +264,17 @@ def settle(kernel, grid, bound: Dict[str, Any], specialization, options: Dict[st
         if certified_only():
             raise TileUnproven(f"ZERO FALLBACK: a confirmation run met element-wise variant {kernel.__name__} "
                                f"{vid} at tile {tile}, which no proof table holds (stamp {tab.key})")
-        tab.keep(vid, prove(kernel, grid, bound, options, tiles, vid))
+        rec = prove(kernel, specialization, options, tiles, vid)
+        if rec.get("unkept"):
+            tab.unkept[vid] = rec           # a refusal that measured nothing: said this run, never written
+        else:
+            tab.keep(vid, rec)
         status = tab.status(vid, tile)
-    refused = (tab.record(vid) or {}).get("refused")
-    if refused:
-        raise TileUnproven(f"ZERO FALLBACK: element-wise variant {kernel.__name__} is not proven: {refused} "
-                           f"(kept; stamp {tab.key})")
+    rec = tab.record(vid) or {}
+    if rec.get("refused"):
+        where = "this run's refusal, never written" if rec.get("unkept") else f"kept; stamp {tab.key}"
+        raise TileUnproven(f"ZERO FALLBACK: element-wise variant {kernel.__name__} is not proven: {rec['refused']} "
+                           f"({where})")
     if status == "passed":
         return None
     return _moved(kernel, grid, bound, options, tiles, tab, vid, tile)
@@ -293,33 +325,55 @@ def at_tile(bound: Dict[str, Any], block) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 # the proof
 # ---------------------------------------------------------------------------
-def prove(kernel, grid, bound, options, tiles, vid) -> dict:
-    """Run every candidate of the class on a snapshot of this launch, in child processes; the variant's record."""
-    from nbxtensor.ops import ew_proof_child
+def prove(kernel, specialization, options, tiles, vid) -> dict:
+    """The variant's record: every candidate of the class run on the variant's synthetic launches
+    (`ew_synthetic.synthesise`), every buffer guarded, in the worker process; judged (`judge`). A variant that
+    cannot be proven here without measuring anything — no guard on this device, no synthetic recipe — gets a refusal
+    marked `unkept` (said this run, never written to a table: a later library or device may prove it)."""
+    from nbxtensor.memory.guarded import guard_kind
+    from nbxtensor.ops import ew_proof_child, ew_synthetic
     from nbxtensor.ops.elementwise_launch import class_candidates
     from nbxtensor.ops.ew_tile import declared_independence
     t0 = time.time()
     cands = class_candidates()
-    grids = [tuple(int(g) for g in grid(at_tile(bound, c[0]))) for c in cands]     # each candidate its own grid
-    with _outside_recordings():
-        spec, nbytes = ew_proof_child.snapshot_launch(kernel, grids, bound, options)
+    guard = guard_kind()
+    if guard is None:
+        return _unkept(kernel, "unguarded", "unguarded: no guard can be made on this device (no VMM range, no shader "
+                       "validation), so no run of a masked tail can show a lane touching past its extent; nothing "
+                       "says proven for a tail no run met")
+    try:
+        launches = ew_synthetic.synthesise(kernel, specialization, cands)
+    except ew_synthetic.NotSynthesisable as why:
+        return _unkept(kernel, guard, str(why))
+    where, nbytes = ew_proof_child.write_job(kernel, launches, cands, options, guard)
     independent = declared_independence(kernel)
     try:
-        results, differ = ew_proof_child.run_candidates(spec, cands)
+        results, differ = ew_proof_child.run_candidates(where, cands)
+        rec = judge(independent, cands, results, differ)
     finally:
         import shutil
-        shutil.rmtree(spec, ignore_errors=True)        # the snapshot (gigabytes): removed on success and on failure (C6-1)
-    rec = judge(independent, cands, results, differ)
-    rec.update(seconds=round(time.time() - t0, 2), snapshot_bytes=nbytes, kernel=kernel.__name__)
+        shutil.rmtree(where, ignore_errors=True)        # the job's files: removed on success and on failure (C6-1)
+    counts = sorted({ln.count for ln in launches})
+    rec.update(seconds=round(time.time() - t0, 2), synthetic_bytes=nbytes, kernel=kernel.__name__,
+               method=ew_synthetic.METHOD, guard=guard, ladder=counts,
+               recipe=getattr(ew_synthetic.recipe_of(kernel), "description", "declared"))
     _count(rec["seconds"], nbytes)
-    print(f"[ew-proof] proved {kernel.__name__} once (variant {stamp_key({'v': vid})}): {len(rec['passed'])} of "
-          f"{len(cands)} tiles pass, {len(rec['faults'])} fault, snapshot {nbytes} bytes, {rec['seconds']} s"
+    print(f"[ew-proof] proved {kernel.__name__} once on synthetic inputs (variant {stamp_key({'v': vid})}): "
+          f"{len(rec['passed'])} of {len(cands)} tiles pass, {len(rec['faults'])} fault, ladder {counts} x "
+          f"{len({ln.layout for ln in launches})} layout(s), guard {guard}, {nbytes} synthetic bytes, {rec['seconds']} s"
           + ("" if independent else " — proven by fault only (" + ("declares itself tile-dependent"
              if independent is False else "declares no tile independence") + ")"), file=sys.stderr)
     return rec              # a refused one too: kept, said once, raised by `settle` at every launch
 
 
-_RUN = {"variants": 0, "seconds": 0.0, "largest_snapshot": 0}
+def _unkept(kernel, guard: str, why: str) -> dict:
+    """A refusal that measured nothing (`prove`): the record `settle` raises, never written to a table."""
+    print(f"[ew-proof] {kernel.__name__}: NOT proven — {why}", file=sys.stderr)
+    return {"independent": None, "faults": [], "dissent": [], "passed": [], "refused": why, "kernel": kernel.__name__,
+            "guard": guard, "unkept": True}
+
+
+_RUN = {"variants": 0, "seconds": 0.0, "largest": 0}
 
 
 def _count(seconds: float, nbytes: int) -> None:
@@ -329,36 +383,21 @@ def _count(seconds: float, nbytes: int) -> None:
         atexit.register(_say_run)
     _RUN["variants"] += 1
     _RUN["seconds"] += seconds
-    _RUN["largest_snapshot"] = max(_RUN["largest_snapshot"], nbytes)
+    _RUN["largest"] = max(_RUN["largest"], nbytes)
 
 
 def _say_run() -> None:
-    """At exit: the run's proofs in one line (variants, seconds, worker processes, largest snapshot)."""
+    """At exit: the run's proofs in one line (variants, seconds, worker processes, largest synthetic job)."""
     from nbxtensor.ops.ew_proof_child import _Worker
     print(f"[ew-proof] this run proved {_RUN['variants']} element-wise variant(s) in {_RUN['seconds']:.1f} s with "
-          f"{_Worker.started} child process(es); largest snapshot {_RUN['largest_snapshot']} bytes", file=sys.stderr)
-
-
-class _outside_recordings:
-    """The proof's own reads of the launch's buffers are no part of a launch plan being recorded
-    (`backend/frozen_plan`): the recorder is paused around them, and resumes as it was."""
-
-    def __enter__(self):
-        """Pause the frozen-plan recorder."""
-        from nbxtensor.backend import frozen_plan
-        self.state = frozen_plan.STATE
-        self.was = self.state.recording
-        self.state.recording = False
-
-    def __exit__(self, *exc):
-        """Resume the recorder as it was."""
-        self.state.recording = self.was
-        return False
+          f"{_Worker.started} child process(es); largest synthetic job {_RUN['largest']} bytes", file=sys.stderr)
 
 
 def judge(independent, cands, results, differ) -> dict:
-    """The record of one variant from its candidates' results ({tile: ('fault', text) | ('ran', digests)});
-    `differ(digests, agreeing digests)` names a dissenting candidate's first differing element."""
+    """The record of one variant from its candidates' results on the same synthetic launches ({tile: ('fault', text)
+    | ('ran', digests)}): faults excluded, the agreeing set (more than half of the non-faulting, at least FLOOR) passed
+    for a tile-independent kernel, every non-faulting one for another; `differ(digests, agreeing digests)` names a
+    dissenting candidate's first differing element."""
     faults = [{"tile": list(t), "fault": results[t][1]} for t in cands if results[t][0] == "fault"]
     ran = [t for t in cands if results[t][0] == "ran"]
     rec = {"independent": independent, "faults": faults, "dissent": [], "passed": [], "refused": None}

@@ -18,6 +18,12 @@ Each kernel of the class DECLARES, where it is defined, whether its result is in
 may write one address, an accumulate, a result defined by order). The proof compares the bits of the candidates'
 results only for a kernel that declares independence; a dependent one is proven by the absence of a fault alone,
 and the proof's record names it.
+
+The proof runs each variant on SYNTHETIC inputs made from the variant alone (`ops/ew_synthetic.py`). A kernel whose
+signature does not determine them — more than one runtime integer, so which one counts the elements and how long each
+pointer is are not said — DECLARES its recipe where it is defined (`synthetic(recipe)`: `ew_synthetic.flat(...)`,
+`ew_synthetic.strided_nd(...)`, or its own function of an `ew_synthetic.Synth`). A kernel that needs one and
+declares none is refused by name, never proven on a launch's data.
 """
 from __future__ import annotations
 
@@ -81,6 +87,17 @@ def tile_dependent(why: str):
     """Declare on a kernel that its result may depend on the tile (`why`: two lanes writing one address, an
     accumulate, an order): the proof of its tile is the absence of a fault alone."""
     return lambda kernel: _mark(kernel, nbx_tile_independent=False, nbx_tile_dependent_why=why)
+
+
+def synthetic(recipe):
+    """Declare on a kernel the recipe of its synthetic launches (`ops/ew_synthetic.py`): a function of an
+    `ew_synthetic.Synth` returning ({parameter: value or buffer}, grid axes or None)."""
+    return lambda kernel: _mark(kernel, nbx_ew_recipe=recipe)
+
+
+def declared_recipe(kernel):
+    """The kernel's declared synthetic recipe, None when it declares none (the generic one then applies)."""
+    return getattr(kernel, "nbx_ew_recipe", None)
 
 
 def declared_independence(kernel):

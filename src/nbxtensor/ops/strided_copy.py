@@ -48,8 +48,12 @@ import triton.language as tl
 
 
 from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+from nbxtensor.ops.ew_tile import synthetic  # noqa: E402  (ops/ew_synthetic.py: the recipe of the tile proof)
+from nbxtensor.ops.ew_synthetic import strided_nd  # noqa: E402
 
 
+
+@synthetic(strided_nd("n_elements", "shape_ptr", {"src_ptr": "stride_ptr"}))
 @tile_independent
 @triton.jit
 def strided_copy_kernel(
@@ -106,6 +110,7 @@ def strided_copy_kernel(
     tl.store(dst_ptr + offsets, vals, mask=mask)
 
 
+@synthetic(strided_nd("n_elements", "shape_ptr", {"dst_ptr": "stride_ptr"}))
 @tile_independent
 @triton.jit
 def strided_scatter_kernel(
@@ -153,6 +158,7 @@ def strided_scatter_kernel(
     tl.store(dst_ptr + dst_offsets, vals, mask=mask)
 
 
+@synthetic(strided_nd("n_elements", "shape_ptr", {"src_ptr": "src_stride_ptr", "dst_ptr": "dst_stride_ptr"}))
 @tile_independent
 @triton.jit
 def strided_copy_nd_kernel(

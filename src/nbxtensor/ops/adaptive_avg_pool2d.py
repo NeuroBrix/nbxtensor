@@ -30,9 +30,46 @@ import triton
 import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
-from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+from nbxtensor.ops.ew_tile import synthetic, tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
 
 
+def _pool_dims(v):
+    """The adaptive pool's input sizes from (stride_w, IW, IH, C): the strides of [N, C, IH, IW] rows of stride_w
+    (the kernel reads C back as stride_n // stride_c)."""
+    sw, iw, ih, c = v["stride_w"], v["IW"], v["IH"], v["C"]
+    return {"stride_w": sw, "IW": iw, "IH": ih, "stride_h": iw * sw, "stride_c": ih * iw * sw,
+            "stride_n": c * ih * iw * sw}
+
+
+def _adaptive_avg_pool2d_recipe(S):
+    """The synthetic launch of `adaptive_avg_pool2d_kernel`: `n_elements` = the ladder's count output elements of a
+    contiguous [N, C, OH, OW] (N implicit in the count, its last image possibly partial), OH and OW small in their
+    specialization, (stride_w, IW, IH, C) the smallest whose derived strides specialise as the variant
+    (`ew_synthetic.solve_dims`). The output `n_elements` elements, the input 1 + the last element of the
+    largest window a lane below the count averages (the PyTorch window: floor start, ceil end); grid
+    `cdiv(n_elements, tile)`."""
+    import numpy as np
+    from nbxtensor.ops.ew_synthetic import solve_dims
+    OH, OW = S.int("OH", 2), S.int("OW", 3)
+    d = solve_dims(S, ["stride_w", "IW", "IH", "C"], _pool_dims)
+    d.pop("C", None)
+    C = d["stride_n"] // d["stride_c"]
+    idx = np.arange(S.n, dtype=np.int64)
+    ow, t = idx % OW, idx // OW
+    oh, t = t % OH, t // OH
+    c, n = t % C, t // C
+    h_last = ((oh + 1) * d["IH"] + OH - 1) // OH - 1
+    w_last = ((ow + 1) * d["IW"] + OW - 1) // OW - 1
+    src = n * d["stride_n"] + c * d["stride_c"] + h_last * d["stride_h"] + w_last * d["stride_w"]
+    return ({**d, "OH": OH, "OW": OW, "n_elements": S.n, "input_ptr": S.buf("input_ptr", int(src.max()) + 1),
+             "output_ptr": S.buf("output_ptr", S.n)}, None)
+
+
+_adaptive_avg_pool2d_recipe.count = "n_elements"
+_adaptive_avg_pool2d_recipe.description = "adaptive avg pool: n_elements out, input = 1 + last element of largest window"
+
+
+@synthetic(_adaptive_avg_pool2d_recipe)
 @tile_independent
 @triton.jit
 def adaptive_avg_pool2d_kernel(

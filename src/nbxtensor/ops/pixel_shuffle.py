@@ -13,9 +13,47 @@ import triton
 import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
-from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+from nbxtensor.ops.ew_tile import synthetic, tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+from nbxtensor.ops.ew_synthetic import reach, solve_dims  # noqa: E402  helpers of the synthetic recipes
 
 
+# ---------------------------------------------------------------------------
+# synthetic launches of the tile proof (ops/ew_synthetic.py)
+# ---------------------------------------------------------------------------
+def _shuffle_dims(v):
+    """The pixel shuffle's sizes from (C_out, H, W, r): contiguous [N, C_out*r*r, H, W] in, [N, C_out, H*r, W*r] out."""
+    c, h, w, r = v["C_out"], v["H"], v["W"], v["r"]
+    oh, ow = h * r, w * r
+    return {"C_out": c, "H": h, "W": w, "r": r, "OH": oh, "OW": ow,
+            "stride_in_n": c * r * r * h * w, "stride_in_c": h * w, "stride_in_h": w, "stride_in_w": 1,
+            "stride_out_n": c * oh * ow, "stride_out_c": oh * ow, "stride_out_h": ow, "stride_out_w": 1}
+
+
+def _pixel_shuffle_recipe(S):
+    """The synthetic launch of `pixel_shuffle_kernel`: `n_elements` = the ladder's count output elements of a
+    contiguous [N, C_out, H*r, W*r] (N implicit in the count, its last image possibly partial), read from a
+    contiguous [N, C_out*r*r, H, W]; (C_out, H, W, r) the smallest whose every derived size (OH, OW, the eight
+    strides) specialises as the variant (`ew_synthetic.solve_dims`). The output `n_elements` elements, the input 1 + the
+    largest offset a lane below the count reads (the op's index map); grid `cdiv(n_elements, tile)`."""
+    import numpy as np
+    d = solve_dims(S, ["C_out", "H", "W", "r"], _shuffle_dims)
+    idx = np.arange(S.n, dtype=np.int64)
+    ow, t = idx % d["OW"], idx // d["OW"]
+    oh, t = t % d["OH"], t // d["OH"]
+    c, n = t % d["C_out"], t // d["C_out"]
+    r = d["r"]
+    ic = c * r * r + (oh % r) * r + (ow % r)
+    src = n * d["stride_in_n"] + ic * d["stride_in_c"] + (oh // r) * d["stride_in_h"] + (ow // r) * d["stride_in_w"]
+    dst = n * d["stride_out_n"] + c * d["stride_out_c"] + oh * d["stride_out_h"] + ow * d["stride_out_w"]
+    return ({**d, "n_elements": S.n, "input_ptr": S.buf("input_ptr", reach(src)),
+             "output_ptr": S.buf("output_ptr", reach(dst))}, None)
+
+
+_pixel_shuffle_recipe.count = "n_elements"
+_pixel_shuffle_recipe.description = "pixel shuffle: n_elements of contiguous NCHW out, input = 1 + largest read offset"
+
+
+@synthetic(_pixel_shuffle_recipe)
 @tile_independent
 @triton.jit
 def pixel_shuffle_kernel(
@@ -74,6 +112,44 @@ def pixel_shuffle_kernel(
     tl.store(output_ptr + out_offset, val, mask=mask)
 
 
+def _bcast_dims(v):
+    """The broadcast-aware shuffle's sizes from (C_out, OH, OW, r, bcast): the view (N, C_pre, bcast, H, W) of a
+    contiguous (N, C_pre, H, W) expanded on dim 2 (stride 0), C_pre = C_out*r*r / bcast; a contiguous output."""
+    c, oh, ow, r, b = v["C_out"], v["OH"], v["OW"], v["r"], v["bcast"]
+    if oh % r or ow % r or (c * r * r) % b:
+        return None
+    h, w, c_pre = oh // r, ow // r, c * r * r // b
+    return {"C_out": c, "OH": oh, "OW": ow, "r": r, "bcast": b,
+            "stride_v_n": c_pre * h * w, "stride_v_c": h * w, "stride_v_b": 0, "stride_v_h": w, "stride_v_w": 1,
+            "stride_out_n": c * oh * ow, "stride_out_c": oh * ow, "stride_out_h": ow, "stride_out_w": 1}
+
+
+def _pixel_shuffle_bcast_recipe(S):
+    """The synthetic launch of `pixel_shuffle_broadcast_aware_kernel`: `n_elements` = the ladder's count output
+    elements of a contiguous [N, C_out, OH, OW] (N implicit in the count), read through the stride-0 broadcast view
+    the call site hands (`_bcast_dims`), (C_out, OH, OW, r, bcast) the smallest whose derived sizes specialise as the
+    variant (`ew_synthetic.solve_dims`). The output `n_elements` elements, the input (the pre-expand tensor) 1 + the largest
+    offset a lane below the count reads; grid `cdiv(n_elements, tile)`."""
+    import numpy as np
+    d = solve_dims(S, ["C_out", "OH", "OW", "r", "bcast"], _bcast_dims)
+    idx = np.arange(S.n, dtype=np.int64)
+    ow, t = idx % d["OW"], idx // d["OW"]
+    oh, t = t % d["OH"], t // d["OH"]
+    c, n = t % d["C_out"], t // d["C_out"]
+    r, b = d["r"], d["bcast"]
+    icv = c * r * r + (oh % r) * r + (ow % r)
+    src = (n * d["stride_v_n"] + (icv // b) * d["stride_v_c"] + (icv % b) * d["stride_v_b"]
+           + (oh // r) * d["stride_v_h"] + (ow // r) * d["stride_v_w"])
+    dst = n * d["stride_out_n"] + c * d["stride_out_c"] + oh * d["stride_out_h"] + ow * d["stride_out_w"]
+    return ({**d, "n_elements": S.n, "bcast_view_ptr": S.buf("bcast_view_ptr", reach(src)),
+             "output_ptr": S.buf("output_ptr", reach(dst))}, None)
+
+
+_pixel_shuffle_bcast_recipe.count = "n_elements"
+_pixel_shuffle_bcast_recipe.description = "pixel shuffle through a stride-0 view: n_elements out, input = 1 + largest read"
+
+
+@synthetic(_pixel_shuffle_bcast_recipe)
 @tile_independent
 @triton.jit
 def pixel_shuffle_broadcast_aware_kernel(

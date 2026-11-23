@@ -11,7 +11,7 @@ import triton
 import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
-from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+from nbxtensor.ops.ew_tile import synthetic, tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
 
 
 #: The contract this kernel enforces. Triton forbids reading a module global
@@ -81,6 +81,29 @@ def index_select_kernel(
     tl.store(out + out_off, selected, mask=final_mask)
 
 
+def _index_select_mid_recipe(S):
+    """The synthetic launch of `index_select_mid_kernel` (`ops/ew_synthetic.py`): inner = the ladder's count, outer,
+    N and index_len small and honouring their specialization. `inp` is the contiguous (outer, N, inner) the kernel
+    reads, outer * N * inner elements; `out` the (outer, index_len, inner) it writes, its total = outer * index_len *
+    inner elements; `index` index_len indices in [0, N) (in range: no fault is reported); `fault_ptr` the call
+    site's one-word channel (`backend/faults.fault_channel`), zeroed. The grid is the call site's: cdiv(total, tile)
+    on one axis."""
+    from nbxtensor.ops.elementwise_launch import per_tile
+    inner = S.n
+    outer = S.int("outer", 2)
+    n = S.int("N", 3)
+    length = S.int("index_len", 2)
+    total = outer * length * inner
+    return ({"inner": inner, "outer": outer, "N": n, "index_len": length,
+             "inp": S.buf("inp", outer * n * inner), "out": S.buf("out", total),
+             "index": S.index("index", length, n), "fault_ptr": S.values("fault_ptr", [0])}, (per_tile(total),))
+
+
+_index_select_mid_recipe.count = "inner"
+_index_select_mid_recipe.description = "index_select_mid(inner, outer x index_len of N, in-range indices)"
+
+
+@synthetic(_index_select_mid_recipe)
 @tile_independent
 @triton.jit(debug=True)
 def index_select_mid_kernel(

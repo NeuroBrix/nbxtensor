@@ -23,6 +23,7 @@ def _home(passed_by_variant):
     tab = object.__new__(ew_proof._Table)
     tab.kept = {vid: {"passed": [list(t) for t in passed]} for vid, passed in passed_by_variant.items()}
     tab.shipped = {}
+    tab.unkept = {}
     tab.seen_classes = {"65536": set(passed_by_variant)}
     return tab
 

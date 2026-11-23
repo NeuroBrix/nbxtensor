@@ -15,9 +15,69 @@ import triton
 import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
-from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+from nbxtensor.ops.ew_tile import synthetic, tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
 
 
+#: the extent of the gathered operand along the gather dim in a synthetic launch (`_gather_recipe`): every index is
+#: drawn in [0, this)
+SYNTH_INDEXED_EXTENT = 3
+
+
+def radix_strides(S, names, extents):
+    """Strides for an operand read as (outer, dim, inner) in a synthetic launch (`ops/ew_synthetic.py`): `names` the
+    stride parameters outer to inner, `extents` the dims' extents outer to inner (the outermost one unused). Chosen
+    from the innermost outward, each the smallest value honouring its parameter's specialization that clears the span
+    of the dims inside it, so the positions of the operand never collide (an injective layout: the contiguous one when
+    the specialization allows it)."""
+    strides, span = [0] * len(names), 0
+    for k in reversed(range(len(names))):
+        strides[k] = S.int(names[k], span + 1)
+        if k:
+            span += (int(extents[k]) - 1) * strides[k]
+    return strides
+
+
+def flat_reach(n, dim, inner, s_outer, s_dim, s_inner):
+    """1 + the largest offset `s_outer * o + s_dim * d + s_inner * i` over the flat positions 0 .. n - 1 decomposed as
+    the kernels of this family decompose them (i = off % inner, d = off // inner % dim, o = off // inner // dim):
+    the extent an operand addressed so must have, no more."""
+    import numpy as np
+    off = np.arange(int(n), dtype=np.int64)
+    i, t = off % inner, off // inner
+    return int((t // dim * s_outer + t % dim * s_dim + i * s_inner).max()) + 1
+
+
+def _gather_recipe(S):
+    """The synthetic launch of `gather_kernel` (`ops/ew_synthetic.py`): N = the ladder's count positions of the index
+    and of the output, read as (outer, dim_size, inner_size) with dim_size and inner_size small and honouring their
+    specialization (outer = cdiv(N, dim_size * inner_size), the last outer slab partial, as N's own tail);
+    `index` and `out` laid out over (outer, dim_size, inner_size), `inp` over (outer, SYNTH_INDEXED_EXTENT,
+    inner_size), each through its stride parameters (`radix_strides`: no two positions of the output collide, so the
+    result is the same at every tile). Each buffer's extent is 1 + the largest offset the kernel forms over its N
+    positions (`flat_reach`), the input's with the largest index an in-range index can take; every index drawn in
+    [0, SYNTH_INDEXED_EXTENT). The grid is the call site's: cdiv(N, tile) on one axis."""
+    n, k = S.n, SYNTH_INDEXED_EXTENT
+    inner = S.int("inner_size", 3)
+    dim = S.int("dim_size", 2)
+    outer = -(-n // (dim * inner))
+    io, idd, ii = radix_strides(S, ["idx_stride_outer", "idx_stride_dim", "idx_stride_inner"], [outer, dim, inner])
+    oo, od, oi = radix_strides(S, ["out_stride_outer", "out_stride_dim", "out_stride_inner"], [outer, dim, inner])
+    po, pk, pi = radix_strides(S, ["inp_stride_outer", "inp_dim_stride", "inp_stride_inner"], [outer, k, inner])
+    args = {"N": n, "outer_size": S.int("outer_size", outer), "dim_size": dim, "inner_size": inner,
+            "idx_stride_outer": io, "idx_stride_dim": idd, "idx_stride_inner": ii,
+            "out_stride_outer": oo, "out_stride_dim": od, "out_stride_inner": oi,
+            "inp_stride_outer": po, "inp_dim_stride": pk, "inp_stride_inner": pi}
+    args["index"] = S.index("index", flat_reach(n, dim, inner, io, idd, ii), k)
+    args["out"] = S.buf("out", flat_reach(n, dim, inner, oo, od, oi))
+    args["inp"] = S.buf("inp", flat_reach(n, dim, inner, po, 0, pi) + (k - 1) * pk)
+    return args, None
+
+
+_gather_recipe.count = "N"
+_gather_recipe.description = "gather(N over (outer, dim_size, inner_size), indices < 3)"
+
+
+@synthetic(_gather_recipe)
 @tile_independent
 @triton.jit
 def gather_kernel(

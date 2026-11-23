@@ -15,9 +15,43 @@ import triton
 import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
-from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+from nbxtensor.ops.ew_tile import synthetic, tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
 
 
+
+def _scatter_recipe(S):
+    """The synthetic launch of the scatter kernels of this file — one signature: `scatter_kernel`, `scatter_add_kernel`,
+    `scatter_reduce_amax_kernel`, `scatter_reduce_amin_kernel` (`ops/ew_synthetic.py`): N = the ladder's count
+    positions of the index and of the source, read as (outer, dim_size, inner_size) with dim_size and inner_size small
+    and honouring their specialization (outer = cdiv(N, dim_size * inner_size), the last outer slab partial, as N's
+    own tail); `index` and `src` laid out over (outer, dim_size, inner_size), `out` over (outer,
+    SYNTH_INDEXED_EXTENT, inner_size), each through its stride parameters (`gather_op.radix_strides`). Each buffer's
+    extent is 1 + the largest offset the kernel forms over its N positions (`gather_op.flat_reach`), the output's
+    with the largest index an in-range index can take; every index drawn in [0, SYNTH_INDEXED_EXTENT). The grid is
+    the call site's: cdiv(N, tile) on one axis."""
+    from nbxtensor.ops.gather_op import SYNTH_INDEXED_EXTENT, flat_reach, radix_strides
+    n, k = S.n, SYNTH_INDEXED_EXTENT
+    inner = S.int("inner_size", 3)
+    dim = S.int("dim_size", 2)
+    outer = -(-n // (dim * inner))
+    io, idd, ii = radix_strides(S, ["idx_stride_outer", "idx_stride_dim", "idx_stride_inner"], [outer, dim, inner])
+    so, sd, si = radix_strides(S, ["src_stride_outer", "src_stride_dim", "src_stride_inner"], [outer, dim, inner])
+    oo, ok, oi = radix_strides(S, ["out_stride_outer", "out_dim_stride", "out_stride_inner"], [outer, k, inner])
+    args = {"N": n, "outer_size": S.int("outer_size", outer), "dim_size": dim, "inner_size": inner,
+            "idx_stride_outer": io, "idx_stride_dim": idd, "idx_stride_inner": ii,
+            "src_stride_outer": so, "src_stride_dim": sd, "src_stride_inner": si,
+            "out_stride_outer": oo, "out_dim_stride": ok, "out_stride_inner": oi}
+    args["index"] = S.index("index", flat_reach(n, dim, inner, io, idd, ii), k)
+    args["src"] = S.buf("src", flat_reach(n, dim, inner, so, sd, si))
+    args["out"] = S.buf("out", flat_reach(n, dim, inner, oo, 0, oi) + (k - 1) * ok)
+    return args, None
+
+
+_scatter_recipe.count = "N"
+_scatter_recipe.description = "scatter(N over (outer, dim_size, inner_size), indices < 3)"
+
+
+@synthetic(_scatter_recipe)
 @tile_dependent("duplicate indices write one address: the last writer wins, an order")
 @triton.jit
 def scatter_kernel(
@@ -52,6 +86,7 @@ def scatter_kernel(
     out_offset = outer_idx * out_stride_outer + cur_index * out_dim_stride + inner_idx * out_stride_inner
     tl.store(out + out_offset, val, mask=mask)
 
+@synthetic(_scatter_recipe)
 @tile_dependent("two lanes may add into one address (an atomic accumulate)")
 @triton.jit
 def scatter_add_kernel(
@@ -87,6 +122,7 @@ def scatter_add_kernel(
 # scatter_reduce kernels — amax, amin using Triton native atomics
 # ═══════════════════════════════════════════════════════════════════════════════
 
+@synthetic(_scatter_recipe)
 @tile_dependent("two lanes may reduce into one address (an atomic max)")
 @triton.jit
 def scatter_reduce_amax_kernel(
@@ -118,6 +154,7 @@ def scatter_reduce_amax_kernel(
     out_offset = outer_idx * out_stride_outer + cur_index * out_dim_stride + inner_idx * out_stride_inner
     tl.atomic_max(out + out_offset, val, mask=mask)
 
+@synthetic(_scatter_recipe)
 @tile_dependent("two lanes may reduce into one address (an atomic min)")
 @triton.jit
 def scatter_reduce_amin_kernel(
