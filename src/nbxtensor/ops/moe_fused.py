@@ -27,11 +27,10 @@ from nbxtensor.backend.capabilities import backend_loads_pointers_from_memory
 from nbxtensor.dtype.nbx_dtype import NBXDtype
 from nbxtensor.memory import pointer_tables as _pt
 from nbxtensor.memory.allocator import DeviceAllocator
-from nbxtensor.memory.device_transfer import transfer_tensor
 from nbxtensor.ops import elementwise_wrappers as _elementwise
 from nbxtensor.ops import moe_wrappers as _moe
 from nbxtensor.ops import reduction_wrappers as _reduction
-from nbxtensor.ops.moe_multi_device import fused_moe_across_devices
+from nbxtensor.ops.moe_multi_device import fused_moe_across_devices, on_device
 from nbxtensor.tensor import NBXTensor
 
 _log = logging.getLogger(__name__)
@@ -97,9 +96,9 @@ def fused_moe(gate_scores, hidden_states, gate_weights, up_weights, down_weights
     _use(c.act_dev)
     blended = topk_indices is not None or topk_weights is not None
     if blended:
-        topk_indices, topk_weights = _xfer(topk_indices, c.act_dev), _xfer(topk_weights, c.act_dev)
+        topk_indices, topk_weights = on_device(topk_indices, c.act_dev), on_device(topk_weights, c.act_dev)
     else:
-        gate_scores = _xfer(gate_scores, c.act_dev)
+        gate_scores = on_device(gate_scores, c.act_dev)
     c.experts = (gate_weights, up_weights, down_weights)
     any_host = store is None and any(getattr(w, '_device', 'cuda') == 'cpu' for lst in c.experts for w in lst)
     c.per_call, c.memory_log = weights_per_call or any_host or store is not None, log_memory and any_host
@@ -143,22 +142,12 @@ def _use(dev: int) -> None:
     DeviceAllocator.ensure_triton_device(dev)
 
 
-def _xfer(tensor, target_dev: int):
-    """`tensor` on `target_dev`: itself when it is there, else through the cross-device transfer, which waits for the
-    source device's stream before the peer copy and materialises a view that is not one dense span (a copy enqueued on
-    the target's stream alone could read routing or activations still being written: illegal addresses at the next
-    fused launch on that device)."""
-    if tensor.device_idx == target_dev:
-        return tensor
-    return transfer_tensor(tensor, target_dev)
-
-
 def _onto(c: _Call, dev: int, *tensors):
     """`tensors` on `dev`, made the current device, when it is not the activations' own."""
     if dev == c.act_dev:
         return tensors
     _use(dev)
-    return tuple(_xfer(t, dev) for t in tensors)
+    return tuple(on_device(t, dev) for t in tensors)
 
 
 def _dump(c: _Call, label: str, tensor) -> None:
@@ -270,7 +259,7 @@ def _decode_on_card(c: _Call):
     output = c.store.decode_on_card(c.layer, indices, scores, hidden, _host_reader(c.experts), c.top_k, c.K,
                                     c.n_gate)
     if sdev != c.act_dev:
-        output = _xfer(output, c.act_dev)
+        output = on_device(output, c.act_dev)
     output = _shaped_back(c, output)
     _use(c.act_dev)
     return output
@@ -314,7 +303,7 @@ def _band(c: _Call, band: str, split_down: bool):
         output = _moe.moe_decode_vec_half_pass(hidden, c.tables, dev, indices, scores, c.top_k, c.K, c.n_gate,
                                                c.experts[0][0].nbx_dtype == NBXDtype.bfloat16)
     if dev != c.act_dev:
-        output = _xfer(output, c.act_dev)
+        output = on_device(output, c.act_dev)
         if band == "int4":          # as the int4 band always did; the half band's device comes back below
             _use(c.act_dev)
     output = _shaped_back(c, output)
@@ -337,10 +326,10 @@ def _grouped(c: _Call):
     hidden, scores, *aligned = _onto(c, dev, c.hidden, c.flat_scores, *aligned)
     if c.dump is not None:
         _log_placement(c, dev, hidden, scores, aligned)
-    indices = c.flat_indices if dev == c.act_dev else _xfer(c.flat_indices, dev)
+    indices = c.flat_indices if dev == c.act_dev else on_device(c.flat_indices, dev)
     result = _three_passes(c, dev, hidden, (scores, tuple(aligned), indices, {}))
     if dev != c.act_dev:
-        result = _xfer(result, c.act_dev)
+        result = on_device(result, c.act_dev)
         _use(c.act_dev)
     return result
 

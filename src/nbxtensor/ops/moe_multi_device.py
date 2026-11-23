@@ -46,10 +46,10 @@ def fused_moe_across_devices(hidden_states, flat_indices, flat_scores, tables, t
         positions = np.where(mask)[0]              # the flat positions [0..M*top_k) routed to this device
         _use(dev)
         aligned = _aligned_at_flat_positions(flat_ids, positions, block_m, num_experts, dev, M * top_k)
-        down_out = _swiglu_passes(_on(flat_scores, dev), _on(hidden_states, dev), tables, dev, aligned,
+        down_out = _swiglu_passes(on_device(flat_scores, dev), on_device(hidden_states, dev), tables, dev, aligned,
                                   (flat_ids.size, n_gate, K, top_k), hidden_states.nbx_dtype)
         # This device's share of every token: its rows summed over the token's top_k, added on the activations' device.
-        share = _on(_reduction.sum_wrapper(down_out.reshape(M, top_k, K), dim=1), act_dev)
+        share = on_device(_reduction.sum_wrapper(down_out.reshape(M, top_k, K), dim=1), act_dev)
         _use(act_dev)
         output = _elementwise.add(output, share)
     return output
@@ -60,9 +60,12 @@ def _use(dev: int) -> None:
     DeviceAllocator.ensure_triton_device(dev)
 
 
-def _on(tensor, dev: int):
+def on_device(tensor, dev: int):
     """`tensor` on device `dev`: itself when it is there, else a copy through the cross-device transfer (which waits
-    for the source device's stream before the peer copy and materialises a view that is not one dense span)."""
+    for the source device's stream before the peer copy and materialises a view that is not one dense span). A host
+    tensor always moves, whatever index it carries (`needs_move`): the one transfer of both MoE paths, the fused one's
+    own copy compared the index alone and handed a host tensor whose index equalled the target back unmoved (library
+    C, 23/11/2026)."""
     return transfer_tensor(tensor, dev) if needs_move(tensor, dev) else tensor
 
 
