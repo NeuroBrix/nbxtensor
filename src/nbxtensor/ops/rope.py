@@ -23,6 +23,14 @@ import triton.language as tl
 
 
 @triton.jit
+def _chain(x, other, cf, sf, dt: tl.constexpr, sign: tl.constexpr):
+    """round(round(x * cos) + round(sign * other * sin)) in `dt`: the traced chain's mul, mul, add."""
+    p1 = (x.to(tl.float32) * cf).to(dt).to(tl.float32)
+    p2 = ((other.to(tl.float32) * sign) * sf).to(dt).to(tl.float32)
+    return (p1 + p2).to(dt)
+
+
+@triton.jit
 def rope_forward_kernel(
     q_ptr,
     q_row_stride,
@@ -128,10 +136,19 @@ def rope_forward_kernel(
         # with an explicit fma it matched the fp32 path but not the fp16 one
         # (VibeVoice, 2026-09-07) — the contraction is not the same in both,
         # and the bytes of every certified row depend on it staying as it is.
-        new_q_1 = q_tile_1 * cos_row - q_tile_2 * sin_row
-        new_q_2 = q_tile_2 * cos_row + q_tile_1 * sin_row
-        new_k_1 = k_tile_1 * cos_row - k_tile_2 * sin_row
-        new_k_2 = k_tile_2 * cos_row + k_tile_1 * sin_row
+        # A FUSION COMPUTES WHAT ITS CHAIN COMPUTES (project lead 23/11): the traced chain is mul(x, cos),
+        # mul(rotate_half(x), sin), add — three ops, each rounded to the stored dtype. Each product and the sum
+        # are rounded here as the chain rounds them, in the fp32 the element-wise kernels compute in, and the
+        # launch compiles with no fp contraction (`enable_fp_fusion=False`): an fma would round once where the
+        # chain rounds twice. Before, the plain expression differed from the chain by one ulp (bf16) and its
+        # contraction (fp32), and granite's fresh and cached prefills parted (Mac, 23/11).
+        dt = q_ptr.dtype.element_ty
+        cf = cos_row.to(tl.float32)
+        sf = sin_row.to(tl.float32)
+        new_q_1 = _chain(q_tile_1, q_tile_2, cf, sf, dt, -1.0)
+        new_q_2 = _chain(q_tile_2, q_tile_1, cf, sf, dt, 1.0)
+        new_k_1 = _chain(k_tile_1, k_tile_2, cf, sf, dt, -1.0)
+        new_k_2 = _chain(k_tile_2, k_tile_1, cf, sf, dt, 1.0)
     else:
         # Backward (inverse rotation): negate sin
         new_q_1 = q_tile_1 * cos_row + q_tile_2 * sin_row

@@ -1236,6 +1236,7 @@ def rope_fused_wrapper(q_raw, k_raw, cos, sin):
         BLOCK_SIZE=BLOCK_SIZE,
         BACKWARD_PASS=False,
         num_warps=4,
+        enable_fp_fusion=False,        # the chain rounds each product: no fma (rope.py `_chain`)
     )
 
     # View back as (B, H, S, D) to match the pre-fusion output layout.
