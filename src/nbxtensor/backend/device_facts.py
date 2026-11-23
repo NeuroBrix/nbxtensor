@@ -25,7 +25,7 @@ import os
 from pathlib import Path
 
 __all__ = ["host_shares_memory_with_device", "kernels_carry_fp64", "certified_dir", "memory_gb", "declare_device_memory",
-           "device_memory_gb", "measured_facts"]
+           "device_memory_gb"]
 
 _CUDA_DEV_ATTR_INTEGRATED = 18      # cudaDevAttrIntegrated (CUDA Runtime API, enum cudaDeviceAttr)
 _FP64 = {"cuda": True, "hip": True, "metal": False}
@@ -109,20 +109,3 @@ def certified_dir() -> Path:
     """The library's own store of certified kernel settings, in the user's cache."""
     base = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache")
     return Path(base) / "nbxtensor" / "certified"
-
-
-#: The kernel and copy facts a device file states under `measured:` (first-launch step 3: read, never measured at a
-#: first launch when the file states them; reset point 6, one key in one place).
-MEASURED_KEYS = ("matmul_tflops", "memory_gbps", "h2d_gbps", "d2h_gbps", "h2d_pageable_gbps", "expert_copy",
-                 "gemv_gbps")
-
-
-def measured_facts(profile: "dict | None" = None) -> dict:
-    """The measured kernel and copy facts of the device in force (its `backend/devices/<vendor>/<arch>.yml`
-    `measured:` block: GEMM TFLOP/s per dtype, memory and copy GB/s, the expert miss copy, the decode matvec per
-    engine), with their `source`; {} when the file states none — the application measures once and keeps it."""
-    if profile is None:
-        from nbxtensor.ops._configs import active_vendor_profile
-        profile = active_vendor_profile()
-    block = dict((profile or {}).get("measured") or {})
-    return {k: v for k, v in block.items() if k in MEASURED_KEYS or k == "source"}
