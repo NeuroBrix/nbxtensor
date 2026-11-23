@@ -392,7 +392,9 @@ def _volta():
 @pytest.mark.skipif(not _volta(), reason="the red cell is a V100 assembler's build of tile (4096, 2, 3)")
 def test_the_red_variant_faults_at_its_tile_on_the_synthetic_ladder_alone():
     """Variant 6be93ab046480f3a, no model and no launch of a caller: the synthetic ladder finds the 700 at
-    (4096, 2, 3) and variant 6859212e3972bf7a (add_strided_nd fp16, NDIM 4) faults at some tile (`tools/prove_an_element_wise_variant.py --red`)."""
+    (4096, 2, 3) with (256, 2, 3) passing, and variant 6859212e3972bf7a (add_strided_nd fp16, NDIM 4) is CLEAN, 15 of
+    15 (its old two-fault record was the worker's memory: Flex's real launch is clean on a V100)
+    (`tools/prove_an_element_wise_variant.py --red`)."""
     import importlib.util
     import pathlib
     tool = pathlib.Path(__file__).resolve().parents[1] / "tools" / "prove_an_element_wise_variant.py"
@@ -555,6 +557,10 @@ def test_the_red_first_verdict_needs_the_bad_tile_to_fault_and_the_good_one_to_p
     assert mod.verdict({"faults": [], "passed": [list(c) for c in CANDS]}, bad, good) == "NOT FOUND"
     assert mod.verdict({"unkept": True, "refused": "could not run", "faults": [], "passed": []}, bad, good) \
         == "COULD NOT RUN"
+    clean = {"faults": [], "passed": [list(c) for c in CANDS]}
+    assert mod.verdict(clean, mod.CLEAN, None) == "CLEAN"                    # 6859212e: every tile passes
+    assert mod.verdict(red, mod.CLEAN, None) == "NOT CLEAN"
+    assert mod.verdict({"faults": [], "passed": [list(c) for c in CANDS[:-1]]}, mod.CLEAN, None) == "NOT CLEAN"
 
 
 # --- 9. the slack, and the launcher's one door --------------------------------------------------------------------
