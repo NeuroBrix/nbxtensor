@@ -79,9 +79,21 @@ def ew_meta(n_elements: int) -> dict:
 
 def class_meta(nb: int, block: int, warps: int) -> dict:
     """The class's tile and warps as the launcher must see them: MARKED (`ops/ew_tile.EwTile`), so the binary of every
-    kernel they reach is proven on them before it runs (`ops/ew_proof.py`)."""
+    kernel they reach is proven on them before it runs (`ops/ew_proof.py`). The warps carry the stages the class's
+    ladder holds for (block, warps) (`class_candidates`): ONE stages value for the class's tile, the one its proof
+    runs, handed as the launch's num_stages where the call site names none (`ew_tile.stated_stages`)."""
     from nbxtensor.ops.ew_tile import EwTile
-    return {'BLOCK_SIZE': EwTile(block, nb, 'tile'), 'num_warps': EwTile(warps, nb, 'warps')}
+    return {'BLOCK_SIZE': EwTile(block, nb, 'tile'), 'num_warps': EwTile(warps, nb, 'warps', ladder_stages(block, warps))}
+
+
+def ladder_stages(block: int, warps: int) -> int:
+    """The stages of the class's ladder candidate (block, warps): what its proof runs it at. Refused by name when the
+    ladder holds no such candidate."""
+    for b, w, s in class_candidates():
+        if (b, w) == (int(block), int(warps)):
+            return s
+    raise RuntimeError(f"ZERO FALLBACK: the element-wise setting {int(block)}x{int(warps)} is no candidate of the "
+                       f"class's ladder {class_candidates()}: no stages are proven for it")
 
 
 def move_class_winner(nb: int, block: int, warps: int) -> dict:

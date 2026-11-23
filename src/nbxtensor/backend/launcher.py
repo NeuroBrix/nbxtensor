@@ -29,6 +29,7 @@ import sys
 from nbxtensor.backend import cuda_profile as _profile
 from nbxtensor.backend import c_compiler as _c_compiler
 from nbxtensor.backend import triton_floor as _triton_floor
+from nbxtensor.ops.ew_tile import EwTile, stated_stages
 
 import numpy as np
 import struct
@@ -1126,6 +1127,10 @@ def prepare(kernel, args, kwargs) -> Tuple[_Prepared, Dict[str, Any]]:
     kernel_cache, key_cache, backend = _binder(kernel)
     kwargs = dict(kwargs)
     _forward_debug(kernel, kwargs)      # into kwargs: `_pack_args` parses the compile options from THEM
+    if "num_stages" not in kwargs and type(kwargs.get("num_warps")) is EwTile and kwargs["num_warps"].stages is not None:
+        # an element-wise class's warps carry the stages its tile is proven at: the launch compiles at them, never at
+        # the backend's own default (`ops/ew_tile.stated_stages`, the same answer the proof keys the tile by)
+        kwargs["num_stages"] = stated_stages(kwargs)
     bound_args, specialization, options = nbx_binder(kernel, args, kwargs)
     from nbxtensor.memory.allocator import DeviceAllocator
     from nbxtensor.backend.runtime import _cached_device_idx

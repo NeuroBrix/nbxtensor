@@ -127,8 +127,10 @@ def variant_of(kernel, specialization, options, tiles) -> Tuple[str, Tuple[int, 
     rest = sorted((k, repr(v)) for k, v in options.items() if k not in ("num_warps", "num_stages"))
     qual = f"{getattr(kernel.fn, '__module__', '?')}.{kernel.__name__}"
     vid = json.dumps([qual, spec, rest])
+    from nbxtensor.ops.ew_tile import stated_stages
+    stages = stated_stages(options)
     return vid, (int(tiles["tile"]), int(options.get("num_warps", _default_option(kernel, "num_warps"))),
-                 int(options.get("num_stages", _default_option(kernel, "num_stages"))))
+                 int(_default_option(kernel, "num_stages") if stages is None else stages))
 
 
 def _is_tile(v) -> bool:
@@ -296,6 +298,9 @@ def _why_failed(rec: dict, tile) -> str:
     return rec.get("struck", {}).get(f"{tile[0]}x{tile[1]}", "not among the tiles its record passes")
 
 
+_SAID: set = set()      # the classes whose move this process has said
+
+
 def _moved(kernel, grid, bound, options, tiles, tab, vid=None, tile=None):
     """The class's winner failed this variant: move the class to the best common candidate, and this launch."""
     cls = tiles["tile"].ew_class
@@ -305,6 +310,9 @@ def _moved(kernel, grid, bound, options, tiles, tab, vid=None, tile=None):
                            f"({sorted(tab.seen_classes.get(str(cls), ()))})")
     from nbxtensor.ops.elementwise_launch import move_class_winner
     meta = move_class_winner(cls, best[0], best[1])
+    if cls in _SAID:
+        return retiled(grid, bound, options, int(tiles["tile"]), meta, best[2])
+    _SAID.add(cls)                          # a class's move is said once per process, never per launch
     why = _why_failed(tab.record(vid) or {}, tile) if vid is not None else "not among the tiles its record passes"
     print(f"[ew-proof] class {cls}: {kernel.__name__} fails the class's tile "
           f"{int(tiles['tile'])}x{int(tiles.get('warps', options.get('num_warps', 0)))} ({why}); the class moves to "

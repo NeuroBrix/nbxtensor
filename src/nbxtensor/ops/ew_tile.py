@@ -32,15 +32,19 @@ _SALT = 0x5EED_E11E
 
 class EwTile(int):
     """An element-wise class's tile or warps: `int(value)`, plus the class (`ew_class`) and the role
-    (`'tile'` | `'warps'`) it was resolved for."""
+    (`'tile'` | `'warps'`) it was resolved for. The class's warps also carry the STAGES its ladder proves the tile at
+    (`stages`; `elementwise_launch.class_meta`): the launcher hands them as the launch's num_stages when the call site
+    names none (`stated_stages`), so the binary that runs is the one the proof's record keys — never the backend's own
+    default (Metal 1, HIP 2), which no candidate of the ladder carries."""
     # no __slots__: CPython refuses a nonempty one on a subtype of int (a variable-size builtin); the instance
     # dict carries the class and the role
 
-    def __new__(cls, value: int, ew_class: int, role: str):
-        """An int of `value` remembering its class and role."""
+    def __new__(cls, value: int, ew_class: int, role: str, stages: int = None):
+        """An int of `value` remembering its class, its role and (the warps) the stages the class's tile is proven at."""
         self = super().__new__(cls, int(value))
         self.ew_class = int(ew_class)
         self.role = role
+        self.stages = None if stages is None else int(stages)
         return self
 
     def __hash__(self):
@@ -62,8 +66,8 @@ class EwTile(int):
     __str__ = __repr__
 
     def __reduce__(self):
-        """Pickles with its class and role."""
-        return (EwTile, (int(self), self.ew_class, self.role))
+        """Pickles with its class, role and stages."""
+        return (EwTile, (int(self), self.ew_class, self.role, getattr(self, "stages", None)))
 
 
 def _mark(kernel, **attrs):
@@ -108,3 +112,13 @@ def declared_independence(kernel):
 def class_tiles(values) -> dict:
     """{role: EwTile} among `values` (a launch's keyword values): empty for a launch outside the class."""
     return {v.role: v for v in values if isinstance(v, EwTile)}
+
+
+def stated_stages(options):
+    """The num_stages a launch's `options` state: their own, else the stages its class warps carry (`EwTile.stages`),
+    else None (the backend's default then applies). One answer for the launcher, which compiles at it, and the proof,
+    which keys the asked tile by it, so the two agree by construction."""
+    own = options.get("num_stages")
+    if own is not None:
+        return own
+    return getattr(options.get("num_warps"), "stages", None)
