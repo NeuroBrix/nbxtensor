@@ -239,6 +239,25 @@ def gemm_rows(key: tuple, dts, unit_keyed: bool = False) -> int:
     return m
 
 
+def conv_widths(key: tuple, x_dt: str, w_dt: str) -> Tuple[int, int]:
+    """The (input, output) widths a conv key is drawn at (`launch_keys.conv_width_representative`): a one-row conv's
+    key holds its W bucket's top, where the matrix unit may take it; drawn there the FMA kernel the key names never
+    ran. A key no width forms is refused."""
+    from nbxtensor.ops import launch_keys as LK
+    from nbxtensor.dtype.nbx_dtype import NBXDtype
+    (n, _ci, h, w, co, oh, ow, kh, kw, _sh, sw, _ph, pw, _dh, dw, groups) = [int(v) for v in key[:16]]
+    if not (h == 1 and oh == 1):
+        return w, ow                                # a 2-D conv's key holds its exact extents (`conv_width_key`)
+    x = _nbx(x_dt) if x_dt in _HALF else NBXDtype.float16
+    wd = _nbx(w_dt) if w_dt in _HALF else x
+    x, wd = LK.conv_dtypes(x, wd)
+    rep = LK.conv_width_representative(n, h, w, co, oh, kw, sw, pw, dw, groups, x, wd, kh)
+    if rep is None:
+        raise ValueError(f"no width forms the conv key {key}: the matrix unit takes every width of its W bucket "
+                         f"— a census defect, the key should not exist")
+    return rep
+
+
 # ---------------------------------------------------------------------------------------------------------------------
 # what a key draws: its operands, read from the key's fields
 # ---------------------------------------------------------------------------------------------------------------------
@@ -775,6 +794,7 @@ def _conv(k):
     from nbxtensor.ops import conv_wrappers as CW
     (n, ci, h, w, co, oh, ow, kh, kw, sh, sw, ph, pw, dh, dw, groups) = [int(v) for v in k.key[:16]]
     x_dt, w_dt = k.d(0, "fp16"), k.d(1, "fp16")
+    w, ow = conv_widths(k.key, x_dt, w_dt)
     k.room.refuse([((n, ci, h, w), x_dt), ((co, ci // max(groups, 1), kh, kw), w_dt), ((n, co, oh, ow), k.out_dt)],
                   k.short)
     x = k.arr((n, ci, h, w), x_dt)

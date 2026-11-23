@@ -750,6 +750,28 @@ def conv_width_key(in_h: int, out_h: int, in_w: int, out_w: int, kw: int, stride
     return int(in_w), int(out_w)
 
 
+def conv_width_representative(n: int, in_h: int, in_w: int, out_c: int, out_h: int, kw: int, stride_w: int,
+                              pad_w: int, dil_w: int, groups: int, x: NBXDtype, w: NBXDtype, kh: int,
+                              unit: Optional[dict] = None) -> Optional[Tuple[int, int]]:
+    """(input width, output width) a convolution key is drawn at: the largest input width whose launch forms the key —
+    the key's own width for a 2-D convolution (`conv_width_key` keeps its extents), and for a ONE-ROW convolution the
+    widest of its W bucket the matrix unit does not take (`matrix_unit_conv_operands`), as `gemm_row_representative`
+    does for M. At the bucket's top the unit may take the conv (no key): the bucket 65..80 keys in_w 80, M = 74 goes
+    to the unit, while in_w 65..69 (M 59..63 < 64) launches the FMA kernel under the SAME key, never proven there
+    (qa 1244, 8 conv certifications). None: no width of the bucket forms the key."""
+    if not (int(in_h) == 1 and int(out_h) == 1):
+        return int(in_w), conv_out_hw(1, in_w, 1, kw, 1, stride_w, 0, pad_w, 1, dil_w)[1]
+    top = int(in_w)
+    iw = top
+    while iw >= 1 and int(bucket_of("W", iw)) == top:
+        ow = conv_out_hw(1, iw, 1, kw, 1, stride_w, 0, pad_w, 1, dil_w)[1]
+        if ow >= 1 and matrix_unit_conv_operands(x, w, int(n) * ow, int(out_c) // max(1, int(groups)), kh, kw,
+                                                 unit) is None:
+            return iw, ow
+        iw -= 1
+    return None
+
+
 def conv_dtypes(x: NBXDtype, w: NBXDtype) -> Tuple[NBXDtype, NBXDtype]:
     """A convolution's operands, narrowed to the narrowest of the pair when they differ."""
     if x != w:
