@@ -97,6 +97,35 @@ def class_candidates():
             for c in ew_launch_kernel.configs]
 
 
-def ew_grid(n_elements: int, meta: dict) -> tuple:
-    """The 1-D grid of an element-wise launch at its configuration."""
-    return (triton.cdiv(int(n_elements), meta['BLOCK_SIZE']),)
+class per_tile:
+    """A grid axis of `times` x cdiv(n, tile): the programs that walk `n` items a class tile at a time."""
+    __slots__ = ("n", "times")
+
+    def __init__(self, n: int, times: int = 1):
+        self.n, self.times = int(n), int(times)
+
+
+def _tile_of(meta) -> int:
+    """The class tile among a launch's bound arguments (`ops/ew_tile.EwTile`, role 'tile')."""
+    from nbxtensor.ops.ew_tile import EwTile
+    for v in meta.values():
+        if isinstance(v, EwTile) and v.role == "tile":
+            return int(v)
+    raise RuntimeError("ZERO FALLBACK: a grid of the element-wise class was evaluated on a launch that carries no "
+                       "class tile (ew_meta's BLOCK_SIZE)")
+
+
+def ew_grid_of(*axes):
+    """The grid of a launch carrying a class tile, as a FUNCTION of the tile (Triton's callable form): each axis an int,
+    or a `per_tile(n)` evaluated at the tile the launch is given — the one the call site was handed, a candidate of
+    the tile proof, or the class's moved setting (`ops/ew_proof.py`). A grid computed by the caller from the tile it
+    was handed is wrong for every other tile (the token bitmask, 23/11/2026)."""
+    def grid(meta):
+        t = _tile_of(meta)
+        return tuple(a.times * -(-a.n // t) if isinstance(a, per_tile) else int(a) for a in axes)
+    return grid
+
+
+def ew_grid(n_elements: int, meta: dict = None):
+    """The 1-D grid of an element-wise launch, as a function of its tile (`ew_grid_of`)."""
+    return ew_grid_of(per_tile(n_elements))

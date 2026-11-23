@@ -57,7 +57,8 @@ def apply_token_bitmask(logits, bitmask: np.ndarray) -> None:
     mask = NBXTensor.from_numpy(bitmask)
     launch_on(logits)
     m = ew_meta(vocab)                                    # the element-wise launch's certified tile and warps
-    _token_bitmask_kernel[(rows, triton.cdiv(vocab, m["BLOCK_SIZE"]))](logits, mask, vocab, bitmask.shape[1],
+    from nbxtensor.ops.elementwise_launch import ew_grid_of, per_tile
+    _token_bitmask_kernel[ew_grid_of(rows, per_tile(vocab))](logits, mask, vocab, bitmask.shape[1],
                                                                        BLOCK=m["BLOCK_SIZE"], num_warps=m["num_warps"])
 
 

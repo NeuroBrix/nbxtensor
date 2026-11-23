@@ -39,7 +39,8 @@ def _ew(n):
 
 def _1d_grid_fixed(n):
     """Grid for element-wise kernels at the certified tile of the count's class."""
-    return (triton.cdiv(n, _ew(n)['BLOCK_SIZE']),)
+    from nbxtensor.ops.elementwise_launch import ew_grid
+    return ew_grid(n)                           # a function of the launch's tile (elementwise_launch.ew_grid_of)
 
 
 def _tensor_to_int(val):
@@ -639,7 +640,7 @@ def _create_scalar_tensor(value=0, **kwargs):
     device = kwargs.get('device', 'cuda')
     out = NBXTensor.empty((1,), dtype=dtype, device=device or 'cuda')
     set_device(out)
-    fill_kernel[(1,)](out, float(value) if value is not None else 0.0, 1, **_ew(1))
+    fill_kernel[_1d_grid_fixed(1)](out, float(value) if value is not None else 0.0, 1, **_ew(1))
     return out
 
 

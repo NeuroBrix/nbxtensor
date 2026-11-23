@@ -86,12 +86,33 @@ def test_a_tile_dependent_kernel_is_proven_by_fault_alone():
     assert len(rec["passed"]) == 4 and rec["dissent"] == []
 
 
-def test_the_moved_launch_covers_what_it_covered():
+def test_the_grid_is_a_function_of_the_tile_on_every_axis():
+    """The token bitmask's grid (rows, cdiv(vocab, tile)): its TILE axis is axis 1 — a grid computed once by the
+    caller, or rescaled on axis 0, ran the candidates and the moved launch on a wrong grid (V100, 23/11)."""
+    from nbxtensor.ops.elementwise_launch import ew_grid_of, per_tile
+    grid = ew_grid_of(2, per_tile(151936))
+    assert grid({"BLOCK": EwTile(2048, 1048576, "tile")}) == (2, 75)
+    assert grid({"BLOCK": EwTile(256, 1048576, "tile")}) == (2, 594)
+    assert ew_grid_of(per_tile(10, times=6))({"B": EwTile(4, 16, "tile")}) == (18,)
+
+
+def test_the_moved_launch_keeps_its_grid_function_and_takes_the_new_tile():
+    from nbxtensor.ops.elementwise_launch import ew_grid_of, per_tile
     meta = {"BLOCK_SIZE": EwTile(256, 65536, "tile"), "num_warps": EwTile(8, 65536, "warps")}
-    bound = {"x": "x", "n": 64, "BLOCK_SIZE": EwTile(4096, 65536, "tile"), "NDIM": 3}
-    grid, kw = ew_proof.retiled((5, 2), bound, {"num_warps": EwTile(2, 65536, "warps")}, 4096, meta, 3)
-    assert grid == (80, 2) and kw["BLOCK_SIZE"] == 256 and kw["num_warps"] == 8 and kw["num_stages"] == 3
-    assert kw["NDIM"] == 3 and kw["n"] == 64
+    bound = {"x": "x", "n": 64, "BLOCK": EwTile(2048, 65536, "tile"), "NDIM": 3}
+    fn = ew_grid_of(2, per_tile(32000))
+    grid, kw = ew_proof.retiled(fn, bound, {"num_warps": EwTile(2, 65536, "warps")}, 2048, meta, 3)
+    assert grid is fn and grid(kw) == (2, 125)
+    assert kw["BLOCK"] == 256 and kw["num_warps"] == 8 and kw["num_stages"] == 3 and kw["NDIM"] == 3
+
+
+def test_a_class_tile_launch_with_a_fixed_grid_is_refused_by_name():
+    class K:
+        __name__ = "k"
+        fn = type("F", (), {"__module__": "m"})
+    tiles = {"tile": EwTile(2048, 65536, "tile")}
+    with pytest.raises(ew_proof.TileUnproven, match="grid is fixed by the caller"):
+        ew_proof.settle(K(), (2, 16), {}, [], {"num_warps": 8}, tiles)
 
 
 class _Empty:
@@ -114,7 +135,7 @@ def test_a_confirmation_run_refuses_an_unproven_variant_by_name(monkeypatch):
     tiles = {"tile": EwTile(4096, 65536, "tile"), "warps": EwTile(2, 65536, "warps")}
     spec = [("*fp32", "D"), ("constexpr", tiles["tile"]), ("constexpr", 3)]
     with pytest.raises(ew_proof.TileUnproven, match="no proof table holds"):
-        ew_proof.settle(K(), (1,), {}, spec, {"num_warps": tiles["warps"], "num_stages": 3}, tiles)
+        ew_proof.settle(K(), lambda meta: (1,), {}, spec, {"num_warps": tiles["warps"], "num_stages": 3}, tiles)
 
 
 def test_the_variant_holds_warps_stages_and_every_constexpr():
@@ -156,3 +177,67 @@ def test_the_pixart_multiply_runs_where_the_class_tile_faults(monkeypatch, tmp_p
     recs = [r for b in kept["stamps"].values() for r in b["variants"].values()
             if r["kernel"] == "mul_scalar_strided_nd_kernel"]
     assert recs and [4096, 2, 3] not in recs[0]["passed"]
+
+
+def _accelerator():
+    from nbxtensor.memory.allocator import DeviceAllocator
+    if DeviceAllocator.device_count() == 0:
+        pytest.skip("no accelerator on this machine")
+
+
+def _fresh_proofs(monkeypatch, tmp_path):
+    monkeypatch.setenv("NEUROBRIX_REPLAY_CACHE", str(tmp_path))
+    monkeypatch.setattr(ew_proof, "_TABLE", [None])
+    from nbxtensor.backend import launcher
+    launcher.reset_caches()
+
+
+@pytest.mark.parametrize("vocab", [32000, 151936])
+def test_the_token_bitmask_runs_at_2048x8_and_after_a_forced_move(vocab, monkeypatch, tmp_path):
+    """The regression of the V100 rerun (23/11): (rows, cdiv(vocab, tile)) at the class tile 2048 x 8 — 32000 had no
+    agreeing set, 151936 left its row untouched after a move. Every candidate agrees on the right grid; after a move
+    the masked logits are -inf over the whole row, the allowed ones keep their bytes."""
+    _accelerator()
+    _fresh_proofs(monkeypatch, tmp_path)
+    from nbxtensor.ops import token_bitmask as TB
+    from nbxtensor.ops.elementwise_launch import class_meta, ew_bucket
+    from nbxtensor.tensor import NBXTensor
+    cls = ew_bucket(vocab)
+    monkeypatch.setattr(TB, "ew_meta", lambda n: class_meta(cls, 2048, 8))
+    rng = np.random.default_rng(vocab)
+    x = rng.standard_normal((2, vocab)).astype(np.float32)
+    allowed = [sorted(rng.choice(vocab, 17, replace=False)), [0, vocab - 1]]
+    mask = np.concatenate([TB.token_bitmask(a, vocab) for a in allowed])
+
+    def check():
+        t = NBXTensor.from_numpy(x.copy())
+        TB.apply_token_bitmask(t, mask)
+        got = t.numpy()
+        for r, a in enumerate(allowed):
+            keep = np.zeros(vocab, bool)
+            keep[a] = True
+            assert np.array_equal(got[r][keep], x[r][keep]) and np.all(np.isneginf(got[r][~keep]))
+    check()
+    tab = ew_proof.table()
+    (vid, rec), = [(v, r) for v, r in tab.kept.items() if r["kernel"] == "_token_bitmask_kernel"]
+    assert rec["refused"] is None and len(rec["passed"]) >= 3
+    assert rec["dissent"] == [] and rec["faults"] == []
+    rec["passed"] = [t for t in rec["passed"] if t[:2] != [2048, 8]]      # force the move: the class tile fails
+    from nbxtensor.backend import launcher
+    launcher.reset_caches()
+    check()
+
+
+def test_a_one_d_kernel_far_above_the_largest_tile_agrees_on_every_candidate(monkeypatch, tmp_path):
+    _accelerator()
+    _fresh_proofs(monkeypatch, tmp_path)
+    from nbxtensor.ops import elementwise_wrappers as EW
+    from nbxtensor.ops.elementwise_launch import class_meta, ew_bucket
+    from nbxtensor.tensor import NBXTensor
+    n = 100003
+    monkeypatch.setattr(EW, "_ew_meta", lambda k: class_meta(ew_bucket(n), 1024, 4))
+    x = np.arange(n, dtype=np.float32)
+    out = EW.mul(NBXTensor.from_numpy(x), 3.0).numpy()
+    assert np.array_equal(out, x * 3.0)
+    recs = [r for r in ew_proof.table().kept.values() if r["kernel"] == "mul_scalar_kernel"]
+    assert recs and recs[0]["dissent"] == [] and recs[0]["refused"] is None

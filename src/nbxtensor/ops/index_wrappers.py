@@ -565,8 +565,8 @@ def index_add_wrapper(x, dim: int, index,
     # fp32 fold, zero atomics, no sort dependency. See
     # ops/index_add.py for the rationale and state-of-the-art notes.
     _inner = _ew_meta(inner_size)
-    n_inner_tiles = (inner_size + _inner['BLOCK_SIZE'] - 1) // _inner['BLOCK_SIZE']
-    grid = (outer_size * inp_shape_dim * n_inner_tiles,)
+    from nbxtensor.ops.elementwise_launch import ew_grid_of, per_tile
+    grid = ew_grid_of(per_tile(inner_size, times=outer_size * inp_shape_dim))     # a function of the tile
     set_device(x)
     index_add_gather_kernel[grid](
         x, source, index, out,

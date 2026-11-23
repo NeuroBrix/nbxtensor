@@ -298,10 +298,8 @@ def upsample_nearest2d_wrapper(
 
     output = NBXTensor.empty((N, C, OH, OW), device=x.device, dtype=x.dtype)
     total_threads = OH * OW
-    grid = (
-        triton.cdiv(total_threads, _ew_meta(total_threads)['BLOCK_SIZE']),
-        triton.cdiv(N * C, 4),
-    )
+    from nbxtensor.ops.elementwise_launch import ew_grid_of, per_tile
+    grid = ew_grid_of(per_tile(total_threads), triton.cdiv(N * C, 4))     # a function of the tile
     set_device(output)
     s_n, s_c, s_h, s_w = x.stride()
     upsample_nearest2d_kernel[grid](
@@ -615,10 +613,8 @@ def upsample_nearest3d_wrapper(
 
     output = NBXTensor.empty((N, C, OD, OH, OW), device=x.device, dtype=x.dtype)
     total_threads = OD * OH * OW
-    grid = (
-        triton.cdiv(total_threads, _ew_meta(total_threads)['BLOCK_SIZE']),
-        triton.cdiv(N * C, 4),
-    )
+    from nbxtensor.ops.elementwise_launch import ew_grid_of, per_tile
+    grid = ew_grid_of(per_tile(total_threads), triton.cdiv(N * C, 4))     # a function of the tile
     set_device(output)
     upsample_nearest3d_kernel[grid](
         output, x, N, C, OD, OH, OW, ID, IH, IW,

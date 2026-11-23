@@ -221,6 +221,10 @@ def table() -> _Table:
 def settle(kernel, grid, bound: Dict[str, Any], specialization, options: Dict[str, Any], tiles: dict):
     """None: this launch runs as asked (its tile is proven on its variant). Else (grid, kwargs) of the same launch at
     the class's moved setting. Raises TileUnproven by name where no proven setting exists."""
+    if not callable(grid):
+        raise TileUnproven(f"ZERO FALLBACK: {kernel.__name__} carries an element-wise class tile and its grid is fixed "
+                           f"by the caller ({tuple(grid)}): a grid computed from the tile it was handed is wrong for "
+                           "every other tile; hand it as a function of the tile (elementwise_launch.ew_grid_of)")
     vid, tile = variant_of(kernel, specialization, options, tiles)
     tab = table()
     tab.seen_classes.setdefault(str(tiles["tile"].ew_class), set()).add(vid)
@@ -232,6 +236,10 @@ def settle(kernel, grid, bound: Dict[str, Any], specialization, options: Dict[st
                                f"{vid} at tile {tile}, which no proof table holds (stamp {tab.key})")
         tab.keep(vid, prove(kernel, grid, bound, options, tiles, vid))
         status = tab.status(vid, tile)
+    refused = (tab.record(vid) or {}).get("refused")
+    if refused:
+        raise TileUnproven(f"ZERO FALLBACK: element-wise variant {kernel.__name__} is not proven: {refused} "
+                           f"(kept; stamp {tab.key})")
     if status == "passed":
         return None
     return _moved(kernel, grid, bound, options, tiles, tab)
@@ -253,16 +261,19 @@ def _moved(kernel, grid, bound, options, tiles, tab):
 
 
 def retiled(grid, bound, options, old_block: int, meta: dict, stages: int):
-    """The same launch at the class setting `meta`: every class tile replaced, axis 0 of a fixed grid scaled to cover
-    what it covered (an element-wise launch's programs walk axis 0 a tile at a time; a callable grid re-reads it)."""
+    """The same launch at the class setting `meta`: every class tile replaced; the grid, a function of the tile
+    (`elementwise_launch.ew_grid_of`), is evaluated again at the new one by the launcher."""
+    return grid, {**at_tile(bound, meta["BLOCK_SIZE"]), **dict(options, num_warps=meta["num_warps"],
+                                                              num_stages=stages)}
+
+
+def at_tile(bound: Dict[str, Any], block) -> Dict[str, Any]:
+    """`bound` with every class tile replaced by `block` (an EwTile of the same class)."""
     from nbxtensor.ops.ew_tile import EwTile
-    kw = {k: (meta["BLOCK_SIZE"] if isinstance(v, EwTile) and v.role == "tile" else v) for k, v in bound.items()}
-    opts = dict(options, num_warps=meta["num_warps"], num_stages=stages)
-    if not callable(grid):
-        g = tuple(int(x) for x in grid)
-        new = int(meta["BLOCK_SIZE"])
-        grid = (-(-g[0] * old_block // new),) + g[1:]
-    return grid, {**kw, **opts}
+    if not isinstance(block, EwTile):
+        cls = next(v.ew_class for v in bound.values() if isinstance(v, EwTile))
+        block = EwTile(int(block), cls, "tile")
+    return {k: (block if isinstance(v, EwTile) and v.role == "tile" else v) for k, v in bound.items()}
 
 
 # ---------------------------------------------------------------------------
@@ -274,10 +285,10 @@ def prove(kernel, grid, bound, options, tiles, vid) -> dict:
     from nbxtensor.ops.elementwise_launch import class_candidates
     from nbxtensor.ops.ew_tile import declared_independence
     t0 = time.time()
-    grid = grid(bound) if callable(grid) else grid
-    spec, nbytes = ew_proof_child.snapshot_launch(kernel, grid, bound, options, int(tiles["tile"]))
-    independent = declared_independence(kernel)
     cands = class_candidates()
+    grids = [tuple(int(g) for g in grid(at_tile(bound, c[0]))) for c in cands]     # each candidate its own grid
+    spec, nbytes = ew_proof_child.snapshot_launch(kernel, grids, bound, options)
+    independent = declared_independence(kernel)
     results, differ = ew_proof_child.run_candidates(spec, cands)
     rec = judge(independent, cands, results, differ)
     rec.update(seconds=round(time.time() - t0, 2), snapshot_bytes=nbytes, kernel=kernel.__name__)
@@ -286,9 +297,7 @@ def prove(kernel, grid, bound, options, tiles, vid) -> dict:
           f"{len(cands)} tiles pass, {len(rec['faults'])} fault, snapshot {nbytes} bytes, {rec['seconds']} s"
           + ("" if independent else " — proven by fault only (" + ("declares itself tile-dependent"
              if independent is False else "declares no tile independence") + ")"), file=sys.stderr)
-    if not rec["passed"]:
-        raise TileUnproven(f"ZERO FALLBACK: element-wise variant {kernel.__name__}: {rec['refused']}")
-    return rec
+    return rec              # a refused one too: kept, said once, raised by `settle` at every launch
 
 
 _RUN = {"variants": 0, "seconds": 0.0, "largest_snapshot": 0}

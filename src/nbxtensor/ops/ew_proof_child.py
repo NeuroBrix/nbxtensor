@@ -49,7 +49,7 @@ class _View:
 # ---------------------------------------------------------------------------
 # parent: the snapshot
 # ---------------------------------------------------------------------------
-def snapshot_launch(kernel, grid, bound: Dict[str, Any], options: Dict[str, Any], block: int) -> Tuple[str, int]:
+def snapshot_launch(kernel, grids, bound: Dict[str, Any], options: Dict[str, Any]) -> Tuple[str, int]:
     """(spec directory, bytes snapshotted) of this launch."""
     from nbxtensor.backend.launcher import _addressable_extent, _snapshot_ranges
     spans = {}
@@ -77,7 +77,7 @@ def snapshot_launch(kernel, grid, bound: Dict[str, Any], options: Dict[str, Any]
         else:
             params[name] = ("val", v)
     spec = {"module": kernel.fn.__module__, "name": kernel.__name__, "params": params,
-            "groups": [hi - lo for lo, hi in groups], "grid": tuple(int(g) for g in grid), "block": int(block),
+            "groups": [hi - lo for lo, hi in groups], "grids": [list(g) for g in grids],
             "options": {k: v for k, v in options.items() if k not in ("num_warps", "num_stages")}}
     with open(os.path.join(where, "spec.pkl"), "wb") as fh:
         pickle.dump(spec, fh)
@@ -249,8 +249,7 @@ def _child_run(where: str, start: int) -> None:
         for buf, blob in zip(bufs, blobs):
             _restore(buf, blob)
         kw = _kwargs(spec, bufs, block)
-        g = spec["grid"]
-        grid = (-(-g[0] * spec["block"] // block),) + tuple(g[1:])
+        grid = tuple(spec["grids"][i])           # the candidate's own grid, evaluated by the parent at its tile
         launch(kernel, grid, **kw, **spec["options"], num_warps=warps, num_stages=stages)
         synchronize()
         digests = []

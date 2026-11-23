@@ -215,7 +215,7 @@ def _widened_once_per_run(t, target):
 
 def _1d_grid(n_elements):
     """Grid for element-wise (memory-bound) kernels, at the certified tile of the count's class (`_ew_meta`)."""
-    return _ew_grid(n_elements, _ew_meta(n_elements))
+    return _ew_grid(n_elements)                 # a function of the launch's tile (elementwise_launch.ew_grid_of)
 
 
 def _batch_block(batch_dim, feat_dim):

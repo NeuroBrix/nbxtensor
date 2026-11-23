@@ -348,7 +348,8 @@ def _conv_transpose1d_gemm(x, weight, bias, stride, padding):
     for n in range(N):
         y = mm(x_c[n].t().contiguous(), w_2d)                           # [L_in, C_out * K]
         set_device(y)
-        col2im1d_kernel[(C_out, triton.cdiv(L_out, meta['BLOCK_SIZE']))](
+        from nbxtensor.ops.elementwise_launch import ew_grid_of, per_tile
+        col2im1d_kernel[ew_grid_of(C_out, per_tile(L_out))](
             y, output[n], C_out, K, L_in, L_out, stride, padding, TAPS=taps, **meta)
     if bias is not None:
         output = _conv_bias_inplace(output.unsqueeze(2), bias).squeeze(2)
