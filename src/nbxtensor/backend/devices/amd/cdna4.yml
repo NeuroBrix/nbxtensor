@@ -61,8 +61,8 @@ sdpa_thresholds:
     num_warps: 4
 
 memory:
-  # The runtime's own context outside every allocator block: not measured on this class yet; null = the chunk
-  # rule reads it once at its first ask, said by name (memory/chunk_rule.py). A measured figure replaces null.
+  # The runtime's own context outside every allocator block: not measured on this class (null). The chunk rule
+  # has no entry for this class, so nothing reads it; a class given a rule entry carries its measured figure here.
   runtime_context_mb: null
   max_shared_memory_per_block: 163840   # 160 KB LDS per workgroup (CDNA4, TargetFeatures.cpp)
   max_registers_per_block: 65536

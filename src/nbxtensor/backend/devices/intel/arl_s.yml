@@ -68,8 +68,8 @@ sdpa_thresholds:
     num_warps: 4
 
 memory:
-  # The runtime's own context outside every allocator block: not measured on this class yet; null = the chunk
-  # rule reads it once at its first ask, said by name (memory/chunk_rule.py). A measured figure replaces null.
+  # The runtime's own context outside every allocator block: not measured on this class (null). The chunk rule
+  # has no entry for this class, so nothing reads it; a class given a rule entry carries its measured figure here.
   runtime_context_mb: null
   # Shared local memory per work-group. Intel's oneAPI GPU optimization guide (2025-2, "Thread mapping and GPU
   # occupancy"): 128 KB of SLM per Xe-core; a work-group's ceiling is 64 KB on this family. The driver states the

@@ -87,16 +87,15 @@ def test_the_rules_chunk_replays_the_carried_run_without_a_refusal():
 
 def test_the_engine_s_two_argument_call_reads_the_architecture_from_the_profile_in_force(monkeypatch):
     """The engine's first launch asks `vmm_chunk_bytes(device, card_bytes)` (prism/facts_probe.py): the architecture is
-    read from the vendor profile in force, never a TypeError (the Mac serve on library C, 23/11) nor a guess."""
+    read from the device file in force (with its runtime context: one reader), never a TypeError (the Mac serve on library C, 23/11) nor a guess."""
     from nbxtensor.memory import trace_replay
     from nbxtensor.memory.allocator import DeviceAllocator
-    from nbxtensor.ops import autotune_certified
     monkeypatch.setattr(trace_replay, "vmm_granularity", lambda dev: 2 * MiB)
     monkeypatch.setattr(DeviceAllocator, "mem_get_info", staticmethod(lambda dev: (V100_16 - CONTEXT, V100_16)))
     monkeypatch.setattr(DeviceAllocator, "_cuda_live_bytes", {})
-    monkeypatch.setattr(autotune_certified, "active_profile", lambda: ("nvidia", "volta"))
+    files = iter([{"architecture": "volta", "memory": {"runtime_context_mb": 306}},
+                  {"architecture": "turing", "memory": {"runtime_context_mb": None}}, {}])
+    monkeypatch.setattr("nbxtensor.ops._configs.active_vendor_profile", lambda: next(files))   # ONE reader: the file
     assert chunk_rule.vmm_chunk_bytes(0, V100_16) == 32 * MiB
-    monkeypatch.setattr(autotune_certified, "active_profile", lambda: ("nvidia", "turing"))
     assert chunk_rule.vmm_chunk_bytes(0, V100_16) is None
-    monkeypatch.setattr(autotune_certified, "active_profile", lambda: None)
-    assert chunk_rule.vmm_chunk_bytes(0, V100_16) is None
+    assert chunk_rule.vmm_chunk_bytes(0, V100_16) is None          # no device file in force: no rule answers

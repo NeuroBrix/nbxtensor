@@ -23,6 +23,9 @@ def _card(monkeypatch):
     # what the process's own blocks hold is no part of the runtime's context: a suite that allocated before this test
     # left live blocks, and the room then read as larger than the card's (the Mac suite, 23/11)
     monkeypatch.setattr(DeviceAllocator, "_cuda_live_bytes", {})
+    # the 16 GB class the rule answers reads its runtime context from its device file (volta's measured 306)
+    monkeypatch.setattr("nbxtensor.ops._configs.active_vendor_profile",
+                        lambda: {"architecture": "volta", "memory": {"runtime_context_mb": 306}})
 
 
 def test_the_allocator_reads_the_rule_where_the_profile_states_no_measure(monkeypatch):

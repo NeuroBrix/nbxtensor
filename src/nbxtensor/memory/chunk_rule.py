@@ -26,8 +26,9 @@ largest chunk measured on a card: an unmeasured chunk is never the rule's answer
 THE ROOM (C18, the Dell 23/11: a granite server refused on a card a neighbour held, "the carried trace sana-video...
 peaks at 14559087916 live bytes, at or over the room this card leaves (13505 MiB)"): the card's total less the runtime
 context of ITS device class, a value of the library's device file (`memory.runtime_context_mb`), READ — never total
-less free, which counts a neighbour's memory as this card's context. A class whose file states null reads its own
-context once, at its first ask, said by name (a measure, for a fact that exists nowhere yet).
+less free, which counts a neighbour's memory as this card's context. Only a class the rule answers reads it, and that
+class must carry its measured figure (null or absent is refused by name); a class the rule does not answer reads
+nothing (its file's null says: not measured on that class, and nothing asks).
 THE RULE THAT CANNOT ANSWER: a class's reference run that does not fit the present room is no reason to refuse a run.
 The rule then answers `ThisRunOnly(0)`: this run takes the driver segments, said once, and NOTHING is kept (a chunk
 chosen under a neighbour would poison later launches); a user model that truly does not fit is refused by its own
@@ -122,25 +123,26 @@ def rule_chunk_bytes(card_bytes: int, granularity: int, room_bytes: int, archite
     return max(fit) * MiB if fit else None
 
 
-def vmm_chunk_bytes(device: int, card_bytes: int, architecture: Optional[str] = None) -> Optional[int]:
-    """The rule's chunk for `device` (its VMM granularity and the room it leaves — its total less what the runtime
-    holds outside the allocator's blocks — read from the driver), or None: no VMM, or no rule entry for its class and
-    architecture — the caller measures once (`trace_replay.chunk_by_replay`) and keeps the result. `architecture`
-    is the caller's when it holds the device's spec (the allocator); else it is READ from the vendor profile in force
-    (its file stem: `volta`), the way the engine's first launch asks with the two arguments it always passed."""
+def vmm_chunk_bytes(device: int, card_bytes: int) -> Optional[int]:
+    """The rule's chunk for `device` of `card_bytes`, or None: no VMM, or no rule entry for its memory class and
+    architecture — the caller measures once (`trace_replay.chunk_by_replay`) and keeps the result. ONE reader decides
+    (qa C18-2): the device file in force (`_configs.active_vendor_profile`) gives the class's architecture AND its
+    runtime context; the room is the card's total (the driver's) less that context, the same at every ask whatever a
+    neighbour holds; a neighbour seen is said once."""
     from nbxtensor.memory.trace_replay import vmm_granularity
     gran = vmm_granularity(device)
     if not gran:
         return None
-    if architecture is None:
-        from nbxtensor.ops.autotune_certified import active_profile
-        prof = active_profile()
-        architecture = prof[1] if prof else ""       # no profile in force: no rule answers, the caller measures
+    from nbxtensor.ops._configs import active_vendor_profile
+    profile = active_vendor_profile()
+    architecture = str(profile.get("architecture") or "")
+    entry = _classes().get(_class_of(card_bytes))
+    if not entry or str(entry.get("architecture")) != architecture:
+        return None                                  # no rule for this class: nothing is read, the caller measures
     from nbxtensor.memory.allocator import DeviceAllocator
     free_b, total_b = DeviceAllocator.mem_get_info(device)
-    held = int(total_b) - int(free_b) - DeviceAllocator._cuda_live_bytes.get(device, 0)   # context + any neighbour
-    context = _context_bytes(device, held)
-    others = max(0, held - context)
+    context = _context_bytes(profile)
+    others = max(0, int(total_b) - int(free_b) - DeviceAllocator._cuda_live_bytes.get(device, 0) - context)
     if others and ("others", device) not in _SAID:
         _SAID.add(("others", device))
         print(f"[chunk rule] device {device}: another process holds about {others // MiB} MiB of this card; the room "
@@ -149,22 +151,14 @@ def vmm_chunk_bytes(device: int, card_bytes: int, architecture: Optional[str] = 
     return rule_chunk_bytes(card_bytes, gran, int(total_b) - context, architecture)
 
 
-def _context_bytes(device: int, held_now: int) -> int:
-    """The runtime context of the card's device class: the device file's `memory.runtime_context_mb` (READ); a class
-    whose file states null reads it once now (what the card holds beyond this process's blocks), said by name; a file
-    that states nothing is refused by name."""
-    from nbxtensor.ops._configs import active_vendor_profile
-    memory = active_vendor_profile().get("memory") or {}
-    if "runtime_context_mb" not in memory:
-        raise RuntimeError("ZERO FALLBACK: the device file in force states no memory.runtime_context_mb (a measured "
-                           "figure, or null for 'read once at the first ask'): a value of the device file, added at "
-                           "its source")
-    stated = memory["runtime_context_mb"]
-    if stated is not None:
-        return int(stated) * MiB
-    if ("context", device) not in _SAID:
-        _SAID.add(("context", device))
-        print(f"[chunk rule] device {device}: its device file states memory.runtime_context_mb: null: read once now "
-              f"({max(0, int(held_now)) // MiB} MiB, a neighbour included if one holds the card)",
-              file=__import__("sys").stderr)
-    return max(0, int(held_now))
+def _context_bytes(profile: dict) -> int:
+    """The runtime context of the card's device class, READ from its device file `profile` (`memory.
+    runtime_context_mb`), for a class the chunk rule answers. That class must carry its measured figure: null (not
+    measured on the class) or nothing is refused by name — the rule never measures the context itself (RED_LINES 5)."""
+    memory = profile.get("memory") or {}
+    stated = memory.get("runtime_context_mb")
+    if stated is None:
+        raise RuntimeError("ZERO FALLBACK: the chunk rule answers this card's class, and its device file states no "
+                           "measured memory.runtime_context_mb (" + ("null" if "runtime_context_mb" in memory else
+                           "absent") + "): the figure is added at its source, measured on a card of the class")
+    return int(stated) * MiB
