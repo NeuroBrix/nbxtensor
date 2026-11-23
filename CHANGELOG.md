@@ -719,7 +719,7 @@ Triton models on Apple GPUs several times faster, and the NeuroBrix engine's rem
   PCI bus (four in a container given one); the others are counted as not visible here.
 - **`python -m nbxtensor install-metal` downloads nothing when the pinned wheels are already installed**, and says so in
   one line (it re-downloaded 131 MB on every call); pip's own lines only with `NBX_LOG=debug`.
-- **Attribution**: author, maintainer and copyright holder Hocine Benkelaya (contact@neurobrix.es); a NOTICE file ships
+- **Attribution**: author, maintainer and copyright holder Hocine Benkelaya (contact@neurobrix.org); a NOTICE file ships
   beside the LICENSE (supported and funded by Neural Network Holding Ltd, commercial distribution by WizWorks OÜ); the
   README carries the same attribution.
 
