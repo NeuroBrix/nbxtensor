@@ -55,7 +55,7 @@ class Int64(int):
         return (Int64, (int(self),))
 
     def __repr__(self):
-        """Prints as the int."""
+        """Prints as the plain int it holds, so a key or a log line reads the same number."""
         return int.__repr__(self)
 
     __str__ = __repr__
@@ -167,15 +167,15 @@ class _Fake:
         self._a, self.dtype, self.shape, self._e = int(address), dtype, (int(elements),), int(elem)
 
     def data_ptr(self):
-        """Its address."""
+        """The stand-in's device address: the binder reads it for the pointer's alignment attribute ("D")."""
         return self._a
 
     def stride(self):
-        """Contiguous."""
+        """The stand-in is one contiguous row: stride 1, as the binder reads a flat pointer argument."""
         return (1,)
 
     def element_size(self):
-        """Its element bytes."""
+        """The bytes of one element of the stand-in's dtype, which the binder reads with the address."""
         return self._e
 
 
