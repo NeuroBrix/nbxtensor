@@ -723,7 +723,8 @@ class DeviceAllocator:
             return 0
         spec = next((d for d in prof.devices if getattr(d, "index", None) == dev), None)
         card_mb = int(getattr(spec, "memory_mb", 0) or 0) if spec is not None else 0
-        ruled = chunk_rule.vmm_chunk_bytes(dev, card_mb * chunk_rule.MiB) if card_mb > 0 else None
+        ruled = (chunk_rule.vmm_chunk_bytes(dev, card_mb * chunk_rule.MiB, str(getattr(spec, "architecture", "")))
+                 if card_mb > 0 else None)
         if ruled:
             return ruled
         measured = (getattr(spec, "measured", None) or {}) if spec is not None else {}

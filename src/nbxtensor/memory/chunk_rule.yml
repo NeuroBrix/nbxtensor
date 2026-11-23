@@ -12,8 +12,10 @@
 # own time, so OFF's noise decided; the grid has no stop bound.
 classes:
   16g:
+    architecture: volta        # the grid's cards; another make of the class is not proven by it (qa 1232-4)
     trace: sana-video-2b-720p.16g.2026-11-02.tsv
     grid_seconds: {0: 2.656, 8: 4.404, 16: 3.105, 32: 2.347, 64: 2.114}
   32g:
+    architecture: volta
     trace: sana-video-2b-720p.16g.2026-11-02.tsv
     grid_seconds: {0: 2.027, 8: 4.140, 16: 2.592, 32: 1.983, 64: 1.714}
