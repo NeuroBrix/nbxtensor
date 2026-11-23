@@ -10,7 +10,7 @@ from typing import Optional, Tuple
 
 __all__ = ["count", "current", "select", "select_for_launch", "synchronize", "drain", "mem_info", "most_free",
            "target_name", "DeviceQueryError", "NoGpuRuntime", "install_shadow", "DevicesVisible", "declare_target",
-           "TargetNotDeclarable", "apple_gpu_limits", "MetalUnavailableError"]
+           "TargetNotDeclarable", "apple_gpu_limit", "MetalUnavailableError"]
 
 
 def __getattr__(name):
@@ -25,18 +25,18 @@ def __getattr__(name):
     if name == "DevicesVisible":              # `install_shadow` asked with a device in sight
         from nbxtensor.memory.shadow import DevicesVisible
         return DevicesVisible
-    if name == "MetalUnavailableError":       # `apple_gpu_limits` asked where the Apple GPU cannot be asked
+    if name == "MetalUnavailableError":       # `apple_gpu_limit` asked where the Apple GPU cannot be asked
         from nbxtensor.backend.metal_device import MetalUnavailableError
         return MetalUnavailableError
     raise AttributeError(f"module 'nbxtensor.device' has no attribute {name!r}")
 
 
-def apple_gpu_limits() -> dict:
-    """The Apple GPU's two memory limits in bytes, {"working_set_bytes", "max_buffer_bytes"}, asked of the device for
-    hardware detection (no device selected, no runtime opened): `backend.metal_device.device_limits`, the one
-    reading; `MetalUnavailableError` (its text the reason alone) when it cannot be asked."""
-    from nbxtensor.backend.metal_device import device_limits
-    return device_limits()
+def apple_gpu_limit(key: str) -> int:
+    """One Apple GPU memory limit in bytes ("working_set_bytes" or "max_buffer_bytes"), asked of the device for hardware
+    detection (no device selected, no runtime opened), each judged on its own: `backend.metal_device.device_limit`;
+    `MetalUnavailableError` (its text the reason alone) when it cannot be read."""
+    from nbxtensor.backend.metal_device import device_limit
+    return device_limit(key)
 
 
 def _allocator():

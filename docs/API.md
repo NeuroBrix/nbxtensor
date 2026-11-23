@@ -3298,7 +3298,7 @@ def select(index: int) -> None           # make `index` current (allocations, co
 def select_for_launch(index: int) -> None    # current for the next kernel launch too (the launcher's context)
 def synchronize() -> None                # the current device finished, through the interceptor in force
 def drain(index: Optional[int] = None) -> None   # every stream of a device drained; the current device restored
-def apple_gpu_limits() -> dict             # the Apple GPU's working set and largest buffer, bytes, for detection; MetalUnavailableError
+def apple_gpu_limit(key: str) -> int      # one Apple GPU limit in bytes ("working_set_bytes" | "max_buffer_bytes"), each judged on its own; MetalUnavailableError
 def mem_info(index: Optional[int] = None) -> Tuple[int, int]   # (free, total) bytes, as the runtime reports them
 def most_free() -> int                   # the device with the most free memory; the current device restored
 def target_name() -> str                 # what the process compiles for, `<backend>-<arch>` (cuda-70); a driver's refusal raised

@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Public names for what a planner reads: `nbxtensor.ops.matrix_units.matrix_unit` (moved from `ops._configs`, the one
   decision point every library reader now goes through) and `nbxtensor.ops.operand.Spec` (moved from `ops._cost`,
-  which imports it); and `nbxtensor.backend.metal_device.device_limits()` (asked through the device door, `nbxtensor.device.apple_gpu_limits()`), the Apple GPU's working-set budget and
+  which imports it); and `nbxtensor.backend.metal_device.device_limits()` (each limit asked through the device door, `nbxtensor.device.apple_gpu_limit(key)`, judged on its own), the Apple GPU's working-set budget and
   largest single buffer asked of `MTLCreateSystemDefaultDevice()` without opening the Metal runtime, refused by name
   (`MetalUnavailableError`, its reason) when the device cannot be asked.
 - The host's speeds beside the device's (`nbxtensor.backend.host_measure`): `host_matmul_gflops` (a float32 GEMM on

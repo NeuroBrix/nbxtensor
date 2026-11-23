@@ -60,7 +60,28 @@ def test_a_host_with_no_device_is_refused_by_that_reason(monkeypatch):
         device_limits()
 
 
-def test_the_device_door_answers_with_the_one_reading():
-    """An application asks the device door (`nbxtensor.device`), which answers from `device_limits` itself."""
+def _answer(call):
+    """What a call answers: its value, or its refusal's type and text."""
+    try:
+        return ("value", call())
+    except MetalUnavailableError as exc:
+        return ("refused", str(exc))
+
+
+def test_the_device_door_answers_with_the_one_reading_on_any_host():
+    """An application asks the device door (`nbxtensor.device`), which answers from `device_limit` itself: the same
+    value on a Mac, the same refusal by name on a host without Metal (qa 1277-1: the test had no macOS gate)."""
     assert _device.MetalUnavailableError is MetalUnavailableError
-    assert _device.apple_gpu_limits() == device_limits()
+    for key in ("working_set_bytes", "max_buffer_bytes"):
+        assert _answer(lambda: _device.apple_gpu_limit(key)) == _answer(lambda: metal_device.device_limit(key))
+
+
+def test_a_limit_that_reads_zero_takes_only_itself(monkeypatch):
+    """qa 1277 (said): a 0 maxBufferLength refused the working set too; each limit is judged on its own."""
+    fake = type(sys)("Metal")
+    dev = type("D", (), {"recommendedMaxWorkingSetSize": lambda self: 19069665280, "maxBufferLength": lambda self: 0})()
+    fake.MTLCreateSystemDefaultDevice = lambda: dev
+    monkeypatch.setitem(sys.modules, "Metal", fake)
+    assert metal_device.device_limit("working_set_bytes") == 19069665280
+    with pytest.raises(MetalUnavailableError, match=r"^maxBufferLength\(\) = 0$"):
+        metal_device.device_limit("max_buffer_bytes")

@@ -1277,7 +1277,8 @@ def metal_device_available() -> bool:
 
 
 def device_limits() -> Dict[str, int]:
-    """The Apple GPU's two memory limits in bytes, asked of the device; refused by name when it cannot be asked.
+    """The Apple GPU's two memory limits in bytes, asked of the device; refused by name when the device cannot be asked
+    (each limit is judged on its own by `device_limit`: a non-positive one never takes the other with it, qa 1277).
 
     `working_set_bytes`: `MTLDevice.recommendedMaxWorkingSetSize()`, how much this process's GPU work may hold in all
     (the budget the allocator enforces, `MetalRuntime.budget_bytes`). `max_buffer_bytes`: `MTLDevice.maxBufferLength()`,
@@ -1286,9 +1287,9 @@ def device_limits() -> Dict[str, int]:
 
     For hardware detection, before any device is selected: it asks `Metal.MTLCreateSystemDefaultDevice()` and nothing
     else — the library's Metal runtime (`runtime()`) is not opened, no queue, no allocator. Never a guess: when the
-    bindings do not import, no device answers, the device raises, or a limit reads not positive, the refusal is
-    `MetalUnavailableError` and its text is the reason alone ("MTLCreateSystemDefaultDevice() returned no device",
-    "maxBufferLength() = 0", or the exception's type and text), for the caller to state in its own words."""
+    bindings do not import, no device answers, or the device raises, the refusal is `MetalUnavailableError` and its
+    text is the reason alone ("MTLCreateSystemDefaultDevice() returned no device", or the exception's type and text),
+    for the caller to state in its own words. The values are returned as the device states them."""
     try:
         import Metal                                    # pyobjc-framework-Metal
         device = Metal.MTLCreateSystemDefaultDevice()
@@ -1300,10 +1301,23 @@ def device_limits() -> Dict[str, int]:
         raise
     except Exception as exc:                            # said, never swallowed
         raise MetalUnavailableError(f"{type(exc).__name__}: {exc}") from exc
-    for key, call in (("working_set_bytes", "recommendedMaxWorkingSetSize()"), ("max_buffer_bytes", "maxBufferLength()")):
-        if limits[key] <= 0:
-            raise MetalUnavailableError(f"{call} = {limits[key]}")
     return limits
+
+
+#: each limit's device call, named in its refusal
+_LIMIT_CALLS = {"working_set_bytes": "recommendedMaxWorkingSetSize()", "max_buffer_bytes": "maxBufferLength()"}
+
+
+def device_limit(key: str) -> int:
+    """One of the Apple GPU's limits (`working_set_bytes` or `max_buffer_bytes`), in bytes, judged on its own: refused
+    by name (`MetalUnavailableError`, the reason alone) when the device cannot be asked or THIS limit reads not
+    positive ("maxBufferLength() = 0"); the other limit is not lost with it."""
+    if key not in _LIMIT_CALLS:
+        raise ValueError(f"device_limit: {key!r} is none of {sorted(_LIMIT_CALLS)}")
+    value = device_limits()[key]
+    if value <= 0:
+        raise MetalUnavailableError(f"{_LIMIT_CALLS[key]} = {value}")
+    return value
 
 
 def reset_runtime_for_tests() -> None:
