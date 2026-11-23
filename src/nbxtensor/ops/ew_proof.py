@@ -333,3 +333,42 @@ def judge(independent, cands, results, differ) -> dict:
     ref = results[agree[0]][1]
     rec["dissent"] = [{"tile": list(t), "first_difference": differ(results[t][1], ref)} for t in ran if t not in agree]
     return rec
+
+
+# ---------------------------------------------------------------------------
+# the shipped table, from the proofs runs made
+# ---------------------------------------------------------------------------
+def export(kept_path: str, shipped_path: str) -> str:
+    """Merge the proofs a run kept (`kept_path`, a replay cache's ew_tile_proof.json) into a shipped table
+    (`shipped_path`, <certified directory>/<vendor>/<profile>/ew_tile_proof.json), stamp by stamp. A variant the
+    two hold differently is refused by name: a table is never silently rewritten. Returns a one-line summary."""
+    kept = json.load(open(kept_path))
+    try:
+        shipped = json.load(open(shipped_path))
+    except OSError:
+        shipped = {"header": HEADER, "stamps": {}}
+    added = 0
+    for key, block in kept.get("stamps", {}).items():
+        dest = shipped["stamps"].setdefault(key, {"stamp": block["stamp"], "variants": {}})
+        for vid, rec in block.get("variants", {}).items():
+            have = dest["variants"].get(vid)
+            if have is not None and sorted(have["passed"]) != sorted(rec["passed"]):
+                raise TileUnproven(f"ZERO FALLBACK: {rec.get('kernel')} variant {vid}: the shipped table passes "
+                                   f"{sorted(have['passed'])}, this run's proof {sorted(rec['passed'])}")
+            if have is None:
+                dest["variants"][vid] = rec
+                added += 1
+    os.makedirs(os.path.dirname(os.path.abspath(shipped_path)), exist_ok=True)
+    with open(shipped_path, "w") as fh:
+        json.dump(shipped, fh, indent=1, sort_keys=True)
+    dep = sorted({r.get("kernel") for b in shipped["stamps"].values() for r in b["variants"].values()
+                  if not r.get("independent")})
+    return (f"{added} variant(s) added to {shipped_path}; proven by fault only (tile-dependent or undeclared): "
+            f"{dep or 'none'}")
+
+
+if __name__ == "__main__":
+    if len(sys.argv) == 4 and sys.argv[1] == "export":
+        print(export(sys.argv[2], sys.argv[3]))
+    else:
+        raise SystemExit("usage: python -m nbxtensor.ops.ew_proof export <kept ew_tile_proof.json> <shipped path>")
