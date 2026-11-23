@@ -20,6 +20,9 @@ def _profile(mb, measured, architecture="volta"):
 def _card(monkeypatch):
     """The driver's (free, total) of a 16 GB card holding a 306 MiB context: the rule's room (qa 1232-1)."""
     monkeypatch.setattr(DeviceAllocator, "mem_get_info", staticmethod(lambda dev: ((16160 - 306) * MiB, 16160 * MiB)))
+    # what the process's own blocks hold is no part of the runtime's context: a suite that allocated before this test
+    # left live blocks, and the room then read as larger than the card's (the Mac suite, 23/11)
+    monkeypatch.setattr(DeviceAllocator, "_cuda_live_bytes", {})
 
 
 def test_the_allocator_reads_the_rule_where_the_profile_states_no_measure(monkeypatch):

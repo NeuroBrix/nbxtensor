@@ -287,7 +287,8 @@ def prove(kernel, grid, bound, options, tiles, vid) -> dict:
     t0 = time.time()
     cands = class_candidates()
     grids = [tuple(int(g) for g in grid(at_tile(bound, c[0]))) for c in cands]     # each candidate its own grid
-    spec, nbytes = ew_proof_child.snapshot_launch(kernel, grids, bound, options)
+    with _outside_recordings():
+        spec, nbytes = ew_proof_child.snapshot_launch(kernel, grids, bound, options)
     independent = declared_independence(kernel)
     results, differ = ew_proof_child.run_candidates(spec, cands)
     rec = judge(independent, cands, results, differ)
@@ -317,6 +318,21 @@ def _say_run() -> None:
     from nbxtensor.ops.ew_proof_child import _Worker
     print(f"[ew-proof] this run proved {_RUN['variants']} element-wise variant(s) in {_RUN['seconds']:.1f} s with "
           f"{_Worker.started} child process(es); largest snapshot {_RUN['largest_snapshot']} bytes", file=sys.stderr)
+
+
+class _outside_recordings:
+    """The proof's own reads of the launch's buffers are no part of a launch plan being recorded
+    (`backend/frozen_plan`): the recorder is paused around them, and resumes as it was."""
+
+    def __enter__(self):
+        from nbxtensor.backend import frozen_plan
+        self.state = frozen_plan.STATE
+        self.was = self.state.recording
+        self.state.recording = False
+
+    def __exit__(self, *exc):
+        self.state.recording = self.was
+        return False
 
 
 def judge(independent, cands, results, differ) -> dict:

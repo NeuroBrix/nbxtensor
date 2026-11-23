@@ -203,7 +203,8 @@ def test_the_token_bitmask_runs_at_2048x8_and_after_a_forced_move(vocab, monkeyp
     from nbxtensor.ops.elementwise_launch import class_meta, ew_bucket
     from nbxtensor.tensor import NBXTensor
     cls = ew_bucket(vocab)
-    monkeypatch.setattr(TB, "ew_meta", lambda n: class_meta(cls, 2048, 8))
+    from nbxtensor.ops import elementwise_launch as EL
+    monkeypatch.setattr(EL, "ew_meta", lambda n: class_meta(cls, 2048, 8))      # token_bitmask imports it at use
     rng = np.random.default_rng(vocab)
     x = rng.standard_normal((2, vocab)).astype(np.float32)
     allowed = [sorted(rng.choice(vocab, 17, replace=False)), [0, vocab - 1]]
