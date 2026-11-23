@@ -15,10 +15,18 @@ def copy_to_address(tensor, address: int) -> None:
 
 
 def host_bytes(tensor) -> bytearray:
-    """The tensor's values, in C order, as host bytes (read through the host when the tensor is on a device)."""
+    """The tensor's values, in C order, as host bytes (read through the host when the tensor is on a device).
+
+    Read through a `(c_uint8 * n).from_address` view, as `NBXTensor.numpy` reads: `ctypes.string_at` takes its size as
+    a C int, so a tensor of 2 GiB or more failed ("Negative size passed to PyBytes_FromStringAndSize"; library C,
+    23/11/2026)."""
     if tensor.nbytes() == 0:
         return bytearray()
     host = tensor.contiguous()
     if not host.is_cpu:
         host = host.to_cpu()
-    return bytearray(ctypes.string_at(host.data_ptr(), host.numel() * host.element_size()))
+    else:
+        from nbxtensor.backend.metal_device import host_reads
+        host_reads()                                # a kernel may still be writing it (a unified alias)
+    nbytes = host.numel() * host.element_size()
+    return bytearray((ctypes.c_uint8 * nbytes).from_address(host.data_ptr()))
