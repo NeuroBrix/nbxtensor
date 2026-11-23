@@ -94,3 +94,57 @@ class MetalMemory(DeviceMemory):
 
     def unmap_host(self, start):
         self._rt.unbind_mapped(start)
+
+
+#: the switch Metal reads when the process opens its device: every load and store of a pipeline is checked against
+#: its bound buffer's length (shader validation). Set by the process's parent, never flipped in a running process.
+SHADER_VALIDATION = "MTL_SHADER_VALIDATION"
+
+
+def shader_validation_on() -> bool:
+    """Whether this process runs with Metal's shader validation (`MTL_SHADER_VALIDATION=1` in its environment)."""
+    import os
+    return os.environ.get(SHADER_VALIDATION) == "1"
+
+
+class GuardedMetalBuffer:
+    """A Metal buffer whose END is the end of a DEDICATED MTLBuffer, in a process with shader validation on: a load
+    or a store past the extent is past the bound buffer's length, so Metal does not make it and reports it on the
+    command buffer (`MetalRuntime.take_validation_reports`) — the Metal side of `memory.guarded`.
+
+    The MTLBuffer is allocated through the one account (`DeviceAllocator.malloc_cuda`, unpooled: never a pool block
+    shared with another tensor) at a page-multiple length — the runtime's own rounding, so its length is exactly
+    what was asked (checked) — and the buffer is placed at its end (`memory.guarded.place`). A launch binds it as
+    (that MTLBuffer, the buffer's offset in it): the length validation checks is the guard. Refused by name in a
+    process without shader validation: there an Apple GPU reads past a buffer without a fault."""
+
+    def __init__(self, nbytes: int, elem: int, aligned: bool) -> None:
+        """Allocate the dedicated MTLBuffer and place a buffer of `nbytes` bytes (elements of `elem` bytes) at its
+        end; `aligned`: its start divisible by 16."""
+        from nbxtensor.backend.metal_device import runtime
+        from nbxtensor.memory.allocator import DeviceAllocator
+        from nbxtensor.memory.guarded import UNIT, place
+        if not shader_validation_on():
+            raise RuntimeError(f"ZERO FALLBACK: a guarded Metal buffer needs shader validation ({SHADER_VALIDATION}=1 "
+                               "when the process starts): without it a read past a buffer is not seen")
+        rt = runtime()
+        page = int(rt._page_size)
+        self.nbytes = int(nbytes)
+        self.length = -(-(self.nbytes + UNIT) // page) * page
+        self.base = int(DeviceAllocator.malloc_cuda(self.length, pooled=False))
+        buffer, offset = rt.buffer_for_pointer(self.base)
+        if buffer is None or offset != 0 or int(buffer.length()) != self.length:
+            DeviceAllocator.free_cuda(self.base)
+            raise RuntimeError(f"ZERO FALLBACK: a guarded Metal buffer of {self.length} bytes was not a dedicated "
+                               f"MTLBuffer of that length (offset {offset}); its end is no guard")
+        self.address = place(self.base + self.length, self.nbytes, int(elem), bool(aligned))
+
+    @property
+    def guard(self) -> int:
+        """The first address past the MTLBuffer: the guard."""
+        return self.base + self.length
+
+    def free(self) -> None:
+        """Give the dedicated MTLBuffer back through the account."""
+        from nbxtensor.memory.allocator import DeviceAllocator
+        DeviceAllocator.free_cuda(self.base)

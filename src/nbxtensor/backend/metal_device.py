@@ -234,6 +234,11 @@ class MetalRuntime:
         # "Failed to create Metal buffer" under memory pressure and, once, a
         # SIGBUS.
         self._page_size = int(os.sysconf("SC_PAGESIZE"))
+        # Shader validation (`memory.metal.SHADER_VALIDATION`, set when the process starts): what it reports on a
+        # retired command buffer is kept here for `take_validation_reports`, never printed and forgotten.
+        from nbxtensor.memory.metal import shader_validation_on
+        self._validating = shader_validation_on()
+        self._validation_reports: list = []
 
         self._lock = threading.RLock()
         # address -> (MTLBuffer, memoryview, nbytes). The buffer entry is what
@@ -669,12 +674,25 @@ class MetalRuntime:
                 self._await(oldest)
 
     def _await(self, command_buffer) -> None:
+        """Wait for a committed command buffer; raise its error by name; keep what shader validation reported on it."""
         command_buffer.waitUntilCompleted()
+        if self._validating:
+            logs = command_buffer.logs()
+            if logs is not None:
+                self._validation_reports.extend(str(entry) for entry in logs)
         error = command_buffer.error()
         if error is not None:
             raise RuntimeError(f"Metal command buffer failed: {error}")
         if _profile.SESSION is not None:
             _profile.SESSION.retired(command_buffer)     # its launches' samples, read once it has retired
+
+    def take_validation_reports(self) -> list:
+        """What shader validation reported on the command buffers retired since the last call (each an access a
+        kernel tried past a bound buffer's length, "Invalid load/store ..."), handed over and cleared. Empty in a
+        process without shader validation."""
+        with self._lock:
+            out, self._validation_reports = self._validation_reports, []
+        return out
 
     def _dispatches_per_buffer(self) -> int:
         """How many dispatches one command buffer may carry before it is
