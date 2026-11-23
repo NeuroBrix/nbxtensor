@@ -70,11 +70,31 @@ def ew_meta(n_elements: int) -> dict:
     if cfg is None:
         if _census.active():         # a census shadow launches nothing: no configuration exists, none is needed
             first = ew_launch_kernel.configs[0]
-            return {'BLOCK_SIZE': first.kwargs['BLOCK_SIZE'], 'num_warps': first.num_warps}
+            return class_meta(nb, first.kwargs['BLOCK_SIZE'], first.num_warps)
         raise RuntimeError(f"element-wise class {nb}: the copy's autotuner ran and holds no configuration for it")
-    hit = {'BLOCK_SIZE': int(cfg.kwargs['BLOCK_SIZE']), 'num_warps': int(cfg.num_warps)}
+    hit = class_meta(nb, int(cfg.kwargs['BLOCK_SIZE']), int(cfg.num_warps))
     _MEMO[nb] = hit
     return hit
+
+
+def class_meta(nb: int, block: int, warps: int) -> dict:
+    """The class's tile and warps as the launcher must see them: MARKED (`ops/ew_tile.EwTile`), so the binary of every
+    kernel they reach is proven on them before it runs (`ops/ew_proof.py`)."""
+    from nbxtensor.ops.ew_tile import EwTile
+    return {'BLOCK_SIZE': EwTile(block, nb, 'tile'), 'num_warps': EwTile(warps, nb, 'warps')}
+
+
+def move_class_winner(nb: int, block: int, warps: int) -> dict:
+    """The class's setting moved to (`block`, `warps`): a variant of the class failed the class's winner and this
+    is the best candidate every proven variant passes (`ops/ew_proof.py`). Later launches of the class read it."""
+    hit = _MEMO[nb] = class_meta(nb, block, warps)
+    return hit
+
+
+def class_candidates():
+    """The class's candidate settings, (block, warps, stages), in the copy's own order."""
+    return [(int(c.kwargs['BLOCK_SIZE']), int(c.num_warps), int(getattr(c, 'num_stages', 3) or 3))
+            for c in ew_launch_kernel.configs]
 
 
 def ew_grid(n_elements: int, meta: dict) -> tuple:

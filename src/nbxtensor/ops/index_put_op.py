@@ -22,12 +22,16 @@ import triton
 import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
+from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+
+
 #: The contract this kernel enforces. Triton forbids reading a module global
 #: from inside a @jit body, so the kernel repeats the literal; the permanent
 #: test pins the two equal so they cannot drift.
 INDEX_PUT_OOB = "index_put: index out of range"
 
 
+@tile_dependent("duplicate indices write one address (an accumulate, or the last writer)")
 @triton.jit(debug=True)
 def index_put_kernel(
     out_ptr, idx_ptr, val_ptr,

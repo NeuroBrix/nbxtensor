@@ -14,6 +14,9 @@ import triton
 import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
+from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+
+
 @triton.jit
 def constant_pad_2d_kernel(
     x_ptr, output_ptr,
@@ -54,6 +57,7 @@ def constant_pad_2d_kernel(
     out_offset = nc * out_h * out_w + oh * out_w + ow
     tl.store(output_ptr + out_offset, val, mask=mask)
 
+@tile_independent
 @triton.jit
 def constant_pad_1d_kernel(
     x_ptr, output_ptr,
@@ -85,6 +89,7 @@ def constant_pad_1d_kernel(
     tl.store(output_ptr + out_offset, val, mask=mask)
 
 
+@tile_independent
 @triton.jit
 def constant_pad_nd_kernel(
     x_ptr, output_ptr,
@@ -125,6 +130,7 @@ def constant_pad_nd_kernel(
     tl.store(output_ptr + offsets, val, mask=mask)
 
 
+@tile_independent
 @triton.jit
 def replication_pad_nd_kernel(
     x_ptr, output_ptr,

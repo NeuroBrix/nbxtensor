@@ -13,6 +13,10 @@ import triton
 import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
+from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+
+
+@tile_independent
 @triton.jit
 def pixel_shuffle_kernel(
     input_ptr,
@@ -70,6 +74,7 @@ def pixel_shuffle_kernel(
     tl.store(output_ptr + out_offset, val, mask=mask)
 
 
+@tile_independent
 @triton.jit
 def pixel_shuffle_broadcast_aware_kernel(
     bcast_view_ptr,  # 5D NBX expand-output view (N, C_pre, B, H, W) with stride_b == 0

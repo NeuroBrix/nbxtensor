@@ -4,6 +4,10 @@ import triton
 import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
+from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+
+
+@tile_independent
 @triton.jit
 def masked_fill_forward_kernel(
     input_ptr, mask_ptr, output_ptr,

@@ -19,6 +19,9 @@ import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go throu
 import triton.language as tl
 
 
+from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+
+
 @triton.jit
 def conv_transpose2d_kernel(
     input_ptr,       # (N, C_in, IH, IW) contiguous
@@ -128,6 +131,7 @@ def conv_transpose2d_kernel(
     tl.store(output_ptr + out_offset, acc, mask=out_mask)
 
 
+@tile_independent
 @triton.jit
 def col2im1d_kernel(y_ptr, out_ptr, C_out, K, L_in, L_out, stride, pad,
                     BLOCK_SIZE: tl.constexpr, TAPS: tl.constexpr):

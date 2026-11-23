@@ -9,6 +9,10 @@ import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go throu
 import triton.language as tl
 
 
+from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+
+
+@tile_independent
 @triton.jit
 def bf16_to_fp16_kernel(
     src_ptr,   # uint16 (bf16 raw bits) on GPU

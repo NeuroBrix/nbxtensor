@@ -12,6 +12,9 @@ import triton
 import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
+from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+
+
 # Triton only lets a @jit kernel read a global that is a constexpr.
 _PI = tl.constexpr(3.14159265358979323846)
 _PI_2 = tl.constexpr(1.57079632679489661923)
@@ -51,6 +54,7 @@ def _atan(z):
     return tl.where(z < 0, -r, r)
 
 
+@tile_independent
 @triton.jit
 def atan2_kernel(y_ptr, x_ptr, out_ptr, n_elements, BLOCK_SIZE: tl.constexpr):
     pid = tl.program_id(0).to(tl.int64)

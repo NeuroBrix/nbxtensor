@@ -17,6 +17,10 @@ import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go throu
 import triton.language as tl
 
 
+from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+
+
+@tile_independent
 @triton.jit
 def add_strided_nd_kernel(
     x_ptr, y_ptr, output_ptr,
@@ -49,6 +53,7 @@ def add_strided_nd_kernel(
     tl.store(output_ptr + offsets, x + alpha * y, mask=mask)
 
 
+@tile_independent
 @triton.jit
 def mul_strided_nd_kernel(
     x_ptr, y_ptr, output_ptr,
@@ -80,6 +85,7 @@ def mul_strided_nd_kernel(
     tl.store(output_ptr + offsets, x * y, mask=mask)
 
 
+@tile_independent
 @triton.jit
 def sub_strided_nd_kernel(
     x_ptr, y_ptr, output_ptr,
@@ -112,6 +118,7 @@ def sub_strided_nd_kernel(
     tl.store(output_ptr + offsets, x - alpha * y, mask=mask)
 
 
+@tile_independent
 @triton.jit
 def div_strided_nd_kernel(
     x_ptr, y_ptr, output_ptr,
@@ -143,6 +150,7 @@ def div_strided_nd_kernel(
     tl.store(output_ptr + offsets, x / y, mask=mask)
 
 
+@tile_independent
 @triton.jit
 def add_scalar_strided_nd_kernel(
     x_ptr, output_ptr,
@@ -170,6 +178,7 @@ def add_scalar_strided_nd_kernel(
     tl.store(output_ptr + offsets, x + scalar, mask=mask)
 
 
+@tile_independent
 @triton.jit
 def mul_scalar_strided_nd_kernel(
     x_ptr, output_ptr,

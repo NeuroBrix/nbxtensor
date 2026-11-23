@@ -12,6 +12,9 @@ import triton
 import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
+from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+
+
 from nbxtensor.backend.launcher import install as _install_launcher
 from nbxtensor.dtype.nbx_dtype import NBXDtype
 
@@ -19,6 +22,7 @@ from nbxtensor.dtype.nbx_dtype import NBXDtype
 # without it reaches the backend's own driver and refuses the NBXTensor arguments (the gathered KV copies, 2026-11-09)
 _install_launcher()
 
+@tile_independent
 @triton.jit
 def _token_bitmask_kernel(logits_ptr, mask_ptr, vocab, words, BLOCK: tl.constexpr):
     row = tl.program_id(0).to(tl.int64)

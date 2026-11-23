@@ -11,6 +11,9 @@ import triton
 import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
+from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+
+
 from nbxtensor.ops._configs import nbx_autotune
 
 # The tile of a fused MoE launch beyond its row block: BLOCK_SIZE_M is the alignment's block (`moe_align_block_size`,
@@ -384,6 +387,7 @@ def silu_and_mul_kernel(
     tl.store(out_ptrs, result, mask=mask)
 
 
+@tile_independent
 @triton.jit
 def silu_mul_split_kernel(
     gate_ptr, up_ptr, output_ptr,

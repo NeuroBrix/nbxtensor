@@ -5,6 +5,9 @@ import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go throu
 import triton.language as tl
 
 
+from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+
+
 @triton.jit
 def _round_half_even(x):
     """Round to nearest, ties to even — what torch.round and libm nearbyint do.
@@ -47,6 +50,7 @@ def _round_half_even(x):
 # input is rounded in fp32 — exact: every half value is an fp32 value and
 # the integer result is representable — and stored back in its own dtype;
 # fp32 inputs take the same path unchanged.
+@tile_independent
 @triton.jit
 def floor_forward_kernel(input_ptr, output_ptr, n_elements, BLOCK_SIZE: tl.constexpr):
     pid = tl.program_id(0).to(tl.int64)
@@ -56,6 +60,7 @@ def floor_forward_kernel(input_ptr, output_ptr, n_elements, BLOCK_SIZE: tl.const
     tl.store(output_ptr + offset, tl.math.floor(x.to(tl.float32)).to(x.dtype), mask=mask)
 
 
+@tile_independent
 @triton.jit
 def ceil_forward_kernel(input_ptr, output_ptr, n_elements, BLOCK_SIZE: tl.constexpr):
     pid = tl.program_id(0).to(tl.int64)
@@ -65,6 +70,7 @@ def ceil_forward_kernel(input_ptr, output_ptr, n_elements, BLOCK_SIZE: tl.conste
     tl.store(output_ptr + offset, tl.math.ceil(x.to(tl.float32)).to(x.dtype), mask=mask)
 
 
+@tile_independent
 @triton.jit
 def round_forward_kernel(input_ptr, output_ptr, n_elements, BLOCK_SIZE: tl.constexpr):
     pid = tl.program_id(0).to(tl.int64)
@@ -79,6 +85,7 @@ def round_forward_kernel(input_ptr, output_ptr, n_elements, BLOCK_SIZE: tl.const
              _round_half_even(x.to(tl.float32)).to(x.dtype), mask=mask)
 
 
+@tile_independent
 @triton.jit
 def trunc_forward_kernel(input_ptr, output_ptr, n_elements, BLOCK_SIZE: tl.constexpr):
     pid = tl.program_id(0).to(tl.int64)

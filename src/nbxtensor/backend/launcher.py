@@ -1127,9 +1127,11 @@ def prepare(kernel, args, kwargs) -> Tuple[_Prepared, Dict[str, Any]]:
         dev = int(DeviceAllocator.get_device())
     fast_key = (tuple(specialization), tuple(options.items()) if options else (), dev)
     prep = kernel_cache.get(fast_key)
-    if prep is None:
-        key = (compute_cache_key(key_cache, specialization, options), dev)
-        prep = kernel_cache.get(key)
+    if prep is not None:
+        return prep, bound_args
+    asked = dict(options)                 # the launch's own options: `_pack_args` below replaces `options`
+    key = (compute_cache_key(key_cache, specialization, options), dev)
+    prep = kernel_cache.get(key)
     if prep is None:
         options, signature, constexprs, attrs = kernel._pack_args(backend, kwargs, bound_args, specialization, options)
         src = _source(kernel, signature, constexprs, attrs)
@@ -1151,8 +1153,37 @@ def prepare(kernel, args, kwargs) -> Tuple[_Prepared, Dict[str, Any]]:
         prep = _Prepared(function, signature, md.shared, md.num_warps, md.name,
                          drv.block_for(md), trailing=drv.trailing_buffers(md))
         kernel_cache[key] = prep
+    tiles = _class_tiles(bound_args, asked)
+    if tiles:
+        # an element-wise class tile: the binary is proven on it before it runs, once (`ops/ew_proof.settle`, from
+        # `launch`), and the fast entry is made only then — a launch refused here is refused again, not served
+        global _EW_PENDING
+        _EW_PENDING = (kernel_cache, fast_key, prep, specialization, asked, tiles)
+        return prep, bound_args
     kernel_cache[fast_key] = prep
     return prep, bound_args
+
+
+_EW_PENDING = None      # the variant `prepare` just resolved on an element-wise class tile, for `launch` to settle
+
+
+def _settle(kernel, grid, bound_args):
+    """The pending element-wise variant settled (`ops/ew_proof.settle`): None to launch as asked — its fast entry is
+    made now — else (grid, keyword arguments) of the same launch at the class's moved setting."""
+    global _EW_PENDING
+    cache, fast_key, prep, specialization, asked, tiles = _EW_PENDING
+    _EW_PENDING = None
+    from nbxtensor.ops.ew_proof import settle
+    moved = settle(kernel, grid, bound_args, specialization, asked, tiles)
+    if moved is None:
+        cache[fast_key] = prep
+    return moved
+
+
+def _class_tiles(bound_args, options) -> dict:
+    """{role: EwTile} of a launch resolving its binary (`ops/ew_tile.py`); read once per compiled variant."""
+    from nbxtensor.ops.ew_tile import class_tiles
+    return class_tiles(list(bound_args.values()) + list(options.values()))
 
 
 _BUILD = os.environ.get("NBX_LAUNCH_TRACE")     # a file: one line per launch, "<kernel>\t<grid>"
@@ -1188,6 +1219,10 @@ def launch(kernel, grid, *args, **kwargs):
     if not callable(grid) and 0 in tuple(int(g) for g in grid):
         return None
     prep, bound_args = prepare(kernel, args, kwargs)
+    if _EW_PENDING is not None:
+        moved = _settle(kernel, grid, bound_args)
+        if moved is not None:
+            return launch(kernel, moved[0], **moved[1])
     if _BUILD:
         with open(_BUILD, "a") as fh:
             fh.write(f"{kernel.__name__}\t{grid if not callable(grid) else 'callable'}\n")

@@ -14,6 +14,10 @@ import triton
 import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
+from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+
+
+@tile_independent
 @triton.jit
 def bitwise_left_shift_kernel(
     x_ptr,
@@ -33,6 +37,7 @@ def bitwise_left_shift_kernel(
     result = x << y
     tl.store(output_ptr + offset, result, mask=mask)
 
+@tile_independent
 @triton.jit
 def bitwise_left_shift_scalar_kernel(
     x_ptr,

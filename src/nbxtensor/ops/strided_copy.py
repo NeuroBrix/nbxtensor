@@ -47,6 +47,10 @@ import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go throu
 import triton.language as tl
 
 
+from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+
+
+@tile_independent
 @triton.jit
 def strided_copy_kernel(
     src_ptr, dst_ptr,
@@ -102,6 +106,7 @@ def strided_copy_kernel(
     tl.store(dst_ptr + offsets, vals, mask=mask)
 
 
+@tile_independent
 @triton.jit
 def strided_scatter_kernel(
     src_ptr, dst_ptr,
@@ -148,6 +153,7 @@ def strided_scatter_kernel(
     tl.store(dst_ptr + dst_offsets, vals, mask=mask)
 
 
+@tile_independent
 @triton.jit
 def strided_copy_nd_kernel(
     src_ptr, dst_ptr,

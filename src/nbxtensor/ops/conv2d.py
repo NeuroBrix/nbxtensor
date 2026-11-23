@@ -22,6 +22,9 @@ import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go throu
 from nbxtensor.ops._configs import fits_shared_memory, nbx_autotune
 import triton.language as tl
 
+from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+
+
 from nbxtensor.ops._autotune_policy import maybe_pin_single, is_conv2d_pinned
 
 
@@ -281,6 +284,7 @@ def conv2d_forward_kernel(
         tl.store(out_ptr, accum, mask=out_mask)
 
 
+@tile_independent
 @triton.jit
 def conv2d_bias_inplace_kernel(out_ptr, bias_ptr, n, HW, C, BLOCK: tl.constexpr):
     """out[i] += bias[(i // HW) % C], in place, flat over a CONTIGUOUS NCHW

@@ -15,6 +15,10 @@ import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go throu
 import triton.language as tl
 
 
+from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+
+
+@tile_independent
 @triton.jit
 def dft_rfft_matrix_kernel(
     cos_ptr,      # (N_bins, N) — cos(2π k n / N)
@@ -39,6 +43,7 @@ def dft_rfft_matrix_kernel(
     tl.store(nsin_ptr + offs, -tl.sin(angle), mask=mask)
 
 
+@tile_independent
 @triton.jit
 def idft_c2r_matrix_kernel(
     cos_ptr,      # (N_bins, N) — weight_k cos(2π k n / N) / N

@@ -17,6 +17,9 @@ import triton
 import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
+from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+
+
 @triton.jit
 def mse_loss_partial_kernel(
     inp,
@@ -62,6 +65,7 @@ def mse_loss_reduce_kernel(
     sum_val = tl.sum(mid_val)
     tl.store(out, sum_val)
 
+@tile_independent
 @triton.jit
 def mse_loss_none_kernel(
     inp_ptr,

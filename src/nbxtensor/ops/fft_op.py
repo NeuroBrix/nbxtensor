@@ -20,6 +20,10 @@ import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go throu
 import triton.language as tl
 
 
+from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+
+
+@tile_independent
 @triton.jit
 def bit_reverse_rows_kernel(
     real_in, imag_in, real_out, imag_out,
@@ -55,6 +59,7 @@ def bit_reverse_rows_kernel(
     tl.store(imag_out + row * n + rev, val_imag, mask=m)
 
 
+@tile_independent
 @triton.jit
 def fft_stage_rows_kernel(
     real_ptr, imag_ptr,
@@ -109,6 +114,7 @@ def fft_stage_rows_kernel(
     tl.store(imag_ptr + second_idx, a_imag - tw_imag, mask=m)
 
 
+@tile_independent
 @triton.jit
 def scale_kernel(
     real_ptr, imag_ptr,

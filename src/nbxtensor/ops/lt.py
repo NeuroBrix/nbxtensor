@@ -4,6 +4,10 @@ import triton
 import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
+from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+
+
+@tile_independent
 @triton.jit
 def lt_forward_kernel(
     x_ptr, y_ptr, output_ptr,
@@ -18,6 +22,7 @@ def lt_forward_kernel(
     y = tl.load(y_ptr + offset, mask=mask)
     tl.store(output_ptr + offset, (x < y).to(tl.int1), mask=mask)
 
+@tile_independent
 @triton.jit
 def lt_scalar_kernel(
     x_ptr, output_ptr,

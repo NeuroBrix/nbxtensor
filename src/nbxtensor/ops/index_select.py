@@ -11,6 +11,9 @@ import triton
 import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
+from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+
+
 #: The contract this kernel enforces. Triton forbids reading a module global
 #: from inside a @jit body, so the kernel repeats the literal; the permanent
 #: test pins the two equal so they cannot drift.
@@ -78,6 +81,7 @@ def index_select_kernel(
     tl.store(out + out_off, selected, mask=final_mask)
 
 
+@tile_independent
 @triton.jit(debug=True)
 def index_select_mid_kernel(
     inp, out, outer, N, inner, index, index_len, fault_ptr,

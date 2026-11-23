@@ -16,6 +16,10 @@ import triton
 import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
+from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+
+
+@tile_independent
 @triton.jit
 def remainder_forward_kernel(
     x_ptr, y_ptr, output_ptr,
@@ -31,6 +35,7 @@ def remainder_forward_kernel(
     result = x - tl.math.floor((x / y).to(tl.float32)).to(x.dtype) * y
     tl.store(output_ptr + offset, result, mask=mask)
 
+@tile_independent
 @triton.jit
 def remainder_scalar_kernel(
     x_ptr, output_ptr,

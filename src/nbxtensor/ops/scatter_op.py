@@ -15,6 +15,10 @@ import triton
 import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
+from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+
+
+@tile_dependent("duplicate indices write one address: the last writer wins, an order")
 @triton.jit
 def scatter_kernel(
     src, index, out,
@@ -48,6 +52,7 @@ def scatter_kernel(
     out_offset = outer_idx * out_stride_outer + cur_index * out_dim_stride + inner_idx * out_stride_inner
     tl.store(out + out_offset, val, mask=mask)
 
+@tile_dependent("two lanes may add into one address (an atomic accumulate)")
 @triton.jit
 def scatter_add_kernel(
     src, index, out,
@@ -82,6 +87,7 @@ def scatter_add_kernel(
 # scatter_reduce kernels — amax, amin using Triton native atomics
 # ═══════════════════════════════════════════════════════════════════════════════
 
+@tile_dependent("two lanes may reduce into one address (an atomic max)")
 @triton.jit
 def scatter_reduce_amax_kernel(
     src, index, out,
@@ -112,6 +118,7 @@ def scatter_reduce_amax_kernel(
     out_offset = outer_idx * out_stride_outer + cur_index * out_dim_stride + inner_idx * out_stride_inner
     tl.atomic_max(out + out_offset, val, mask=mask)
 
+@tile_dependent("two lanes may reduce into one address (an atomic min)")
 @triton.jit
 def scatter_reduce_amin_kernel(
     src, index, out,

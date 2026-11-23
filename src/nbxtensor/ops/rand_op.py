@@ -10,6 +10,10 @@ import triton
 import nbxtensor.ops._launch_seam  # noqa: F401  this module's launches go through nbxtensor's launcher
 import triton.language as tl
 
+from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
+
+
+@tile_independent
 @triton.jit
 def rand_kernel(
     output_ptr,
@@ -31,6 +35,7 @@ def rand_kernel(
     r = tl.rand(seed, offset)
     tl.store(output_ptr + offset, r, mask=mask)
 
+@tile_independent
 @triton.jit
 def randn_kernel(
     output_ptr,
