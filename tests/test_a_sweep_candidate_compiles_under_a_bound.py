@@ -9,6 +9,7 @@ from nbxtensor.backend import compile_bound as CB
 
 class _Fn:
     __name__ = "k"
+    params = ()
     fn = type("F", (), {"__module__": "m"})
 
 

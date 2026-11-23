@@ -55,6 +55,8 @@ def _describe(value: Any) -> Tuple[str, Any]:
 def precompile(kernel, args: tuple, kwargs: Dict[str, Any]) -> None:
     """Compile `kernel` for this launch in the run's worker, under the profile's bound; raise CompileUnbounded when it
     does not end in time. A no-op where the profile declares no bound."""
+    if not hasattr(kernel, "params"):       # not a Triton kernel (a test's stand-in): nothing is compiled to bound
+        return
     bound = bound_s()
     if bound is None:
         return
