@@ -86,7 +86,8 @@ def class_meta(nb: int, block: int, warps: int) -> dict:
 
 def move_class_winner(nb: int, block: int, warps: int) -> dict:
     """The class's setting moved to (`block`, `warps`): a variant of the class failed the class's winner and this
-    is the best candidate every proven variant passes (`ops/ew_proof.py`). Later launches of the class read it."""
+    is the candidate nearest the winner on the class's ladder that every proven variant passes (`ops/ew_proof.py`).
+    Later launches of the class read it."""
     hit = _MEMO[nb] = class_meta(nb, block, warps)
     return hit
 

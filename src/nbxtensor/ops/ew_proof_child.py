@@ -8,7 +8,6 @@ every buffer is restored; after it, every buffer's bytes are digested — the la
 them are compared. A child that dies mid-candidate names that candidate's fault; a fresh child resumes at the next.
 
     python -m nbxtensor.ops.ew_proof_child run  <spec dir> <first candidate>
-    python -m nbxtensor.ops.ew_proof_child time <spec dir>
 """
 from __future__ import annotations
 
@@ -19,7 +18,6 @@ import pickle
 import subprocess
 import sys
 import tempfile
-import time
 from typing import Any, Dict, List, Tuple
 
 # The spec is pickled by the parent into its own private temporary directory (mkdtemp, mode 0700) and read back only
@@ -189,7 +187,7 @@ _WORKER = _Worker()
 
 
 def _child(argv) -> Tuple[int, str]:
-    """One job for the run's worker: ['run', spec dir, first candidate] or ['time', spec dir]."""
+    """One job for the run's worker: ['run', spec dir, first candidate]."""
     return _WORKER.ask({"mode": argv[0], "where": argv[1], "start": int(argv[2]) if len(argv) > 2 else 0})
 
 
@@ -225,23 +223,6 @@ def first_difference(where: str, a, b) -> dict:
         return {"group": gi, "byte": byte, "element_bytes": elem, "candidate": xa[at:at + elem].hex(),
                 "agreeing": xb[at:at + elem].hex()}
     return {}
-
-
-def time_copy_in_child(cls: int, tiles) -> Dict[tuple, float]:
-    """The copy's milliseconds at each tile, at the class's floor, measured in a child (said by the caller)."""
-    where = tempfile.mkdtemp(prefix="nbx_ew_time_")
-    with open(os.path.join(where, "time.json"), "w") as fh:
-        json.dump({"cls": int(cls), "tiles": [list(t) for t in tiles]}, fh)
-    try:
-        rc, err = _child(["time", where])
-        if rc != 0:
-            from nbxtensor.ops.ew_proof import TileUnproven
-            raise TileUnproven(f"ZERO FALLBACK: the copy's timing child failed for class {cls}: {err[-800:]}")
-        got = json.load(open(os.path.join(where, "timing.json")))
-    finally:
-        import shutil
-        shutil.rmtree(where, ignore_errors=True)       # removed on success and on failure (C6-1)
-    return {tuple(t): ms for t, ms in got}
 
 
 # ---------------------------------------------------------------------------
@@ -310,33 +291,6 @@ def _kwargs(spec, bufs, block: int) -> Dict[str, Any]:
     return kw
 
 
-def _child_time(where: str) -> None:
-    """The worker's timing job: the copy kernel at each tile on the class floor, milliseconds per launch."""
-    import triton
-    from nbxtensor.backend.launcher import launch
-    from nbxtensor.device import synchronize
-    from nbxtensor.dtype.nbx_dtype import NBXDtype
-    from nbxtensor.ops.autotune_bucket import class_floor
-    from nbxtensor.ops.elementwise_launch import ew_launch_kernel
-    from nbxtensor.tensor import NBXTensor
-    job = json.load(open(os.path.join(where, "time.json")))
-    rep = class_floor("elements", job["cls"])
-    buf = NBXTensor.empty((rep,), dtype=NBXDtype.float32, device="cuda")
-    raw = ew_launch_kernel.fn
-    got = []
-    for block, warps, stages in job["tiles"]:
-        grid = (triton.cdiv(rep, block),)
-        for _ in range(3):
-            launch(raw, grid, buf, buf, rep, job["cls"], BLOCK_SIZE=block, num_warps=warps, num_stages=stages)
-        synchronize()
-        t0 = time.perf_counter()
-        for _ in range(20):
-            launch(raw, grid, buf, buf, rep, job["cls"], BLOCK_SIZE=block, num_warps=warps, num_stages=stages)
-        synchronize()
-        got.append([[block, warps, stages], (time.perf_counter() - t0) * 1000.0 / 20])
-    json.dump(got, open(os.path.join(where, "timing.json"), "w"))
-
-
 def _serve() -> None:
     """The worker: one job per line on stdin, one reply line on the protocol stream when it finished."""
     proto = os.fdopen(os.dup(1), "w")
@@ -345,8 +299,6 @@ def _serve() -> None:
         job = json.loads(line)
         if job["mode"] == "run":
             _child_run(job["where"], job["start"])
-        elif job["mode"] == "time":
-            _child_time(job["where"])
         elif job["mode"] == "compile":
             from nbxtensor.backend.compile_bound import compile_in_worker
             compile_in_worker(job["where"])

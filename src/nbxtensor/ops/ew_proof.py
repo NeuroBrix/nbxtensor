@@ -28,8 +28,11 @@ exists for was the assembler's. Shipped proofs: `<certified directory>/<vendor>/
 proofs a run made: the replay cache's `ew_tile_proof.json`, kept per stamp.
 
 At run time a variant no table holds is proven ONCE at its first launch, one printed line saying so (kernel,
-variant, bytes snapshotted, seconds), and kept. If the class's winner fails on it, the class moves to the best
-candidate (the copy's timing) every proven variant of the class passes, and that is kept too. A confirmation run
+variant, bytes snapshotted, seconds), and kept. If the class's winner fails on it, the class moves to the candidate
+NEAREST the winner on the class's own ordered ladder (`elementwise_launch.class_candidates`, the copy's configs in
+order; a tie to the earlier one) among those every proven variant of the class passes: read, never timed, so two
+homes pick the same tile (C17: a timing measured per fresh replay cache re-picked 512x8, 2048x8 or 1024x4 run to run
+on the Dell, a search the owner's reset forbids). A confirmation run
 (`--certified-only`) proves nothing: an unproven variant is refused by name there.
 """
 from __future__ import annotations
@@ -129,7 +132,6 @@ class _Table:
         self.shipped = self._read(self._shipped_path()).get("variants", {})
         kept = self._read(self._kept_path())
         self.kept = dict(kept.get("variants", {}))
-        self.timing = dict(kept.get("copy_timing", {}))
         self.seen_classes: Dict[str, set] = {}
 
     @staticmethod
@@ -170,10 +172,6 @@ class _Table:
         self.kept[vid] = rec
         self._write()
 
-    def keep_timing(self) -> None:
-        """Write the kept table after the copy's timing changed."""
-        self._write()
-
     def _write(self) -> None:
         """Write the kept table whole (beside it, renamed over it), this stamp's block updated."""
         path = self._kept_path()
@@ -185,35 +183,29 @@ class _Table:
             doc = {"header": HEADER, "stamps": {}}
         block = doc["stamps"].setdefault(self.key, {"stamp": stamp(), "variants": {}})
         block["variants"].update(self.kept)
-        block["copy_timing"] = self.timing
+        block.pop("copy_timing", None)                  # the timing the move once read (before C17): no longer a fact
         tmp = f"{path}.{os.getpid()}"
         with open(tmp, "w") as fh:
             json.dump(doc, fh, indent=1, sort_keys=True)
         os.replace(tmp, path)
 
-    def class_winner(self, cls: int) -> Optional[Tuple[int, int, int]]:
-        """The best candidate, by the copy's timing, that every proven variant of class `cls` passes."""
+    def class_winner(self, cls: int, winner: Tuple[int, int]) -> Optional[Tuple[int, int, int]]:
+        """The candidate class `cls` moves to: among those every proven variant of the class passes, the one nearest
+        the class's `winner` (block, warps) on the class's ordered ladder (`elementwise_launch.class_candidates`), a
+        tie to the earlier; None when no candidate passes every variant. Read from the ladder and the proofs, never
+        timed."""
         sets = [set(map(tuple, self.record(v)["passed"])) for v in self.seen_classes.get(str(cls), ())]
         if not sets:
             return None
         common = set.intersection(*sets)
-        timing = self.copy_timing(cls, sorted(common))
-        return min(common, key=lambda t: timing[t]) if common else None
-
-    def copy_timing(self, cls: int, tiles) -> Dict[tuple, float]:
-        """The copy's milliseconds per tile at the class's floor: kept, else measured ONCE in a child, said, kept."""
-        known = self.timing.get(str(cls), {})
-        missing = [t for t in tiles if repr(list(t)) not in known]
-        if missing:
-            from nbxtensor.ops import ew_proof_child
-            t0 = time.time()
-            got = ew_proof_child.time_copy_in_child(cls, missing)
-            known.update({repr(list(t)): ms for t, ms in got.items()})
-            self.timing[str(cls)] = known
-            self.keep_timing()
-            print(f"[ew-proof] class {cls}: the copy timed once at {len(missing)} tile(s) to choose among the "
-                  f"candidates every proven variant passes ({time.time() - t0:.1f} s), kept", file=sys.stderr)
-        return {tuple(t): known[repr(list(t))] for t in tiles}
+        from nbxtensor.ops.elementwise_launch import class_candidates
+        ladder = class_candidates()
+        at = next((i for i, c in enumerate(ladder) if (c[0], c[1]) == tuple(winner)), None)
+        if at is None:
+            raise TileUnproven(f"ZERO FALLBACK: element-wise class {cls}: its winner {winner[0]}x{winner[1]} is no "
+                               f"candidate of the class's ladder {ladder}")
+        passing = [i for i, c in enumerate(ladder) if c in common]
+        return ladder[min(passing, key=lambda i: (abs(i - at), i))] if passing else None
 
 
 _TABLE: List[Optional[_Table]] = [None]
@@ -269,7 +261,7 @@ def _why_failed(rec: dict, tile) -> str:
 def _moved(kernel, grid, bound, options, tiles, tab, vid=None, tile=None):
     """The class's winner failed this variant: move the class to the best common candidate, and this launch."""
     cls = tiles["tile"].ew_class
-    best = tab.class_winner(cls)
+    best = tab.class_winner(cls, (int(tiles["tile"]), int(tiles.get("warps", options.get("num_warps", 0)))))
     if best is None:
         raise TileUnproven(f"ZERO FALLBACK: element-wise class {cls}: no candidate passes every proven variant "
                            f"({sorted(tab.seen_classes.get(str(cls), ()))})")
@@ -278,7 +270,7 @@ def _moved(kernel, grid, bound, options, tiles, tab, vid=None, tile=None):
     why = _why_failed(tab.record(vid) or {}, tile) if vid is not None else "not among the tiles its record passes"
     print(f"[ew-proof] class {cls}: {kernel.__name__} fails the class's tile "
           f"{int(tiles['tile'])}x{int(tiles.get('warps', options.get('num_warps', 0)))} ({why}); the class moves to "
-          f"{best[0]}x{best[1]} (stages {best[2]}), the best candidate every proven variant passes", file=sys.stderr)
+          f"{best[0]}x{best[1]} (stages {best[2]}), the nearest on its ladder every proven variant passes", file=sys.stderr)
     return retiled(grid, bound, options, int(tiles["tile"]), meta, best[2])
 
 
