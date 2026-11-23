@@ -120,14 +120,53 @@ def run_candidates(where: str, cands) -> Tuple[Dict[tuple, tuple], Any]:
     return results, lambda a, b: first_difference(where, a, b)
 
 
+class _Worker:
+    """ONE child process that serves every proof of the run (orchestrator 23/11: a process and a device context per
+    variant would put seconds times the variant count into a first launch). Started at the first proof; started
+    again only after a fault killed it. Requests and replies are JSON lines on its stdin / a duplicate of its
+    stdout; its own prints go to stderr, kept in a file so a fault's text can be read."""
+    started = 0                      # children started in this run (the record's measure)
+
+    def __init__(self):
+        self.proc = None
+        self.err = None
+
+    def ask(self, job: dict) -> Tuple[int, str]:
+        """(0, '') when the job finished; (exit code, its stderr since the job began) when the child died on it."""
+        import selectors
+        if self.proc is None or self.proc.poll() is not None:
+            self._start()
+        mark = self.err.tell() if self.err else 0
+        self.proc.stdin.write(json.dumps(job) + "\n")
+        self.proc.stdin.flush()
+        sel = selectors.DefaultSelector()
+        sel.register(self.proc.stdout, selectors.EVENT_READ)
+        reply = self.proc.stdout.readline() if sel.select(timeout=_CHILD_SECONDS) else None
+        if reply:
+            return 0, ""
+        if self.proc.poll() is None:
+            self.proc.kill()
+        code = self.proc.wait()
+        self.err.seek(mark)
+        text = self.err.read()
+        self.err.seek(0, 2)
+        return (code if reply is not None else -1), (text if reply is not None
+                                                     else f"timed out after {_CHILD_SECONDS} s: {text[-400:]}")
+
+    def _start(self):
+        self.err = tempfile.TemporaryFile("w+")
+        env = dict(os.environ, CUDA_LAUNCH_BLOCKING="1")
+        self.proc = subprocess.Popen([sys.executable, "-m", "nbxtensor.ops.ew_proof_child", "serve"], env=env,
+                                     stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.err, text=True)
+        _Worker.started += 1
+
+
+_WORKER = _Worker()
+
+
 def _child(argv) -> Tuple[int, str]:
-    env = dict(os.environ, CUDA_LAUNCH_BLOCKING="1")
-    try:
-        p = subprocess.run([sys.executable, "-m", "nbxtensor.ops.ew_proof_child", *argv], env=env,
-                           capture_output=True, text=True, timeout=_CHILD_SECONDS)
-        return p.returncode, (p.stderr or "") + (p.stdout or "")[-400:]
-    except subprocess.TimeoutExpired as e:
-        return -1, f"timed out after {_CHILD_SECONDS} s: {(e.stderr or '')[-400:]}"
+    """One job for the run's worker: ['run', spec dir, first candidate] or ['time', spec dir]."""
+    return _WORKER.ask({"mode": argv[0], "where": argv[1], "start": int(argv[2]) if len(argv) > 2 else 0})
 
 
 def _read_out(where, start, results, cands):
@@ -266,10 +305,24 @@ def _child_time(where: str) -> None:
     json.dump(got, open(os.path.join(where, "timing.json"), "w"))
 
 
+def _serve() -> None:
+    """The worker: one job per line on stdin, one reply line on the protocol stream when it finished."""
+    proto = os.fdopen(os.dup(1), "w")
+    sys.stdout = sys.stderr                    # a kernel's or the library's print never reaches the protocol
+    for line in sys.stdin:
+        job = json.loads(line)
+        if job["mode"] == "run":
+            _child_run(job["where"], job["start"])
+        elif job["mode"] == "time":
+            _child_time(job["where"])
+        else:
+            raise SystemExit(f"unknown job {job['mode']!r}")
+        proto.write("{}\n")
+        proto.flush()
+
+
 if __name__ == "__main__":
-    if sys.argv[1] == "run":
-        _child_run(sys.argv[2], int(sys.argv[3]))
-    elif sys.argv[1] == "time":
-        _child_time(sys.argv[2])
+    if sys.argv[1] == "serve":
+        _serve()
     else:
         raise SystemExit(f"unknown mode {sys.argv[1]!r}")

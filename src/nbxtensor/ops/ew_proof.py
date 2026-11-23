@@ -8,8 +8,8 @@ carrying a class tile (`ops/ew_tile.EwTile`) to `settle`, once per compiled vari
 The proof (orchestrator rulings 23/11/2026 12:5x-13:1x):
   * every candidate of the class runs the variant on the SAME inputs — a snapshot of the real launch, each pointer
     argument's addressable bytes, overlapping arguments kept overlapping — in a CHILD process with
-    CUDA_LAUNCH_BLOCKING=1: an illegal address is sticky and ends the process that meets it. A fault ends the child;
-    it is recorded (kernel, variant, tile, the fault's text) and a fresh child resumes at the next candidate;
+    CUDA_LAUNCH_BLOCKING=1 (ONE worker serves every proof of the run): an illegal address is sticky and ends the process that meets it. A fault ends the worker;
+    it is recorded (kernel, variant, tile, the fault's text) and a fresh worker resumes at the next candidate;
   * a candidate PASSES when it does not fault and, for a kernel that declares itself tile-independent
     (`ew_tile.tile_independent`), every byte it leaves in the launch's buffers is identical (NaN payloads included)
     to the agreeing set: more than half of the non-faulting candidates AND at least three. A candidate outside that
@@ -281,6 +281,7 @@ def prove(kernel, grid, bound, options, tiles, vid) -> dict:
     results, differ = ew_proof_child.run_candidates(spec, cands)
     rec = judge(independent, cands, results, differ)
     rec.update(seconds=round(time.time() - t0, 2), snapshot_bytes=nbytes, kernel=kernel.__name__)
+    _count(rec["seconds"], nbytes)
     print(f"[ew-proof] proved {kernel.__name__} once (variant {stamp_key({'v': vid})}): {len(rec['passed'])} of "
           f"{len(cands)} tiles pass, {len(rec['faults'])} fault, snapshot {nbytes} bytes, {rec['seconds']} s"
           + ("" if independent else " — proven by fault only (" + ("declares itself tile-dependent"
@@ -288,6 +289,25 @@ def prove(kernel, grid, bound, options, tiles, vid) -> dict:
     if not rec["passed"]:
         raise TileUnproven(f"ZERO FALLBACK: element-wise variant {kernel.__name__}: {rec['refused']}")
     return rec
+
+
+_RUN = {"variants": 0, "seconds": 0.0, "largest_snapshot": 0}
+
+
+def _count(seconds: float, nbytes: int) -> None:
+    """This run's proofs, said once at its end: what a first launch with no shipped table paid."""
+    if _RUN["variants"] == 0:
+        import atexit
+        atexit.register(_say_run)
+    _RUN["variants"] += 1
+    _RUN["seconds"] += seconds
+    _RUN["largest_snapshot"] = max(_RUN["largest_snapshot"], nbytes)
+
+
+def _say_run() -> None:
+    from nbxtensor.ops.ew_proof_child import _Worker
+    print(f"[ew-proof] this run proved {_RUN['variants']} element-wise variant(s) in {_RUN['seconds']:.1f} s with "
+          f"{_Worker.started} child process(es); largest snapshot {_RUN['largest_snapshot']} bytes", file=sys.stderr)
 
 
 def judge(independent, cands, results, differ) -> dict:
