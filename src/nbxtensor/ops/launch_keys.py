@@ -179,6 +179,13 @@ def matrix_unit_operands(a: NBXDtype, b: NBXDtype, M: int, unit: Optional[dict] 
     return (ra, rb) if M >= min(int(r["block_m"]) for r in rows) else None
 
 
+def empty_product(M: int, N: int) -> bool:
+    """A product with no output row or no output column does no work: its wrapper returns the empty output before
+    any launch, so no key is formed for it (qa 1249: an empty bmm formed an M-bucket-0 key the wrapper then swept at
+    run time). A zero CONTRACTED dimension still writes M x N values (zeros, or the bias) and keeps its launch."""
+    return M == 0 or N == 0
+
+
 def matrix_unit_takes(a: NBXDtype, b: NBXDtype, M: int) -> bool:
     """The profile's matrix unit can run this GEMM (`matrix_unit_operands`). A batched product on it has NO autotune
     key (`bmm_launches`, `baddbmm_launches` return []); `mm` and `addmm` keep their FMA key, whose certificate names
@@ -242,6 +249,8 @@ def mm_launches(M: int, K: int, N: int, a: NBXDtype, b: NBXDtype, native_bf16: b
     """`mm` (and `mm_epilogue`): M <= 4 runs one GEMV per row on the operands as `mm_dtypes` casts them (the weight
     transposed to [N, K], each activation row the vector) — one key; otherwise one key, matrix unit or not — row bands
     above 2^31 output elements keep the whole shape's M bucket."""
+    if empty_product(M, N):
+        return []
     a, b, promote_a, promote_b = mm_dtypes(a, b, native_bf16, force_accum)
     if M <= 4:
         return mv_launches(N, K, b, a, native_bf16, force_accum, contract_half)
@@ -256,6 +265,8 @@ def addmm_launches(M: int, K: int, N: int, a: NBXDtype, b: NBXDtype, bias: NBXDt
                    native_bf16: bool, force_accum: bool = False, contract_half: bool = False, bias_row: bool = True) -> List[Launch]:
     """`addmm` on a 2-D activation (an N-D one is flattened to (numel/K, K) first): M <= 4 runs
     per-row addmv; otherwise one key, where a [N] / [1, N] bias (`bias_row`) lets the unit take it, the unit runs it by rule."""
+    if empty_product(M, N):
+        return []
     a, b, bias, promote_a, promote_b, _ = addmm_dtypes(a, b, bias, native_bf16, force_accum)
     if M <= 4:
         # one addmv per row on the operands as cast, the weight transposed to [N, K], the bias its row or the shared one
@@ -270,6 +281,8 @@ def bmm_launches(M: int, K: int, N: int, a: NBXDtype, b: NBXDtype, native_bf16: 
     """`bmm`: always one batched launch through `baddbmm_kernel` (HAS_BIAS False, the output
     passed as the bias pointer), every dim bucketed, the output fp32 for any half input; on the matrix unit
     (M > 4, operands taken as they are in memory, before the widening) no key."""
+    if empty_product(M, N):
+        return []
     if matrix_unit_takes(a, b, M):
         return []
     a, b, promote_b = bmm_dtypes(a, b, native_bf16, force_accum)
@@ -283,6 +296,8 @@ def baddbmm_launches(M: int, K: int, N: int, a: NBXDtype, b: NBXDtype, bias: NBX
     """`baddbmm_wrapper`: one batched launch at the operands' own dtypes (no promotion, no
     widened store: the output is batch1's dtype), IEEE_PRECISION and HAS_BIAS set, PROMOTE_B
     off, every dim bucketed; the bias pointer keyed at its own dtype. On the matrix unit (M > 4) no key."""
+    if empty_product(M, N):
+        return []
     if matrix_unit_takes(a, b, M):
         return []
     return [(BADDBMM, (bucket_of("M", M), bucket_of("N", N), bucket_of("K", K),

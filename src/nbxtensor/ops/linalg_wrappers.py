@@ -655,6 +655,10 @@ def bmm(a, b, allow_strided_b: bool = False) :
     b = _core._ensure_cuda(b)
     if hasattr(a, '_device_idx') and hasattr(b, '_device_idx') and a._device_idx != b._device_idx:
         b = _core._transfer_to_device(b, a._device_idx)
+    if _lk.empty_product(a.shape[1], b.shape[2]):      # no output value: no launch, the key formers agree
+        return NBXTensor.empty((a.shape[0], a.shape[1], b.shape[2]), device=a.device, dtype=_lk.bmm_out(
+            a.shape[1], a.nbx_dtype, b.nbx_dtype, _core._NBX_HAS_NATIVE_BF16, NBX_FORCE_FP32_ACCUM,
+            bool(_core._NBX_ACTIVATIONS_FP16_SAFE)))
 
     # The matrix unit takes two operands of its operand dtype as they are in memory: the widening below exists
     # because the tl.dot kernel has no PROMOTE_A, and an fp16 value is exact in fp32 with fp16 x fp16 products
@@ -1042,6 +1046,8 @@ def baddbmm_wrapper(
             f"contracted dimension differs, {K} against {K2}")
 
     output = NBXTensor.empty((B, M, N), device=batch1.device, dtype=batch1.dtype)
+    if _lk.empty_product(M, N):                        # no output value: no launch, the key formers agree
+        return output
 
     # Handle bias broadcasting: input may be [M, N], [B, M, N], [1, M, N],
     # [B, 1, N], [M, 1], etc. Any size-1 dim broadcasts with stride 0 —
