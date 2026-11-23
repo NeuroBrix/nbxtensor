@@ -11,18 +11,25 @@ from nbxtensor.memory.allocator import DeviceAllocator
 MiB = 1 << 20
 
 
-def _profile(mb, measured):
-    return SimpleNamespace(devices=[SimpleNamespace(index=0, memory_mb=mb, measured=measured)])
+def _profile(mb, measured, architecture="volta"):
+    return SimpleNamespace(devices=[SimpleNamespace(index=0, memory_mb=mb, measured=measured,
+                                                    architecture=architecture)])
+
+
+@pytest.fixture(autouse=True)
+def _card(monkeypatch):
+    """The driver's (free, total) of a 16 GB card holding a 306 MiB context: the rule's room (qa 1232-1)."""
+    monkeypatch.setattr(DeviceAllocator, "mem_get_info", staticmethod(lambda dev: ((16160 - 306) * MiB, 16160 * MiB)))
 
 
 def test_the_allocator_reads_the_rule_where_the_profile_states_no_measure(monkeypatch):
     monkeypatch.setattr(trace_replay, "vmm_granularity", lambda dev: 2 * MiB)
     monkeypatch.setattr("nbxtensor.ops.wrappers.get_hardware_profile", lambda: _profile(16160, {}))
-    assert DeviceAllocator._vmm_chunk_fact(0) == 64 * MiB
+    assert DeviceAllocator._vmm_chunk_fact(0) == 32 * MiB       # the 16 GB card's own room bounds it at 59.7 MiB
     # the rule is the answer for its class, over an older sweep's figure
     monkeypatch.setattr("nbxtensor.ops.wrappers.get_hardware_profile",
                         lambda: _profile(16160, {"vmm_chunk_bytes": 16 * MiB}))
-    assert DeviceAllocator._vmm_chunk_fact(0) == 64 * MiB
+    assert DeviceAllocator._vmm_chunk_fact(0) == 32 * MiB
 
 
 def test_a_class_without_rule_keeps_its_measure_or_is_refused(monkeypatch):
