@@ -15,6 +15,7 @@ from nbxtensor.ops.ew_tile import tile_dependent, tile_independent  # noqa: F401
 
 
 from nbxtensor.ops._configs import nbx_autotune
+from nbxtensor.ops._common import sigmoid
 
 # The tile of a fused MoE launch beyond its row block: BLOCK_SIZE_M is the alignment's block (`moe_align_block_size`,
 # the caller's), every other parameter a candidate the certification measures per key — the former fixed tile
@@ -410,10 +411,14 @@ def silu_mul_split_kernel(
     row = offs // N
     col = offs % N
 
-    gate = tl.load(gate_ptr + row * stride_gm + col * stride_gn, mask=mask, other=0.0).to(tl.float32)
+    gate_raw = tl.load(gate_ptr + row * stride_gm + col * stride_gn, mask=mask, other=0.0)
     up = tl.load(up_ptr + row * stride_um + col * stride_un, mask=mask, other=0.0).to(tl.float32)
 
-    silu_gate = gate * tl.sigmoid(gate)
+    # THE CHAIN'S ROUNDINGS (a fusion computes what its chain computes, project lead 23/11): silu as silu.py computes
+    # it, rounded to the stored dtype as its store rounds it, then the product rounded once at the store (fp32 holds
+    # the product of two half values exactly); the launch compiles with no fp contraction.
+    g = gate_raw.to(tl.float32)
+    silu_gate = (g * sigmoid(g)).to(gate_raw.dtype).to(tl.float32)
     result = silu_gate * up
 
     tl.store(output_ptr + row * stride_om + col * stride_on, result, mask=mask)

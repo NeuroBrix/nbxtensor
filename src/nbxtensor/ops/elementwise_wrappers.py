@@ -1149,7 +1149,7 @@ def swiglu_fused_wrapper(gate, up):
         gate2d.stride(0), gate2d.stride(1),
         up2d.stride(0), up2d.stride(1),
         output.stride(0), output.stride(1),
-        **_ew_meta(n),
+        **_ew_meta(n), enable_fp_fusion=False,      # the chain rounds silu, then the product: no fma
     )
     return output.view(*orig_shape)
 
