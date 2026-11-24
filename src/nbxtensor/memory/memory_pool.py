@@ -87,6 +87,8 @@ def join_weights(held: dict, loaded: dict) -> dict:
 
 
 def _join_arenas(held: dict, loaded: dict) -> dict:
+    """`join_weights` before the ties: `loaded` with its arenas merged into `held`'s under distinct keys, or
+    `loaded` itself when it brings none, so no weight of the first load points into a block the second dropped."""
     if "_arenas" not in loaded:
         return loaded
     merged = dict(held.get("_arenas") or {})

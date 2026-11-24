@@ -32,6 +32,7 @@ class _Ties:
     __slots__ = ("binds", "orphaned", "__weakref__")
 
     def __init__(self):
+        """An empty record: no tie yet, no source released under it."""
         self.binds = {}
         self.orphaned = set()           # params whose source's table was released while this table held the alias
 
@@ -41,12 +42,16 @@ _PARKED = {}                            # id(released table) -> (that table, its
 
 
 def _held_record(weights):
+    """The record a LOADED table carries in its bookkeeping (`_arenas["_tied"]`), None without one: where
+    a tie lives while its table is loaded, so a rebuilt dict that keeps `_arenas` keeps it too."""
     arenas = weights.get("_arenas")
     rec = arenas.get(KEY) if isinstance(arenas, dict) else None
     return rec if isinstance(rec, _Ties) else None
 
 
 def _parked_record(weights):
+    """The record kept apart for a RELEASED table, None when this table was not released with ties: looked up
+    by the table's id and matched by identity, so another dict reusing that id never takes its ties."""
     entry = _PARKED.get(id(weights))
     return entry[1] if entry is not None and entry[0] is weights else None
 
@@ -63,11 +68,15 @@ def tied_params(weights) -> frozenset:
 
 
 def _spec_differs(name, what, mine, theirs):
+    """The refusal of a tie whose `what` (shape or dtype) differs, naming the entry and both values: a tie
+    reads the source in place, so a different layout would read wrong memory."""
     return TiedWeightError(f"bind_tied: '{name}' {what} {mine} differs from its source's {theirs}; a tie binds a "
                            f"weight of the same {what} only")
 
 
 def _dtype_of(d):
+    """A dtype given by name ("bfloat16") read as the library's NBXDtype, any other value as given: so a
+    caller may state the param's dtype as its graph writes it and still be compared with the source's."""
     if isinstance(d, str):
         from nbxtensor.dtype.nbx_dtype import parse_dtype
         return parse_dtype(d)
