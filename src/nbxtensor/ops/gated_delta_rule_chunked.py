@@ -67,9 +67,14 @@ _OUTPUT_CONFIGS = [triton.Config({'BK': bk, 'BV': bv}, num_warps=w, num_stages=s
 
 @triton.jit
 def _forward_substitution(a, t_left, o_i, BC: tl.constexpr):
-    """(I + a)^-1 of a strictly-lower [BC, BC] block, its first `t_left` rows real (fla's in-register solve)."""
+    """(I + a)^-1 of a strictly-lower [BC, BC] block, its first `t_left` rows real (fla's in-register solve).
+
+    `t_left` is T minus a 64-bit chunk offset, so it arrives 64-bit; the loop runs over min(BC, t_left) rows, a count
+    in [-3 BC, BC] (a sub-block starts at most 3 BC past T's last chunk start), so it is narrowed to 32 bit after the
+    min, exactly, and the loop bound is 32-bit. The kernel's addresses keep their own 64-bit offsets."""
     ai = -a
-    for i in range(2, min(BC, t_left)):
+    n = tl.minimum(t_left, BC).to(tl.int32)
+    for i in range(2, n):
         row = tl.sum(tl.where((o_i == i)[:, None], -a, 0.), 0)
         row = tl.where(o_i < i, row, 0.)
         row = row + tl.sum(row[:, None] * ai, 0)
