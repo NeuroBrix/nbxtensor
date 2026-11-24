@@ -302,3 +302,26 @@ def test_a_source_whose_memory_no_arena_of_its_table_holds_is_refused_by_name_un
     assert memory.bind_tied(head, "lm_head.weight", {"w": owning}, "w") is owning
     view = owning.reshape(8, 4)
     assert memory.bind_tied(_head(tmp_path, tag="h2"), "lm_head.weight", {"w": view}, "w") is view
+
+
+def test_a_refused_rejoin_leaves_the_parked_record_for_a_corrected_reload(tmp_path):
+    """A released source reloaded from entries whose memory no arena of the load holds: the rejoin is refused by name
+    BEFORE anything changes, so the released table's parked record (its ties) is still there, and the corrected
+    reload (the loader's table, its "_arenas" with it) rejoins and the consumer's bind aliases the new tensor."""
+    from nbxtensor.memory import tied
+    lm, head = _lm(tmp_path), _head(tmp_path)
+    memory.bind_tied(head, "lm_head.weight", lm, "embed_tokens.weight")
+    memory.release_weights(lm)
+    rec = tied.record_of(lm)
+    assert rec is not None and len(rec.sourced) == 1
+    lm2 = _lm(tmp_path, tag="lm2")
+    stripped = {"embed_tokens.weight": lm2["embed_tokens.weight"]}         # the loader's tensor, its arena not here
+    with pytest.raises(memory.TiedWeightError, match=r"lm_head\.weight.*no arena"):
+        memory.join_weights(lm, stripped)
+    assert tied._parked_record(lm) is rec, "a refused rejoin deleted the released table's parked record"
+    assert len(rec.sourced) == 1
+    lm = memory.join_weights(lm, lm2)
+    assert tied.record_of(lm) is rec
+    memory.bind_tied(head, "lm_head.weight", lm, "embed_tokens.weight")
+    assert head["lm_head.weight"] is lm2["embed_tokens.weight"]
+    _reads_the_shard(head["lm_head.weight"])

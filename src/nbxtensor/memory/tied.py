@@ -281,7 +281,9 @@ def rejoin(held: dict, joined: dict) -> dict:
     """`join_weights`'s last step: `joined` (what `held` is updated with, or replaced by on a reload) with `held`'s
     record in its bookkeeping. As a source, each tie learns the tensor now at its key; as a consumer, each tie whose
     source offers a tensor aliases it (a stored copy the loader read anyway replaced), a tie whose source is not
-    loaded waits, and a tie whose source can never come back is refused by name, `held` left as it was."""
+    loaded waits, and a tie whose source can never come back is refused by name, `held` left as it was. Every
+    refusal comes before anything changes: the offers are computed first, so a refused rejoin leaves the record
+    (parked or held) and every tie as they were, for a corrected reload to rejoin."""
     rec = _held_record(held)
     parked = rec is None
     if parked:
@@ -292,15 +294,19 @@ def rejoin(held: dict, joined: dict) -> dict:
     if gone:
         raise TiedWeightError(f"bind_tied: the source of {gone} can never come back (its table was dropped without "
                               f"a release); load the source component and bind the tie again")
-    if parked:
-        del _PARKED[id(held)]
-    out = dict(joined)
-    _install(out, rec, {**(held.get("_arenas") or {}), **(joined.get("_arenas") or {})})
-    view = {**held, **out}
+    arenas = {**(held.get("_arenas") or {}), **(joined.get("_arenas") or {})}
+    view = {**held, **joined, "_arenas": arenas}
+    offers = []
     for tie in list(rec.sourced):
         t = view.get(tie.key)
         if t is not None and tie.key not in rec.binds:
-            tie.offer = (t, _keeper(view, t, tie.param))
+            offers.append((tie, (t, _keeper(view, t, tie.param))))
+    if parked:
+        del _PARKED[id(held)]
+    out = dict(joined)
+    _install(out, rec, arenas)
+    for tie, offer in offers:
+        tie.offer = offer
     for param, tie in rec.binds.items():
         if tie.offer is not None:
             tie.alias = tie.offer
