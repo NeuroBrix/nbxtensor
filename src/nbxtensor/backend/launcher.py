@@ -554,6 +554,16 @@ class CudaDriver(ModuleDriver):
         self._check(self.lib.cuDeviceGetAttribute(ctypes.byref(minor), self.CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, dev), "cuDeviceGetAttribute")
         return major.value * 10 + minor.value
 
+    def pci_bus_id_of(self, ordinal: int) -> str:
+        """The PCI bus id ("0000:3B:00.0") of the visible device `ordinal`, asked of the driver
+        (`cuDeviceGet`, `cuDeviceGetPCIBusId`): a device query, no context opened and none made current.
+        The bridge from this process's numbering (CUDA_VISIBLE_DEVICES applies) to NVML's (the boards)."""
+        dev = ctypes.c_int()
+        self._check(self.lib.cuDeviceGet(ctypes.byref(dev), ctypes.c_int(int(ordinal))), "cuDeviceGet")
+        bus = ctypes.create_string_buffer(64)
+        self._check(self.lib.cuDeviceGetPCIBusId(bus, ctypes.c_int(64), dev), "cuDeviceGetPCIBusId")
+        return bus.value.decode()
+
     def max_shared_memory_per_block(self) -> int:
         """The device's opt-in shared-memory ceiling per block, in bytes.
 

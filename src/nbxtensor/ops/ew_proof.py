@@ -401,13 +401,16 @@ def prove(kernel, specialization, options, tiles, vid) -> dict:
 
 def remedy(kernel_name: str, vid) -> str:
     """What a variant whose proof could not run needs, said with its refusal: room for the worker on a card of the
-    launch's class (the worker ran on the freest one this process sees), or the variant's line in the shipped table —
-    named by its signature as the record line prints it (`variant <key>`), its stamp and the table's path."""
+    launch's class (the worker ran on the freest of the cards the run declared, `ew_proof_child.declare_proof_cards`),
+    or the variant's line in the shipped table — named by its signature as the record line prints it (`variant <key>`),
+    its stamp and the table's path."""
     from nbxtensor.ops.ew_proof_child import _WORKER
     st = stamp()
     card, free = _WORKER.device
-    where = (f"the worker ran on visible card {card}, the freest of the class, {free // (1024 * 1024)} MiB free at its "
-             f"start" if free >= 0 else "the worker ran on the one card this process sees")
+    where = (f"the worker ran on visible card {card}, the freest of the run's declared cards of the class, "
+             f"{free // (1024 * 1024)} MiB free at its start" if free >= 0 else
+             f"the worker ran on the launch's own card {card}: the run declared no other card of the class "
+             f"(`ew_proof_child.declare_proof_cards`), or no free-memory reading was available")
     return (f"REMEDY: free memory on a card of this class ({st['vendor']}/{st['profile']}; {where}), or add the "
             f"variant's line to the shipped table {_Table._shipped_path()} (stamp {stamp_key(st)}, {kernel_name} "
             f"variant {stamp_key({'v': vid})}): prove it where a card of this class has room and merge the kept "

@@ -12,15 +12,19 @@ buffers at a time, kilobytes to megabytes. A lane that touches past its extent f
 validation (Metal): the worker ends on it, the parent records that candidate's fault, and a fresh worker resumes at
 the next candidate.
 
-THE WORKER'S CARD (the project lead, 24/11/2026; register row 444): each worker the proof starts runs on the FREEST
-VISIBLE CARD OF THE LAUNCH'S STAMP (`proof_device`): among the cards this process sees that compile the same binary
-(the backend's own, at the launch card's compute capability — the vendor profile is a function of it), the one with
-the most free memory at that moment, read through the library's device facts (`DeviceAllocator.mem_get_info` per
-card). The launch's own card is among them: a model on every card leaves no spare, and the freest one wins. The
-worker's environment carries the choice (`worker_env`: the backend's visibility variable narrowed to that one card),
-so the worker's context opens there and nowhere else. A card of another compute capability is never chosen. A model
-that filled its card (deepseek-moe-16b on V100 32 GB: its card at 32 169 MiB used, the other at 709 MiB) no longer
-puts the proof's context on the full card.
+THE WORKER'S CARD (the project lead, 24/11/2026; register row 444; qa 24/11: never a card the run was not given, never
+a context to ask): each worker the proof starts runs on the FREEST OF THE RUN'S OWN CARDS OF THE LAUNCH'S STAMP
+(`proof_device`). The candidates are the cards the APPLICATION DECLARED for this run (`declare_proof_cards`: NeuroBrix
+declares its plan's cards and the run's `--proof-card`), the launch's own card among them; a run that declared none (a
+library test, a tool) has the launch's own card alone — never "every visible card": on a shared machine a visible card
+may be someone else's. Among them, the cards that compile the same binary (the launch card's compute capability, a
+device attribute read without a context), the one with the most free memory, read from NVML (`nvmlDeviceGetMemoryInfo`,
+the card found by its PCI bus id, `cuDeviceGetPCIBusId` of this process's ordinal: NVML numbers the boards, the
+process its visible cards) — no context is opened on any card to ask. Without NVML (no management library, HIP) the
+launch's own card alone, said once by name. The worker's environment carries the choice (`worker_env`: the backend's
+visibility variable narrowed to that one card), so the worker's context opens there and nowhere else. A model that
+filled its card (deepseek-moe-16b on V100 32 GB: its card at 32 169 MiB used, the other at 709 MiB) no longer puts the
+proof's context on the full card when the run declares the spare one.
 
 The worker holds nothing on the card while the parent runs: after each job it waits for the device and empties its
 pool back to the driver, and it EXITS once no job came for IDLE_SECONDS (the idle bound, 2 s); the parent's next
@@ -30,6 +34,7 @@ job starts a fresh one.
 """
 from __future__ import annotations
 
+import ctypes
 import hashlib
 import json
 import os
@@ -166,19 +171,97 @@ def _card_arch(ordinal: int):
     return CudaDriver.instance().capability_of(int(ordinal))
 
 
+_DECLARED_CARDS = None              # the run's cards (visible ordinals) an application declared; None: none declared
+_SAID: set = set()                  # the fallbacks already said, once each
+
+
+def declare_proof_cards(ordinals) -> None:
+    """The application states the cards THIS RUN WAS GIVEN, as visible ordinals of this process (NeuroBrix: its plan's
+    cards and the run's `--proof-card`): the only cards a proof's worker may run on, the launch's own card always among
+    them. None forgets the declaration (the launch's own card alone). A negative ordinal is refused by name."""
+    global _DECLARED_CARDS
+    if ordinals is None:
+        _DECLARED_CARDS = None
+        return
+    cards = sorted({int(i) for i in ordinals})
+    if any(i < 0 for i in cards):
+        raise ValueError(f"declare_proof_cards: {cards}: a visible ordinal is 0 or more")
+    _DECLARED_CARDS = tuple(cards)
+
+
+def declared_proof_cards():
+    """The run's cards as declared (`declare_proof_cards`), a sorted tuple of visible ordinals; None when none was."""
+    return _DECLARED_CARDS
+
+
+def _say_once(key: str, text: str) -> None:
+    """Print one `[ew-proof]` line on stderr the first time `key` is met in this process, never again."""
+    if key not in _SAID:
+        _SAID.add(key)
+        print(f"[ew-proof] {text}", file=sys.stderr)
+
+
+class _NvmlMemory(ctypes.Structure):
+    """NVML's nvmlMemory_t: the card's total, free and used bytes, as `nvmlDeviceGetMemoryInfo` fills it."""
+    _fields_ = [("total", ctypes.c_ulonglong), ("free", ctypes.c_ulonglong), ("used", ctypes.c_ulonglong)]
+
+
+def _card_free_bytes(ordinals) -> "Dict[int, int] | None":
+    """{visible ordinal: free bytes} of each card, from NVML (`nvmlDeviceGetHandleByPciBusId_v2`, then
+    `nvmlDeviceGetMemoryInfo`), each card found by its PCI bus id (`CudaDriver.pci_bus_id_of`, a device query): no
+    context is opened on any card. None when NVML does not answer (no management library, a backend without one, a
+    card NVML does not find): the caller then has the launch's card alone."""
+    from nbxtensor.backend import runtime as _rt
+    from nbxtensor.backend.process_memory import _nvml
+    if _rt.gpu_backend() != "cuda":
+        return None
+    lib = _nvml(_rt.backend_table().get("management_libs"))
+    if lib is None:
+        return None
+    from nbxtensor.backend.launcher import CudaDriver
+    drv = CudaDriver.instance()
+    out = {}
+    for i in ordinals:
+        bus = ctypes.create_string_buffer(drv.pci_bus_id_of(int(i)).encode())
+        handle, mem = ctypes.c_void_p(), _NvmlMemory()
+        if lib.nvmlDeviceGetHandleByPciBusId_v2(bus, ctypes.byref(handle)) != 0:
+            return None
+        if lib.nvmlDeviceGetMemoryInfo(handle, ctypes.byref(mem)) != 0:
+            return None
+        out[int(i)] = int(mem.free)
+    return out
+
+
 def proof_device() -> Tuple[int, int]:
-    """(visible ordinal, its free bytes) of the card the proof's next worker runs on: the FREEST visible card of the
-    launch's stamp — the cards whose compute capability is the launch card's (the launch's own card included), the
-    one with the most free memory at this moment (`DeviceAllocator.mem_get_info`), the lowest ordinal on a tie. With
-    one device, that device (its free bytes unread: -1)."""
+    """(visible ordinal, its free bytes or -1 unread) of the card the proof's next worker runs on: the FREEST OF THE
+    RUN'S DECLARED CARDS of the launch's stamp (`declare_proof_cards`; none declared: the launch's own card alone) —
+    those whose compute capability is the launch card's, the launch's own card included, the most free memory by NVML
+    (`_card_free_bytes`, no context opened), the lowest ordinal on a tie. Without NVML, the launch's own card, said
+    once. A declared card this process does not see is refused by name. With one device, that device (-1)."""
     from nbxtensor.memory.allocator import DeviceAllocator as DA
     seen = DA.device_count()
     if seen <= 1:
         return 0, -1
     own = int(DA.get_device())
+    declared = _DECLARED_CARDS or ()
+    unseen = [i for i in declared if not 0 <= i < seen]
+    if unseen:
+        raise ProofCouldNotRun(f"the run declared card(s) {unseen} for the proof (`declare_proof_cards`), and this "
+                               f"process sees {seen} card(s), ordinals 0 to {seen - 1}")
+    given = sorted({own, *declared})
+    if len(given) == 1:
+        return own, -1
     arch = _card_arch(own)
-    same = [i for i in range(seen) if i == own or (arch is not None and _card_arch(i) == arch)]
-    free = {i: int(DA.mem_get_info(i)[0]) for i in same}
+    same = [i for i in given if i == own or (arch is not None and _card_arch(i) == arch)]
+    if len(same) == 1:
+        return own, -1
+    free = _card_free_bytes(same)
+    if free is None:
+        from nbxtensor.backend import runtime as _rt
+        _say_once("no-nvml", f"no free-memory reading without opening a context (NVML, "
+                  f"{list(_rt.backend_table().get('management_libs') or []) or 'none for this backend'}, does not "
+                  f"answer): the proof's worker runs on the launch's own card {own} alone, not on the run's cards {same}")
+        return own, -1
     best = max(same, key=lambda i: (free[i], -i))
     return best, free[best]
 
@@ -257,12 +340,13 @@ class _Worker:
                                                      else f"timed out after {limit:g} s: {text[-400:]}")
 
     def _start(self):
-        """Start the worker process on the freest card of the launch's stamp (`proof_device`, carried by its
-        environment: `worker_env`), its stderr kept in a temporary file."""
+        """Start the worker process on the freest of the run's declared cards of the launch's stamp (`proof_device`,
+        carried by its environment: `worker_env`), its stderr kept in a temporary file."""
         self.err = tempfile.TemporaryFile("w+")
         from nbxtensor.memory.metal import SHADER_VALIDATION
         self.device = proof_device()
-        env = worker_env(self.device[0]) if self.device[1] >= 0 else dict(os.environ)    # one device: as it is
+        from nbxtensor.memory.allocator import DeviceAllocator
+        env = worker_env(self.device[0]) if DeviceAllocator.device_count() > 1 else dict(os.environ)    # one: as is
         env["CUDA_LAUNCH_BLOCKING"] = "1"
         if _metal():
             env[SHADER_VALIDATION] = "1"         # every access checked against its buffer's length (the guard)

@@ -6,8 +6,9 @@ The proof of variant 863fce847ea79e39 (mul_scalar_strided_nd_kernel) could not r
 (2: out of memory)" — its worker inherited the launch's environment and opened its context on the process's first
 visible card, the full one. The worker must start on card 3.
 
-The device facts (count, current card, free bytes, compute capability) are patched; no card is touched, and the
-worker process is never started (Popen is replaced by a recorder of its environment)."""
+The device facts (count, current card, free bytes, compute capability) are patched, the run's cards declared (the
+cure of qa 24/11 is tested in test_the_proof_worker_runs_only_on_the_run_s_declared_cards_read_by_nvml.py); no card
+is touched, and the worker process is never started (Popen is replaced by a recorder of its environment)."""
 import os
 
 import pytest
@@ -20,16 +21,27 @@ MIB = 1024 * 1024
 TOTAL = 32510 * MIB
 
 
-def _cards(monkeypatch, used_mib, arches, own=0, backend="cuda", visible=("CUDA_VISIBLE_DEVICES",)):
-    """Patch the library's device facts: one card per entry of `used_mib`, its compute capability in `arches`."""
+def _cards(monkeypatch, used_mib, arches, own=0, backend="cuda", visible=("CUDA_VISIBLE_DEVICES",), declared="all"):
+    """Patch the library's device facts: one card per entry of `used_mib`, its compute capability in `arches`; the
+    free memory is NVML's reading (`_card_free_bytes`, patched), the runtime's per-card reading refused (no context
+    is opened to ask); the run declares `declared` (default: every card)."""
     monkeypatch.setattr(_rt, "gpu_backend", lambda: backend)
     monkeypatch.setattr(_rt, "backend_table", lambda: {"visible_env": visible})
     monkeypatch.setattr(DeviceAllocator, "device_count", staticmethod(lambda: len(used_mib)))
     monkeypatch.setattr(DeviceAllocator, "get_device", staticmethod(lambda: own))
-    monkeypatch.setattr(DeviceAllocator, "mem_get_info",
-                        classmethod(lambda cls, i=None: (TOTAL - used_mib[own if i is None else i] * MIB, TOTAL)))
+
+    def _no_context(*_a, **_k):
+        """A per-card runtime reading would select the card and open a context on it: refused."""
+        raise AssertionError("a context was opened on a card to read its free memory")
+
+    monkeypatch.setattr(DeviceAllocator, "mem_get_info", classmethod(_no_context))
+    monkeypatch.setattr(DeviceAllocator, "set_device", staticmethod(_no_context))
+    monkeypatch.setattr(ew_proof_child, "_card_free_bytes",
+                        lambda cards: {i: TOTAL - used_mib[i] * MIB for i in cards}, raising=False)
     monkeypatch.setattr(ew_proof_child, "_card_arch", lambda i: arches[i], raising=False)
     monkeypatch.setattr(ew_proof_child, "_metal", lambda: False)
+    monkeypatch.setattr(ew_proof_child, "_DECLARED_CARDS",
+                        tuple(range(len(used_mib))) if declared == "all" else declared, raising=False)
 
 
 def _started_env(monkeypatch):
@@ -114,6 +126,6 @@ def test_a_proof_that_could_not_run_says_the_remedy_and_the_variant_s_signature(
     vid = "a variant id"
     text = ew_proof.remedy("mul_scalar_strided_nd_kernel", vid)
     assert text.startswith("REMEDY: free memory on a card of this class (nvidia/volta")
-    assert "visible card 1, the freest of the class, 31801 MiB free" in text
+    assert "visible card 1, the freest of the run's declared cards of the class, 31801 MiB free" in text
     assert f"mul_scalar_strided_nd_kernel variant {ew_proof.stamp_key({'v': vid})}" in text
     assert "/certified/nvidia/volta/t.json" in text and "python -m nbxtensor.ops.ew_proof export" in text
