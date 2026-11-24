@@ -1,22 +1,28 @@
-"""Tied weights: a weight table's entry made an ALIAS of another component's loaded tensor, kept across the
-consumer's unload and reload.
+"""Tied weights: a weight table's entry made an ALIAS of the tensor another table holds at a key, kept across the
+unloads and reloads of both tables.
 
-A weight table is the application's dict {name: tensor} with the library's bookkeeping under "_arenas" (the device
-blocks its weights point into). `bind_tied(weights, param, source)` puts `source` itself at `param` (no copy, no
-allocation) and records the tie in that bookkeeping, `weights["_arenas"]["_tied"]`: the record holds the source by
-reference, as a view holds its allocation, so it is memory bookkeeping like the arenas beside it, and a table's
-readers that already skip "_arenas" never meet it.
+A weight table is the application's dict {name: tensor} with the library's bookkeeping under "_arenas" (the blocks
+its weights point into: a weight placed by the loader is an NBXTensor over a sub-allocation that holds NO reference
+to its arena, so "_arenas" is the arena's only owner). `bind_tied(weights, param, source_weights, source_key)` puts
+`source_weights[source_key]` itself at `weights[param]` (no copy, no allocation) and records the tie in each table's
+bookkeeping, `"_arenas"["_tied"]`: one record per table, which moves with "_arenas" when the application replaces
+the dict (a rebuilt dict that keeps its "_arenas", as `_reconcile_weight_keys` does). The library holds NO table
+dict while it is loaded: it neither keeps a replaced dict alive nor writes into one.
 
-Lifetime (the library's: an allocation lives while a reference to it does, `NBXTensor._base`, `ComponentArena.__del__`):
-  * the consumer unloaded (`release_weights`): its table is cleared like any other, the record kept apart for that
-    table (it still references the source, so the reload aliases the same storage);
-  * the consumer reloaded (`join_weights(released_table, loaded)`, the library's reload door): every tied entry is
-    the source's tensor again, a stored copy the loader read anyway replaced by it; `tied_params` names the entries a
-    loader need not read at all;
-  * the source unloaded while the consumer holds the alias: the source stays alive by that reference, freed when the
-    consumer's table lets go of it;
-  * the source unloaded after the consumer was: the record drops the source (a released consumer keeps nothing of a
-    released component alive), and the consumer's reload is refused by name: load the source and bind again.
+Lifetime (the lead's ruling, 1371):
+  * the alias LOADED keeps the source's arenas (the blocks whose range holds its address) alive: releasing the
+    source (`release_weights`) releases its name, not its memory; the arenas go when the last alias goes, after the
+    release that drops it synchronised its devices;
+  * the consumer released: its tie keeps nothing (no tensor, no arena) and waits for the table's reload;
+  * the source reloaded through `join_weights(released_table, loaded)`: its ties learn the new tensor at their key;
+    the consumer's reload (`join_weights`) or the application's next `bind_tied` then aliases THAT tensor, never the
+    released one. A source reloaded as a new dict is re-bound by the application's `bind_tied` (by table and key);
+  * the consumer reloaded while its source is not loaded: the tie waits (`tied_params` names it, the entry is not
+    set), and the next `bind_tied` completes it; refused by name only when the source can never come back (its
+    record is gone: its table dropped without a release);
+  * a table tied to itself: released and reloaded, the param is the new load's tensor at the key.
+Counting (`weight_bytes`): a tie is 0 while its source is loaded (its bytes are the source's); once the source is
+released, the arenas the alias keeps are counted once, in the tables that keep them, whatever tables are summed.
 No torch; the tensors are the library's (NBXTensor)."""
 import weakref
 
@@ -27,31 +33,55 @@ class TiedWeightError(ValueError):
     """A tie that cannot be made or restored; the message names the entry and why."""
 
 
-class _Ties:
-    """One table's ties: {param: source tensor, or None once the source was released under a released consumer}."""
-    __slots__ = ("binds", "orphaned", "__weakref__")
+class _Record:
+    """One table's ties: `binds` {param: _Tie} where it is the consumer, `sourced` the ties it is the source of."""
+    __slots__ = ("binds", "sourced", "loaded", "__weakref__")
 
     def __init__(self):
-        """An empty record: no tie yet, no source released under it."""
+        """A record for a loaded table with no tie yet."""
         self.binds = {}
-        self.orphaned = set()           # params whose source's table was released while this table held the alias
+        self.sourced = weakref.WeakSet()  # held by their consumers' records: a dropped consumer leaves nothing here
+        self.loaded = True
 
 
-_LIVE = weakref.WeakSet()               # every record, to tell it when a table holding its source is released
-_PARKED = {}                            # id(released table) -> (that table, its record): the ties of an unloaded table
+class _Tie:
+    """One tie: the consumer's `param` is the source's tensor at `key`. `offer` is what the source holds there while
+    loaded (tensor, the arenas holding it); `alias` what the consumer's table holds while loaded (the same pair, its
+    arenas kept alive by it)."""
+    __slots__ = ("param", "key", "source", "offer", "alias", "__weakref__")
+
+    def __init__(self, param, key, source):
+        """A tie of `param` to the record `source` at `key`, nothing offered or aliased yet."""
+        self.param, self.key = param, key
+        self.source = weakref.ref(source, _withdraw(weakref.ref(self)))
+        self.offer = self.alias = None
+
+
+def _withdraw(tie_ref):
+    """The callback run when a tie's source record dies (its table dropped without a release): the tie lets go of
+    what the source offered, so a dropped source's memory is not kept by a tie that can never alias it again."""
+    def withdraw(_):
+        """Drop the dead source's offer from the tie, if the tie still lives."""
+        tie = tie_ref()
+        if tie is not None:
+            tie.offer = None
+    return withdraw
+
+
+_PARKED = {}                            # id(released table) -> (that table, its record): an empty dict waiting
 
 
 def _held_record(weights):
-    """The record a LOADED table carries in its bookkeeping (`_arenas["_tied"]`), None without one: where
-    a tie lives while its table is loaded, so a rebuilt dict that keeps `_arenas` keeps it too."""
+    """The record a LOADED table carries in its bookkeeping (`_arenas["_tied"]`), None without one: where the ties
+    live while the table is loaded, so a rebuilt dict that keeps `_arenas` keeps them too."""
     arenas = weights.get("_arenas")
     rec = arenas.get(KEY) if isinstance(arenas, dict) else None
-    return rec if isinstance(rec, _Ties) else None
+    return rec if isinstance(rec, _Record) else None
 
 
 def _parked_record(weights):
-    """The record kept apart for a RELEASED table, None when this table was not released with ties: looked up
-    by the table's id and matched by identity, so another dict reusing that id never takes its ties."""
+    """The record kept apart for a RELEASED table, None when this table was not released with ties: looked up by the
+    table's id and matched by identity, so another dict reusing that id never takes its ties."""
     entry = _PARKED.get(id(weights))
     return entry[1] if entry is not None and entry[0] is weights else None
 
@@ -62,34 +92,78 @@ def record_of(weights):
 
 
 def tied_params(weights) -> frozenset:
-    """The entries of `weights` that are another component's tensor (loaded, or due again at the table's reload)."""
+    """The entries of `weights` that are another table's tensor, aliased now or due at the next bind or reload."""
     rec = record_of(weights)
     return frozenset(rec.binds) if rec is not None else frozenset()
 
 
+def _install(weights, rec, arenas=None):
+    """Put `rec` in a table's bookkeeping (a new "_arenas" dict: the loader's own is never written), on top of
+    `arenas` when given (the bookkeeping to keep), else the table's own."""
+    base = weights.get("_arenas") if arenas is None else arenas
+    weights["_arenas"] = {**(base or {}), KEY: rec}
+    rec.loaded = True
+
+
+def _record_for(weights):
+    """The record of a table being bound: its own, its parked one taken back, or a new one installed."""
+    rec = _held_record(weights)
+    if rec is None:
+        rec = _parked_record(weights)
+        if rec is not None:
+            del _PARKED[id(weights)]
+        else:
+            rec = _Record()
+        _install(weights, rec)
+    return rec
+
+
+def _arenas_holding(weights, tensor) -> tuple:
+    """The arenas of a table's bookkeeping whose block holds `tensor`'s address: what a weight placed by the loader
+    needs alive, since it holds no reference to them. None for a tensor that owns its memory (it keeps it)."""
+    ptr = tensor.data_ptr()
+    found = []
+    for name, arena in (weights.get("_arenas") or {}).items():
+        base, total = getattr(arena, "_base_ptr", 0), getattr(arena, "_total", 0)
+        if name != KEY and base and base <= ptr < base + total:
+            found.append(arena)
+    return tuple(found)
+
+
 def _spec_differs(name, what, mine, theirs):
-    """The refusal of a tie whose `what` (shape or dtype) differs, naming the entry and both values: a tie
-    reads the source in place, so a different layout would read wrong memory."""
+    """The refusal of a tie whose `what` (shape or dtype) differs, naming the entry and both values: a tie reads the
+    source in place, so a different layout would read wrong memory."""
     return TiedWeightError(f"bind_tied: '{name}' {what} {mine} differs from its source's {theirs}; a tie binds a "
                            f"weight of the same {what} only")
 
 
 def _dtype_of(d):
-    """A dtype given by name ("bfloat16") read as the library's NBXDtype, any other value as given: so a
-    caller may state the param's dtype as its graph writes it and still be compared with the source's."""
+    """A dtype given by name ("bfloat16") read as the library's NBXDtype, any other value as given: so a caller may
+    state the param's dtype as its graph writes it and still be compared with the source's."""
     if isinstance(d, str):
         from nbxtensor.dtype.nbx_dtype import parse_dtype
         return parse_dtype(d)
     return d
 
 
-def bind_tied(weights: dict, param: str, source, *, shape=None, dtype=None):
-    """Make `weights[param]` the tensor `source` (another component's loaded weight): the same tensor, no copy, no
-    allocation, 0 bytes for this table (`weight_bytes`). Refused by name (TiedWeightError) when `source` is not a
-    library tensor, or when its shape or dtype differs from the entry already at `param` (the stored copy) or from
-    `shape` / `dtype` when given. The tie is kept across the table's `release_weights` and `join_weights` (module
-    docstring). Returns `source`."""
+def _purge():
+    """Released tables whose record ties nothing any more are forgotten (their empty dict and record dropped): what a
+    re-bind to a new source dict or a dropped consumer leaves behind does not pile up request after request."""
+    for k, (_, rec) in list(_PARKED.items()):
+        if not rec.binds and not len(rec.sourced):
+            del _PARKED[k]
+
+
+def bind_tied(weights: dict, param: str, source_weights: dict, source_key: str, *, shape=None, dtype=None):
+    """Make `weights[param]` the tensor `source_weights[source_key]` (another table's loaded weight, or this table's
+    own): the same tensor, no copy, no allocation; the source's arenas kept alive while the alias is loaded. Refused by
+    name (TiedWeightError) when the source holds no such key, when it is not a library tensor, or when its shape or
+    dtype differs from the entry already at `param` (the stored copy) or from `shape` / `dtype` when given. Binding
+    again (each request, after a reload) re-binds to what the source holds now. Returns the source tensor."""
     from nbxtensor.tensor import NBXTensor
+    if source_key not in source_weights:
+        raise TiedWeightError(f"bind_tied: the source of '{param}' holds no weight '{source_key}'")
+    source = source_weights[source_key]
     if not isinstance(source, NBXTensor):
         raise TiedWeightError(f"bind_tied: the source of '{param}' is not a library tensor ({type(source).__name__})")
     held = weights.get(param)
@@ -102,92 +176,117 @@ def bind_tied(weights: dict, param: str, source, *, shape=None, dtype=None):
         raise _spec_differs(param, "shape", tuple(shape), tuple(source.shape))
     if dtype is not None and _dtype_of(dtype) != source.dtype:
         raise _spec_differs(param, "dtype", _dtype_of(dtype), source.dtype)
-    rec = _held_record(weights)
-    if rec is None:
-        parked = _PARKED.pop(id(weights), None)
-        rec = parked[1] if parked is not None and parked[0] is weights else _Ties()
-    rec.binds[param] = source
-    rec.orphaned.discard(param)
+    cons = _record_for(weights)
+    src = cons if source_weights is weights else _record_for(source_weights)
+    offer = (source, _arenas_holding(source_weights, source))
+    tie = cons.binds.get(param)
+    if tie is None or tie.source() is not src or tie.key != source_key:
+        old = tie.source() if tie is not None else None
+        if old is not None and tie is not None:
+            old.sourced.discard(tie)
+        tie = cons.binds[param] = _Tie(param, source_key, src)
+    for other in list(src.sourced):         # a released copy of this consumer tied the same: superseded by this bind
+        if other is not tie and other.key == source_key and other.param == param and other.alias is None:
+            src.sourced.discard(other)
+            for _, rec in list(_PARKED.values()):
+                if rec.binds.get(param) is other:
+                    del rec.binds[param]
+    src.sourced.add(tie)
+    tie.offer = tie.alias = offer
     weights[param] = source
-    arenas = weights.get("_arenas")
-    weights["_arenas"] = {**(arenas or {}), KEY: rec}
-    _LIVE.add(rec)
+    _purge()
     return source
 
 
-def weight_bytes(weights: dict) -> int:
-    """The bytes a table's own weights hold: each allocation counted once (a view by its allocation), the tied entries
-    0 (they are their source's), the bookkeeping ("_arenas") not a weight."""
+def _bytes_of(t, seen) -> int:
+    """A tensor's bytes, its allocation counted once across the call (`seen` holds the ids already counted)."""
     from nbxtensor.tensor import NBXTensor
-    tied = tied_params(weights)
-    seen, total = set(), 0
-    for name, t in weights.items():
-        if name == "_arenas" or name in tied or t is None:
-            continue
-        if isinstance(t, NBXTensor):
-            root = t.storage_root()
-            if id(root) not in seen:
-                seen.add(id(root))
-                total += root.nbytes()
-        elif callable(getattr(t, "nbytes", None)):
-            total += t.nbytes()
+    if isinstance(t, NBXTensor):
+        root = t.storage_root()
+        if id(root) in seen:
+            return 0
+        seen.add(id(root))
+        return root.nbytes()
+    return t.nbytes() if callable(getattr(t, "nbytes", None)) else 0
+
+
+def weight_bytes(*tables) -> int:
+    """The bytes the tables hold, each allocation counted once across them: their own weights (the bookkeeping
+    "_arenas" is not a weight); a tied entry 0 while its source is loaded (the bytes are the source's), and once the
+    source is released the arenas its alias keeps alive, counted once where they are."""
+    seen, kept, total = set(), set(), 0
+    for weights in tables:
+        rec = record_of(weights)
+        binds = rec.binds if rec is not None else {}
+        for name, t in weights.items():
+            if name == "_arenas" or t is None:
+                continue
+            tie = binds.get(name)
+            if tie is None:
+                total += _bytes_of(t, seen)
+                continue
+            src = tie.source()
+            if tie.alias is None or (src is not None and src.loaded):
+                continue
+            tensor, arenas = tie.alias
+            if not arenas:
+                total += _bytes_of(tensor, seen)
+            for arena in arenas:
+                if id(arena) not in kept:
+                    kept.add(id(arena))
+                    total += arena.capacity
     return total
 
 
 def before_release(weights: dict):
-    """`release_weights`'s first step on a library table: its record taken out of its bookkeeping, and every other
-    record whose source is one of this table's tensors told so (a released consumer drops it; a loaded one keeps
-    the alias, the source alive by it). Returns the table's own record, None without one."""
-    from nbxtensor.tensor import NBXTensor
+    """`release_weights`'s first step on a library table: its record taken out of its bookkeeping (so the arenas
+    the release reads are the table's own), nothing dropped yet. Returns the record, None without one."""
     arenas = weights.get("_arenas")
     rec = arenas.pop(KEY, None) if isinstance(arenas, dict) else None
-    rec = rec if isinstance(rec, _Ties) else None
-    own = set(rec.binds) if rec is not None else set()
-    roots = set()
-    for name, t in weights.items():
-        if name not in own and isinstance(t, NBXTensor):
-            roots.update((id(t), id(t.storage_root())))
-    if roots:
-        parked = {id(r) for _, r in _PARKED.values()}
-        for other in list(_LIVE):
-            if other is rec:
-                continue
-            for p, s in list(other.binds.items()):
-                if s is not None and (id(s) in roots or id(s.storage_root()) in roots):
-                    if id(other) in parked:
-                        other.binds[p] = None
-                    else:
-                        other.orphaned.add(p)
-    return rec
+    return rec if isinstance(rec, _Record) else None
 
 
 def after_release(weights: dict, rec) -> None:
-    """`release_weights`'s last step: the cleared table's record kept for its reload; a source whose table was
-    released meanwhile is forgotten (nothing released stays alive behind a released consumer)."""
+    """`release_weights`'s last step, once the devices are synchronised and the table cleared: as a consumer, its
+    aliases dropped (the source arenas they kept go if they were the last); as a source, its name withdrawn from
+    every tie (a loaded consumer keeps its alias and arenas); the record kept for the table's reload."""
     if rec is None:
         return
-    for p in rec.orphaned:
-        rec.binds[p] = None
-    rec.orphaned.clear()
+    for tie in rec.binds.values():
+        tie.alias = None
+    for tie in list(rec.sourced):
+        tie.offer = None
+    rec.loaded = False
     _PARKED[id(weights)] = (weights, rec)
+    _purge()
 
 
 def rejoin(held: dict, joined: dict) -> dict:
-    """`join_weights`'s last step: `joined` (what `held` is updated with, or replaced by on a reload) with every tie of
-    `held` restored, the source's tensor at each tied entry (a stored copy the loader read anyway replaced), the
-    record in its bookkeeping. A tie whose source was released is refused by name, `held` left as it was."""
+    """`join_weights`'s last step: `joined` (what `held` is updated with, or replaced by on a reload) with `held`'s
+    record in its bookkeeping. As a source, each tie learns the tensor now at its key; as a consumer, each tie whose
+    source offers a tensor aliases it (a stored copy the loader read anyway replaced), a tie whose source is not
+    loaded waits, and a tie whose source can never come back is refused by name, `held` left as it was."""
     rec = _held_record(held)
     parked = rec is None
     if parked:
         rec = _parked_record(held)
     if rec is None:
         return joined
-    gone = sorted(p for p, s in rec.binds.items() if s is None)
+    gone = sorted(p for p, tie in rec.binds.items() if tie.source() is None)
     if gone:
-        raise TiedWeightError(f"bind_tied: the source of {gone} was released after this table was: the reload "
-                              f"cannot alias it; load the source component and bind the tie again")
+        raise TiedWeightError(f"bind_tied: the source of {gone} can never come back (its table was dropped without "
+                              f"a release); load the source component and bind the tie again")
     if parked:
         del _PARKED[id(held)]
-    out = {**joined, **rec.binds}
-    out["_arenas"] = {**(joined.get("_arenas") or {}), KEY: rec}
+    out = dict(joined)
+    _install(out, rec, {**(held.get("_arenas") or {}), **(joined.get("_arenas") or {})})
+    view = {**held, **out}
+    for tie in list(rec.sourced):
+        t = view.get(tie.key)
+        if t is not None and tie.key not in rec.binds:
+            tie.offer = (t, _arenas_holding(view, t))
+    for param, tie in rec.binds.items():
+        if tie.offer is not None:
+            tie.alias = tie.offer
+            out[param] = tie.offer[0]
     return out

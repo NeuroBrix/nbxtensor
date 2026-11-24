@@ -1,140 +1,288 @@
-"""`memory.bind_tied(weights, param, source)`: a weight table's entry `param` made an ALIAS of another component's
-loaded tensor — the same tensor, no copy, no allocation, 0 bytes counted for the table — and kept across the
-consumer's unload (`release_weights`) and reload (`join_weights` of the released table and the new load); a shape or
-dtype that differs is refused by name; the source released while the consumer holds the alias stays alive (the alias is
-a reference, as every view keeps its allocation), and a consumer released AND its source released refuses its reload
-by name instead of keeping a released component's memory alive behind it.
+"""`memory.bind_tied(weights, param, source_weights, source_key)`: a weight table's entry `param` made an ALIAS of the
+tensor another table holds at `source_key` (no copy, no allocation) and kept across the unloads and reloads the engine
+really makes (`release_weights`, `join_weights`, and the engine's own bind again at each request).
 
-What this test would do if the code were wrong: a copy (another pointer, bytes allocated), the reload bringing back
-the stored copy or nothing, a mismatch bound, the source's memory freed under the alias, a released source kept
-alive by a released consumer — RED."""
+The sources here are the real thing: a safetensors shard written by the test, read through the library's own
+placement (`io.safetensors.place_in_arena`) into a `ComponentArena` sized by `WeightArenas`, the table's "_arenas"
+the arena's only reference — exactly the engine's loader. A weight there is an NBXTensor over a sub-allocation that
+holds NO reference to its arena, so a tie that kept only the tensor would read freed memory once the source's table
+lets go of "_arenas". Each cell checks that fact, not luck: the alias's address lies inside a block the allocator
+still holds (`blocks_in_use`), and its values are the shard's after a same-size allocation filled with a sentinel.
+
+The orders replayed are the engine's: the text flow releases the language model at each request's end while the head
+stays loaded (triton/flow/autoregressive.py:344, :829-835), then reloads it and binds the ties again; a consumer and
+its source both released and reloaded; a tie inside one component; a consumer's dict replaced after its load
+(graph_executor.py `_reconcile_weight_keys`).
+
+What this test would do if the code were wrong: the source's arena freed under a loaded alias, an arena kept after
+its last alias went, a stale tensor aliased after the source's reload, a refusal where the source can come back, a
+replaced dict kept or written, a tie counted twice or not at all — RED."""
 import gc
+import json
+import struct
+import weakref
 
 import numpy as np
 import pytest
 
 from nbxtensor import memory
+from nbxtensor.io import safetensors as sf
 from nbxtensor.memory.allocator import DeviceAllocator as DA
 from nbxtensor.tensor import NBXTensor
+
+EMBED = np.arange(32, dtype=np.float32).reshape(8, 4)
 
 
 @pytest.fixture(autouse=True)
 def _device():
-    """Skip on a machine without an accelerator only: the tensors are device tensors."""
+    """Skip on a machine without an accelerator only: the arenas and tensors are device memory."""
     if DA.device_count() == 0:          # only a machine without an accelerator skips; any other error fails
         pytest.skip("no accelerator on this machine")
 
 
-def _t(a):
-    """A device tensor holding the numpy array `a` (made contiguous)."""
-    return NBXTensor.from_numpy(np.ascontiguousarray(a))
+def _write_shard(path, arrays):
+    """A safetensors file at `path` holding `arrays` ({name: float32 array}), written as the format says."""
+    header, blobs, offset = {}, [], 0
+    for name, a in arrays.items():
+        raw = np.ascontiguousarray(a, dtype=np.float32).tobytes()
+        header[name] = {"dtype": "F32", "shape": list(a.shape), "data_offsets": [offset, offset + len(raw)]}
+        blobs.append(raw)
+        offset += len(raw)
+    text = json.dumps(header).encode()
+    with open(path, "wb") as f:
+        f.write(struct.pack("<Q", len(text)) + text + b"".join(blobs))
+    return path
 
 
-def _source_table():
-    """The source component's loaded table: its token table [8, 4] and a norm weight."""
-    embed = _t(np.arange(32, dtype=np.float32).reshape(8, 4))
-    return {"embed_tokens.weight": embed, "norm.weight": _t(np.ones(4, np.float32))}
+def _load_shard(path):
+    """The shard loaded as the engine's loader does: sized by `WeightArenas`, one `ComponentArena` on the current
+    device, each tensor placed by the library's `place_in_arena`, the arenas under "_arenas" (their only reference)."""
+    with open(path, "rb") as f:
+        (hsize,) = struct.unpack("<Q", f.read(8))
+        header = json.loads(f.read(hsize))
+        data = f.read()
+    dev = DA.get_device()
+    arenas = memory.weight_arenas()
+    for info in header.values():
+        arenas.reserve(dev, info["data_offsets"][1] - info["data_offsets"][0])
+    arenas.allocate()
+    table = {}
+    for name, info in header.items():
+        np_dtype, nbx_dtype, _ = sf.SF_DTYPE_INFO[info["dtype"]]
+        start, end = info["data_offsets"]
+        table[name] = sf.place_in_arena(data[start:end], tuple(info["shape"]), nbx_dtype, np_dtype, nbx_dtype,
+                                        False, arenas.devices[dev], dev, None)
+    table["_arenas"] = arenas.devices
+    return table
 
 
-def _consumer_load(with_stored_copy=True):
-    """What the consumer's loader returns: its own weight, and its stored copy of the tied param when asked."""
-    loaded = {"proj.weight": _t(np.full((4, 4), 2.0, np.float32))}
-    if with_stored_copy:
-        loaded["lm_head.weight"] = _t(np.zeros((8, 4), np.float32))
-    return loaded
+def _lm(tmp_path, tag="lm"):
+    """The source component (a language model): its token table and a norm, from its own shard and arena."""
+    return _load_shard(_write_shard(tmp_path / f"{tag}.safetensors",
+                                    {"embed_tokens.weight": EMBED, "norm.weight": np.ones(4, np.float32)}))
 
 
-def test_the_param_becomes_the_source_s_tensor_with_no_allocation_and_no_bytes():
-    """The bind puts the source itself at the param: same object and pointer, nothing allocated, 0 bytes."""
-    src = _source_table()
-    head = _consumer_load()
-    source = src["embed_tokens.weight"]
-    own = memory.weight_bytes(head) - head["lm_head.weight"].nbytes()
+def _head(tmp_path, stored_copy=True, tag="head"):
+    """The consumer (a head): its own weight and, when asked, its stored copy of the tied param, from its own shard."""
+    arrays = {"proj.weight": np.full((4, 4), 2.0, np.float32)}
+    if stored_copy:
+        arrays["lm_head.weight"] = np.zeros((8, 4), np.float32)
+    return _load_shard(_write_shard(tmp_path / f"{tag}.safetensors", arrays))
+
+
+def _arena_base(table):
+    """The device address of the (one) arena a loaded table's "_arenas" holds."""
+    return next(a._base_ptr for k, a in table["_arenas"].items() if k != "_tied")
+
+
+def _live(ptr):
+    """Whether `ptr` lies inside a block the allocator still holds for a tensor (not freed, not parked)."""
+    return any(base <= ptr < base + n for base, n in memory.blocks_in_use().items())
+
+
+def _reads_the_shard(alias):
+    """The alias's live memory still holds the shard's values once a same-size allocation is filled with a sentinel
+    (freed memory would be handed out again and overwritten)."""
+    assert _live(alias.data_ptr()), "the alias points into memory the allocator freed"
+    sentinel = NBXTensor.from_numpy(np.full(EMBED.shape, -7.0, np.float32))
+    np.testing.assert_array_equal(alias.numpy(), EMBED)
+    del sentinel
+
+
+def test_the_param_becomes_the_source_s_tensor_with_no_copy_and_no_allocation(tmp_path):
+    """The bind puts the source's tensor itself at the param: same object and address, nothing allocated."""
+    lm, head = _lm(tmp_path), _head(tmp_path)
     before = memory.memory_allocated()
-    assert memory.bind_tied(head, "lm_head.weight", source) is source
+    assert memory.bind_tied(head, "lm_head.weight", lm, "embed_tokens.weight") is lm["embed_tokens.weight"]
     assert memory.memory_allocated() == before, "the bind allocated"
-    assert head["lm_head.weight"] is source and head["lm_head.weight"].data_ptr() == source.data_ptr()
-    assert memory.weight_bytes(head) == own, "the alias was counted in the consumer's bytes"
+    assert head["lm_head.weight"] is lm["embed_tokens.weight"]
     assert memory.tied_params(head) == frozenset({"lm_head.weight"})
-    np.testing.assert_array_equal(head["lm_head.weight"].numpy(), np.arange(32, dtype=np.float32).reshape(8, 4))
+    np.testing.assert_array_equal(head["lm_head.weight"].numpy(), EMBED)
 
 
-def test_the_alias_holds_across_the_consumer_s_unload_and_reload():
-    """Released then joined with a new load, twice: the param is the source's tensor each time."""
-    src = _source_table()
-    source = src["embed_tokens.weight"]
-    head = _consumer_load()
-    memory.bind_tied(head, "lm_head.weight", source)
-    assert memory.release_weights(head) is True and head == {}
-    assert memory.tied_params(head) == frozenset({"lm_head.weight"}), "the unload forgot the tie"
-    # the reload: the loader skips what is tied (no stored copy read), the library joins the released table
-    reloaded = memory.join_weights(head, _consumer_load(with_stored_copy=False))
-    assert reloaded["lm_head.weight"] is source and reloaded["lm_head.weight"].data_ptr() == source.data_ptr()
-    assert memory.tied_params(reloaded) == frozenset({"lm_head.weight"})
-    # a loader that read the stored copy anyway: the alias wins, the copy is not what the table holds
-    assert memory.release_weights(reloaded) is True
-    again = memory.join_weights(reloaded, _consumer_load(with_stored_copy=True))
-    assert again["lm_head.weight"] is source
-    # and a second cycle on the new table
-    assert memory.release_weights(again) is True
-    assert memory.join_weights(again, _consumer_load(False))["lm_head.weight"] is source
-
-
-def test_a_partial_load_into_a_held_table_keeps_the_alias():
-    """A load that adds readers to a held table leaves the tied param the source's, its stored copy unused."""
-    src = _source_table()
-    source = src["embed_tokens.weight"]
-    head = _consumer_load()
-    memory.bind_tied(head, "lm_head.weight", source)
-    head.update(memory.join_weights(head, {"extra.weight": _t(np.ones(2, np.float32)),
-                                           "lm_head.weight": _t(np.zeros((8, 4), np.float32))}))
-    assert head["lm_head.weight"] is source and "extra.weight" in head
-
-
-def test_a_shape_or_dtype_that_differs_is_refused_by_name():
-    """A differing shape or dtype, or a source that is no library tensor: refused by name, the table unchanged."""
-    src = _source_table()
-    head = _consumer_load()
-    wrong_shape = _t(np.zeros((4, 8), np.float32))
-    with pytest.raises(memory.TiedWeightError, match=r"lm_head\.weight.*shape"):
-        memory.bind_tied(head, "lm_head.weight", wrong_shape)
-    wrong_dtype = _t(np.zeros((8, 4), np.float16))
-    with pytest.raises(memory.TiedWeightError, match=r"lm_head\.weight.*dtype"):
-        memory.bind_tied(head, "lm_head.weight", wrong_dtype)
-    with pytest.raises(memory.TiedWeightError, match=r"lm_head\.weight.*shape"):
-        memory.bind_tied({}, "lm_head.weight", src["embed_tokens.weight"], shape=(4, 8))
-    with pytest.raises(memory.TiedWeightError, match=r"lm_head\.weight.*not a library tensor"):
-        memory.bind_tied(head, "lm_head.weight", np.zeros((8, 4), np.float32))
-    assert head["lm_head.weight"] is not src["embed_tokens.weight"], "a refused bind changed the table"
-    assert memory.tied_params(head) == frozenset()
-
-
-def test_the_source_released_under_a_held_alias_stays_alive_by_reference():
-    """The source's table released while the consumer holds the alias: its memory stays allocated and readable."""
-    src = _source_table()
-    source = src["embed_tokens.weight"]
-    ptr = source.data_ptr()
-    head = _consumer_load()
-    memory.bind_tied(head, "lm_head.weight", source)
-    del source
-    assert memory.release_weights(src) is True and src == {}
+def test_the_source_released_under_a_loaded_alias_keeps_its_arena_until_the_last_alias_goes(tmp_path):
+    """Releasing the source releases its NAME: the arena stays while the head holds the alias, and goes with it."""
+    lm, head = _lm(tmp_path), _head(tmp_path)
+    base = _arena_base(lm)
+    memory.bind_tied(head, "lm_head.weight", lm, "embed_tokens.weight")
+    assert memory.release_weights(lm) is True and lm == {}
     gc.collect()
-    alias = head["lm_head.weight"]
-    assert alias.data_ptr() == ptr and ptr in memory.blocks_in_use(alias.device_idx), "the source was freed"
-    np.testing.assert_array_equal(alias.numpy(), np.arange(32, dtype=np.float32).reshape(8, 4))
-
-
-def test_a_released_consumer_does_not_keep_a_released_source_alive_and_its_reload_is_refused_by_name():
-    """Consumer released, then source released: the source is freed and the consumer's reload refused by name."""
-    src = _source_table()
-    source = src["embed_tokens.weight"]
-    ptr, dev = source.data_ptr(), source.device_idx
-    head = _consumer_load()
-    memory.bind_tied(head, "lm_head.weight", source)
+    assert _live(base), "the source's arena was freed under a loaded alias"
+    _reads_the_shard(head["lm_head.weight"])
     assert memory.release_weights(head) is True
-    del source
-    assert memory.release_weights(src) is True
     gc.collect()
-    assert ptr not in memory.blocks_in_use(dev), "a released consumer kept the released source alive"
-    with pytest.raises(memory.TiedWeightError, match=r"lm_head\.weight.*released"):
-        memory.join_weights(head, _consumer_load(False))
+    assert not _live(base), "the source's arena outlived its last alias"
+
+
+def test_the_bytes_are_counted_once_where_they_are(tmp_path):
+    """Source loaded: the tie is 0 in the head, its bytes the source's. Source released: the kept arena is counted
+    once, in the tables that keep it, however many of them are summed together."""
+    lm, head, head2 = _lm(tmp_path), _head(tmp_path), _head(tmp_path, tag="head2")
+    lm_own, head_own = memory.weight_bytes(lm), memory.weight_bytes(head) - EMBED.nbytes
+    memory.bind_tied(head, "lm_head.weight", lm, "embed_tokens.weight")
+    memory.bind_tied(head2, "lm_head.weight", lm, "embed_tokens.weight")
+    assert memory.weight_bytes(head) == head_own
+    assert memory.weight_bytes(lm, head, head2) == lm_own + 2 * head_own
+    kept = next(a for k, a in lm["_arenas"].items() if k != "_tied").capacity
+    memory.release_weights(lm)
+    assert memory.weight_bytes(head) == head_own + kept
+    assert memory.weight_bytes(head, head2) == 2 * head_own + kept, "the kept arena was counted twice"
+
+
+def test_the_text_flow_s_order_rebinds_the_head_to_the_reloaded_language_model(tmp_path):
+    """The LM released at the request's end with the head loaded (autoregressive.py:344), reloaded at the next one
+    the engine's way (a new dict), then the twin's per-request bind: the head aliases the NEW tensor and the old
+    arena is freed. Several requests in a row keep nothing behind."""
+    from nbxtensor.memory import tied
+    parked = len(tied._PARKED)
+    head = _head(tmp_path)
+    lm = _lm(tmp_path)
+    memory.bind_tied(head, "lm_head.weight", lm, "embed_tokens.weight")
+    for turn in range(3):
+        old_base = _arena_base(lm)
+        memory.release_weights(lm)                                  # :344, the head stays
+        gc.collect()
+        assert _live(old_base)
+        _reads_the_shard(head["lm_head.weight"])                    # the head may still run on the old one
+        lm = _lm(tmp_path, tag=f"lm{turn}")                         # the reload: `self._weights = loaded`
+        memory.bind_tied(head, "lm_head.weight", lm, "embed_tokens.weight")   # the twin's bind, every request
+        gc.collect()
+        assert head["lm_head.weight"] is lm["embed_tokens.weight"], "the head kept the stale tensor"
+        assert not _live(old_base), "the old language model's arena outlived the re-bind"
+    assert len(tied._PARKED) <= parked, f"released tables pile up: {len(tied._PARKED) - parked} more"
+
+
+def test_the_source_reloaded_through_join_weights_is_what_the_consumer_reload_aliases(tmp_path):
+    """Consumer released, source released, source reloaded (`join_weights`), consumer reloaded: the consumer aliases
+    the source's NEW tensor; never refused, since the source came back."""
+    lm, head = _lm(tmp_path), _head(tmp_path)
+    old_base = _arena_base(lm)
+    memory.bind_tied(head, "lm_head.weight", lm, "embed_tokens.weight")
+    memory.release_weights(head)
+    memory.release_weights(lm)
+    gc.collect()
+    assert not _live(old_base), "a released consumer kept its released source's arena"
+    lm = memory.join_weights(lm, _lm(tmp_path, tag="lm2"))
+    head = memory.join_weights(head, _head(tmp_path, stored_copy=False, tag="head2"))
+    assert head["lm_head.weight"] is lm["embed_tokens.weight"]
+    _reads_the_shard(head["lm_head.weight"])
+
+
+def test_a_consumer_reloaded_before_its_source_waits_for_it_then_binds(tmp_path):
+    """The twin loads the consumer before the source: the consumer's reload leaves the tie waiting (named by
+    `tied_params`, no stale alias), and the bind after the source's load completes it."""
+    lm, head = _lm(tmp_path), _head(tmp_path)
+    memory.bind_tied(head, "lm_head.weight", lm, "embed_tokens.weight")
+    memory.release_weights(head)
+    memory.release_weights(lm)
+    head = memory.join_weights(head, _head(tmp_path, stored_copy=False, tag="head2"))
+    assert "lm_head.weight" not in head and memory.tied_params(head) == frozenset({"lm_head.weight"})
+    lm = _lm(tmp_path, tag="lm2")
+    memory.bind_tied(head, "lm_head.weight", lm, "embed_tokens.weight")
+    assert head["lm_head.weight"] is lm["embed_tokens.weight"]
+
+
+def test_a_source_that_can_never_come_back_is_refused_by_name_at_the_consumer_s_reload(tmp_path):
+    """The source's table dropped without a release (its record gone): nothing can bring it back, so the consumer's
+    reload refuses the tie by name."""
+    lm, head = _lm(tmp_path), _head(tmp_path)
+    memory.bind_tied(head, "lm_head.weight", lm, "embed_tokens.weight")
+    memory.release_weights(head)
+    del lm
+    gc.collect()
+    with pytest.raises(memory.TiedWeightError, match=r"lm_head\.weight.*never come back"):
+        memory.join_weights(head, _head(tmp_path, stored_copy=False, tag="head2"))
+
+
+def test_a_tie_inside_one_component_aliases_the_new_load_never_the_old_memory(tmp_path):
+    """A table tied to itself, released and reloaded: the param is the NEW load's tensor, the old arena freed."""
+    t = _load_shard(_write_shard(tmp_path / "one.safetensors", {"embed_tokens.weight": EMBED,
+                                                                "lm_head.weight": np.zeros((8, 4), np.float32)}))
+    old_base = _arena_base(t)
+    memory.bind_tied(t, "lm_head.weight", t, "embed_tokens.weight")
+    memory.release_weights(t)
+    gc.collect()
+    assert not _live(old_base), "the table's own tie kept its released arena"
+    new = _load_shard(_write_shard(tmp_path / "two.safetensors", {"embed_tokens.weight": EMBED}))
+    t = memory.join_weights(t, new)
+    assert t["lm_head.weight"] is t["embed_tokens.weight"]
+    _reads_the_shard(t["lm_head.weight"])
+
+
+def test_a_replaced_dict_is_neither_kept_nor_written(tmp_path):
+    """The engine replaces a loaded table's dict (`_reconcile_weight_keys`): the tie's record moves with "_arenas";
+    the old dict is not referenced by the library (it is collected) and nothing writes into a dict it kept."""
+    class Marker:
+        """A weakly referenced value only the old dict holds."""
+
+    lm, head = _lm(tmp_path), _head(tmp_path)
+    memory.bind_tied(head, "lm_head.weight", lm, "embed_tokens.weight")
+    memory.bind_tied(head, "lm_head.weight", lm, "embed_tokens.weight")      # a second bind changes nothing
+    marker = Marker()
+    head["marker"] = marker
+    probe = weakref.ref(marker)
+    renamed = {k: v for k, v in head.items() if k != "marker"}              # the engine's `self._weights = new`
+    kept_lm = dict(lm)                                                       # an old source dict the test keeps
+    snapshot = {k: id(v) for k, v in kept_lm.items()}
+    del head, marker
+    gc.collect()
+    assert probe() is None, "the library kept the replaced dict"
+    assert memory.tied_params(renamed) == frozenset({"lm_head.weight"})
+    memory.release_weights(lm)
+    lm = memory.join_weights(lm, _lm(tmp_path, tag="lm2"))
+    memory.bind_tied(renamed, "lm_head.weight", lm, "embed_tokens.weight")
+    assert {k: id(v) for k, v in kept_lm.items()} == snapshot, "the library wrote into a dict it should not hold"
+    assert renamed["lm_head.weight"] is lm["embed_tokens.weight"]
+
+
+def test_a_partial_load_into_a_held_table_keeps_the_alias_and_the_table_s_arenas(tmp_path):
+    """A load that adds readers to a held table: the tied param stays the source's, the table's own arenas stay."""
+    lm, head = _lm(tmp_path), _head(tmp_path)
+    memory.bind_tied(head, "lm_head.weight", lm, "embed_tokens.weight")
+    base = _arena_base(head)
+    head.update(memory.join_weights(head, {"extra.weight": NBXTensor.from_numpy(np.ones(2, np.float32)),
+                                           "lm_head.weight": NBXTensor.from_numpy(np.zeros((8, 4), np.float32))}))
+    gc.collect()
+    assert head["lm_head.weight"] is lm["embed_tokens.weight"] and "extra.weight" in head
+    assert _arena_base(head) == base and _live(base), "the partial load dropped the table's own arena"
+
+
+def test_a_shape_dtype_or_key_that_differs_is_refused_by_name(tmp_path):
+    """A differing shape or dtype, a key the source does not hold, a source that is no library tensor: refused by
+    name, the table unchanged."""
+    lm, head = _lm(tmp_path), _head(tmp_path)
+    stored = head["lm_head.weight"]
+    other = {"wide": NBXTensor.from_numpy(np.zeros((4, 8), np.float32)),
+             "half": NBXTensor.from_numpy(np.zeros((8, 4), np.float16)),
+             "host": np.zeros((8, 4), np.float32)}
+    with pytest.raises(memory.TiedWeightError, match=r"lm_head\.weight.*shape"):
+        memory.bind_tied(head, "lm_head.weight", other, "wide")
+    with pytest.raises(memory.TiedWeightError, match=r"lm_head\.weight.*dtype"):
+        memory.bind_tied(head, "lm_head.weight", other, "half")
+    with pytest.raises(memory.TiedWeightError, match=r"lm_head\.weight.*not a library tensor"):
+        memory.bind_tied(head, "lm_head.weight", other, "host")
+    with pytest.raises(memory.TiedWeightError, match=r"lm_head\.weight.*'missing'"):
+        memory.bind_tied(head, "lm_head.weight", lm, "missing")
+    with pytest.raises(memory.TiedWeightError, match=r"lm_head\.weight.*shape"):
+        memory.bind_tied({}, "lm_head.weight", lm, "embed_tokens.weight", shape=(4, 8))
+    assert head["lm_head.weight"] is stored and memory.tied_params(head) == frozenset()

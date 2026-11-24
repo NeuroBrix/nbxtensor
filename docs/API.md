@@ -132,16 +132,19 @@ The application's door (`nbxtensor.memory` itself), each name answered by the mo
 def set_limit(nbytes, device=None) -> None
 def release_weights(weights: dict) -> bool                     # memory_pool.release_weights
 def join_weights(held: dict, loaded: dict) -> dict             # memory_pool.join_weights (a table's ties restored)
-def bind_tied(weights: dict, param: str, source, *, shape=None, dtype=None) -> NBXTensor   # tied.bind_tied
-    # weights[param] made the tensor `source` (another component's loaded weight): an alias, no copy, no allocation;
-    # a source that is not an NBXTensor, or a shape / dtype differing from the entry at `param` (or from `shape` /
-    # `dtype` when given), refused by name: TiedWeightError. The tie is recorded in the table's "_arenas" and kept:
-    # release_weights(weights) keeps it apart for the reload; join_weights(weights, loaded) puts the source's tensor
-    # back at `param` (the reload: `table = join_weights(table, loaded)`). Lifetime by reference: the source released
-    # while a loaded table holds the alias stays alive by it; released after the consumer was, it is forgotten and the
-    # consumer's reload refused by name (load the source, bind again).
+def bind_tied(weights: dict, param: str, source_weights: dict, source_key: str, *, shape=None, dtype=None) -> NBXTensor
+    # tied.bind_tied: weights[param] made the tensor source_weights[source_key] (another table's, or this table's own):
+    # an alias, no copy, no allocation; a missing key, a source that is not an NBXTensor, or a shape / dtype differing
+    # from the entry at `param` (or from `shape` / `dtype` when given) refused by name: TiedWeightError. One record
+    # per table in its "_arenas" (it moves with "_arenas" when the dict is rebuilt; no loaded dict is held). Lifetime:
+    # a LOADED alias keeps the source's arenas (the blocks holding its address) alive, so releasing the source
+    # releases its name, not its memory, and the arenas go with the last alias; a released consumer keeps nothing;
+    # a source reloaded through join_weights(table, loaded) is what the consumer's reload aliases, a source reloaded
+    # as a new dict is re-bound by the next bind_tied; a consumer reloaded before its source waits (tied_params names
+    # it) and is refused by name only when its source can never come back (its table dropped without a release).
 def tied_params(weights: dict) -> frozenset                    # the tied entries (a loader need not read them)
-def weight_bytes(weights: dict) -> int                         # a table's own bytes, each allocation once, a tie 0
+def weight_bytes(*tables) -> int                               # the tables' bytes, each allocation once: a tie 0
+    # while its source is loaded, the arenas its alias keeps counted once (capacity) after the source's release
 TiedWeightError                                                # a tie refused by name (ValueError)
 def pool_enabled() -> bool                                      # pool.parks_freed_blocks
 def pool_parked_cap_bytes(vendor, architecture, total_bytes) -> int   # pool.parked_cap_bytes

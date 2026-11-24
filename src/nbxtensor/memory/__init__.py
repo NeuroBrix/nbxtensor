@@ -26,25 +26,26 @@ def join_weights(held: dict, loaded: dict) -> dict:
     return join(held, loaded)
 
 
-def bind_tied(weights: dict, param: str, source, *, shape=None, dtype=None):
-    """`weights[param]` made the tensor `source` (another component's loaded weight): an alias, no copy, kept across
-    the table's `release_weights` and `join_weights`; a shape or dtype that differs refused by name
-    (`tied.bind_tied`)."""
+def bind_tied(weights: dict, param: str, source_weights: dict, source_key: str, *, shape=None, dtype=None):
+    """`weights[param]` made the tensor `source_weights[source_key]`: an alias, no copy, the source's arenas kept
+    alive while it is loaded, re-bound by table and key across the tables' `release_weights` and `join_weights`; a
+    missing key, a shape or a dtype that differs refused by name (`tied.bind_tied`)."""
     from nbxtensor.memory.tied import bind_tied as bind
-    return bind(weights, param, source, shape=shape, dtype=dtype)
+    return bind(weights, param, source_weights, source_key, shape=shape, dtype=dtype)
 
 
 def tied_params(weights: dict) -> frozenset:
-    """The entries of a table (loaded, or released and due again at its reload) that are another component's tensor:
-    the ones a loader need not read (`tied.tied_params`)."""
+    """The entries of a table that are another table's tensor, aliased now or due at the next bind or reload: the
+    ones a loader need not read (`tied.tied_params`)."""
     from nbxtensor.memory.tied import tied_params as tied
     return tied(weights)
 
 
-def weight_bytes(weights: dict) -> int:
-    """The bytes a table's own weights hold, each allocation once, a tied entry 0 (`tied.weight_bytes`)."""
+def weight_bytes(*tables) -> int:
+    """The bytes the tables hold, each allocation once: a tie 0 while its source is loaded, the arenas it keeps once
+    the source is released (`tied.weight_bytes`)."""
     from nbxtensor.memory.tied import weight_bytes as count
-    return count(weights)
+    return count(*tables)
 
 
 def pool_enabled() -> bool:

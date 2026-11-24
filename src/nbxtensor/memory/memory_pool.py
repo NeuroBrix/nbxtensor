@@ -51,8 +51,9 @@ def release_weights(weights: dict) -> bool:
     pointer tables that pin experts) dropped; then, when the set is the library's (an NBXTensor in it, or its arenas
     under "_arenas", {device: ComponentArena}), every device holding one synchronised, the dict cleared (the
     finalizers free) and the pool's cached blocks given back — True. False, the dict untouched: another library's
-    weights. A table's ties (`tied.bind_tied`) are kept apart for its reload (`join_weights`), the sources they alias
-    left alive by them while a loaded table holds them."""
+    weights. A table's ties (`tied.bind_tied`) are kept apart for its reload (`join_weights`): its aliases dropped
+    after the synchronisation (the source arenas they kept go with the last), its name withdrawn from the ties it is
+    the source of (a loaded consumer keeps its alias and the arenas under it)."""
     import sys
     from nbxtensor.memory import tied
     from nbxtensor.tensor import NBXTensor
