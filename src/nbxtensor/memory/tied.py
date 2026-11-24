@@ -130,6 +130,22 @@ def _arenas_holding(weights, tensor) -> tuple:
     return tuple(found)
 
 
+def _keeper(weights, tensor, param) -> tuple:
+    """What a tie of `param` must hold to keep `tensor`'s memory alive: the arenas of the table holding its address,
+    else nothing when the tensor (or the allocation it views) owns its memory or keeps an owner as its base. A tensor
+    that owns nothing and lies in no arena of its table is refused by name: a reference to it would keep nothing
+    alive, and the alias would read freed memory once the table that does hold it lets go."""
+    arenas = _arenas_holding(weights, tensor)
+    if arenas:
+        return arenas
+    root = tensor.storage_root()
+    if root._owns_data or root._base is not None:
+        return ()
+    raise TiedWeightError(f"bind_tied: the source of '{param}' owns no memory and no arena of its table holds its "
+                          f"address {tensor.data_ptr():#x}: the tie cannot keep it alive. Bind from the table the "
+                          f"loader filled (its \"_arenas\" with it), not from a copy of its entries")
+
+
 def _spec_differs(name, what, mine, theirs):
     """The refusal of a tie whose `what` (shape or dtype) differs, naming the entry and both values: a tie reads the
     source in place, so a different layout would read wrong memory."""
@@ -176,9 +192,9 @@ def bind_tied(weights: dict, param: str, source_weights: dict, source_key: str, 
         raise _spec_differs(param, "shape", tuple(shape), tuple(source.shape))
     if dtype is not None and _dtype_of(dtype) != source.dtype:
         raise _spec_differs(param, "dtype", _dtype_of(dtype), source.dtype)
+    offer = (source, _keeper(source_weights, source, param))
     cons = _record_for(weights)
     src = cons if source_weights is weights else _record_for(source_weights)
-    offer = (source, _arenas_holding(source_weights, source))
     tie = cons.binds.get(param)
     if tie is None or tie.source() is not src or tie.key != source_key:
         old = tie.source() if tie is not None else None
@@ -284,7 +300,7 @@ def rejoin(held: dict, joined: dict) -> dict:
     for tie in list(rec.sourced):
         t = view.get(tie.key)
         if t is not None and tie.key not in rec.binds:
-            tie.offer = (t, _arenas_holding(view, t))
+            tie.offer = (t, _keeper(view, t, tie.param))
     for param, tie in rec.binds.items():
         if tie.offer is not None:
             tie.alias = tie.offer

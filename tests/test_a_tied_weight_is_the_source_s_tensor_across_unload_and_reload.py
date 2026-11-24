@@ -286,3 +286,19 @@ def test_a_shape_dtype_or_key_that_differs_is_refused_by_name(tmp_path):
     with pytest.raises(memory.TiedWeightError, match=r"lm_head\.weight.*shape"):
         memory.bind_tied({}, "lm_head.weight", lm, "embed_tokens.weight", shape=(4, 8))
     assert head["lm_head.weight"] is stored and memory.tied_params(head) == frozenset()
+
+
+def test_a_source_whose_memory_no_arena_of_its_table_holds_is_refused_by_name_unless_it_owns_it(tmp_path):
+    """A loader-placed weight in a table without its "_arenas" (it owns nothing, no arena of the table holds it): the
+    tie could keep nothing alive, so it is refused by name. A tensor that owns its memory, or a view of one, needs no
+    arena: the reference keeps it, and it is accepted."""
+    lm = _lm(tmp_path)
+    stripped = {"embed_tokens.weight": lm["embed_tokens.weight"]}          # the loader's tensor, its arena not here
+    head = _head(tmp_path)
+    with pytest.raises(memory.TiedWeightError, match=r"lm_head\.weight.*no arena"):
+        memory.bind_tied(head, "lm_head.weight", stripped, "embed_tokens.weight")
+    assert memory.tied_params(head) == frozenset()
+    owning = NBXTensor.from_numpy(EMBED)
+    assert memory.bind_tied(head, "lm_head.weight", {"w": owning}, "w") is owning
+    view = owning.reshape(8, 4)
+    assert memory.bind_tied(_head(tmp_path, tag="h2"), "lm_head.weight", {"w": view}, "w") is view

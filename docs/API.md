@@ -141,7 +141,8 @@ def bind_tied(weights: dict, param: str, source_weights: dict, source_key: str, 
     # releases its name, not its memory, and the arenas go with the last alias; a released consumer keeps nothing;
     # a source reloaded through join_weights(table, loaded) is what the consumer's reload aliases, a source reloaded
     # as a new dict is re-bound by the next bind_tied; a consumer reloaded before its source waits (tied_params names
-    # it) and is refused by name only when its source can never come back (its table dropped without a release).
+    # it) and is refused by name only when its source can never come back (its table dropped without a release);
+    # a source that owns no memory and lies in no arena of its table is refused by name (nothing could keep it).
 def tied_params(weights: dict) -> frozenset                    # the tied entries (a loader need not read them)
 def weight_bytes(*tables) -> int                               # the tables' bytes, each allocation once: a tie 0
     # while its source is loaded, the arenas its alias keeps counted once (capacity) after the source's release
