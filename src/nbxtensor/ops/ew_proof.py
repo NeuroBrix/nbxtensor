@@ -373,7 +373,8 @@ def prove(kernel, specialization, options, tiles, vid) -> dict:
         return _unkept(kernel, guard, str(why))
     unseen = canary(guard)
     if unseen:
-        return _unkept(kernel, "unguarded", f"unguarded: {unseen}")
+        return _unkept(kernel, "unguarded", f"unguarded: {unseen}"
+                       + (f". {remedy(kernel.__name__, vid)}" if guard in _CANARY_UNRUN else ""))
     where, nbytes = ew_proof_child.write_job(kernel, launches, cands, options, guard)
     independent = declared_independence(kernel)
     try:
@@ -381,7 +382,7 @@ def prove(kernel, specialization, options, tiles, vid) -> dict:
         rec = judge(independent, cands, results, differ)
     except ew_proof_child.ProofCouldNotRun as why:
         return _unkept(kernel, guard, f"ZERO FALLBACK: the proof of {kernel.__name__} (variant "
-                       f"{stamp_key({'v': vid})}) could not run: {why}")
+                       f"{stamp_key({'v': vid})}) could not run: {why}. {remedy(kernel.__name__, vid)}")
     finally:
         import shutil
         shutil.rmtree(where, ignore_errors=True)        # the job's files: removed on success and on failure (C6-1)
@@ -398,7 +399,23 @@ def prove(kernel, specialization, options, tiles, vid) -> dict:
     return rec              # a refused one too: kept, said once, raised by `settle` at every launch
 
 
+def remedy(kernel_name: str, vid) -> str:
+    """What a variant whose proof could not run needs, said with its refusal: room for the worker on a card of the
+    launch's class (the worker ran on the freest one this process sees), or the variant's line in the shipped table —
+    named by its signature as the record line prints it (`variant <key>`), its stamp and the table's path."""
+    from nbxtensor.ops.ew_proof_child import _WORKER
+    st = stamp()
+    card, free = _WORKER.device
+    where = (f"the worker ran on visible card {card}, the freest of the class, {free // (1024 * 1024)} MiB free at its "
+             f"start" if free >= 0 else "the worker ran on the one card this process sees")
+    return (f"REMEDY: free memory on a card of this class ({st['vendor']}/{st['profile']}; {where}), or add the "
+            f"variant's line to the shipped table {_Table._shipped_path()} (stamp {stamp_key(st)}, {kernel_name} "
+            f"variant {stamp_key({'v': vid})}): prove it where a card of this class has room and merge the kept "
+            f"proofs with `python -m nbxtensor.ops.ew_proof export <replay cache>/ew_tile_proof.json <that path>`")
+
+
 _CANARY: Dict[str, str] = {}
+_CANARY_UNRUN: set = set()          # the guards whose canary could not run (its worker found no room, ...)
 
 
 def canary(guard: str) -> str:
@@ -420,6 +437,7 @@ def canary(guard: str) -> str:
                                               f"guard ({guard}): it does not guard on this device")
         except ew_proof_child.ProofCouldNotRun as why:
             _CANARY[guard] = f"the guard's canary could not run ({why})"
+            _CANARY_UNRUN.add(guard)
         finally:
             import shutil
             shutil.rmtree(where, ignore_errors=True)

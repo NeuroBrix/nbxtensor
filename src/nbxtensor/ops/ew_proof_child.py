@@ -12,6 +12,16 @@ buffers at a time, kilobytes to megabytes. A lane that touches past its extent f
 validation (Metal): the worker ends on it, the parent records that candidate's fault, and a fresh worker resumes at
 the next candidate.
 
+THE WORKER'S CARD (the project lead, 24/11/2026; register row 444): each worker the proof starts runs on the FREEST
+VISIBLE CARD OF THE LAUNCH'S STAMP (`proof_device`): among the cards this process sees that compile the same binary
+(the backend's own, at the launch card's compute capability — the vendor profile is a function of it), the one with
+the most free memory at that moment, read through the library's device facts (`DeviceAllocator.mem_get_info` per
+card). The launch's own card is among them: a model on every card leaves no spare, and the freest one wins. The
+worker's environment carries the choice (`worker_env`: the backend's visibility variable narrowed to that one card),
+so the worker's context opens there and nowhere else. A card of another compute capability is never chosen. A model
+that filled its card (deepseek-moe-16b on V100 32 GB: its card at 32 169 MiB used, the other at 709 MiB) no longer
+puts the proof's context on the full card.
+
 The worker holds nothing on the card while the parent runs: after each job it waits for the device and empties its
 pool back to the driver, and it EXITS once no job came for IDLE_SECONDS (the idle bound, 2 s); the parent's next
 job starts a fresh one.
@@ -146,6 +156,56 @@ def run_candidates(where: str, cands) -> Tuple[Dict[tuple, tuple], Any]:
 TIMED_OUT = -1000
 
 
+def _card_arch(ordinal: int):
+    """The compute capability of the visible card `ordinal` (70 for sm_70) on a CUDA process; None on a backend whose
+    cards are not told apart here (that card is then never chosen for the proof but the launch's own)."""
+    from nbxtensor.backend import runtime as _rt
+    if _rt.gpu_backend() != "cuda":
+        return None
+    from nbxtensor.backend.launcher import CudaDriver
+    return CudaDriver.instance().capability_of(int(ordinal))
+
+
+def proof_device() -> Tuple[int, int]:
+    """(visible ordinal, its free bytes) of the card the proof's next worker runs on: the FREEST visible card of the
+    launch's stamp — the cards whose compute capability is the launch card's (the launch's own card included), the
+    one with the most free memory at this moment (`DeviceAllocator.mem_get_info`), the lowest ordinal on a tie. With
+    one device, that device (its free bytes unread: -1)."""
+    from nbxtensor.memory.allocator import DeviceAllocator as DA
+    seen = DA.device_count()
+    if seen <= 1:
+        return 0, -1
+    own = int(DA.get_device())
+    arch = _card_arch(own)
+    same = [i for i in range(seen) if i == own or (arch is not None and _card_arch(i) == arch)]
+    free = {i: int(DA.mem_get_info(i)[0]) for i in same}
+    best = max(same, key=lambda i: (free[i], -i))
+    return best, free[best]
+
+
+def worker_env(ordinal: int, base: Dict[str, str] = None) -> Dict[str, str]:
+    """The environment of a worker on the visible card `ordinal`: the backend's visibility variable (its table's
+    `visible_env`; the innermost one this process has set, else the last the backend names) narrowed to the one entry
+    that IS that card in this process's numbering. A backend with no such variable (Metal: one device) is unchanged.
+    An ordinal past the entries this process's variable lists is refused by name."""
+    from nbxtensor.backend import runtime as _rt
+    env = dict(os.environ if base is None else base)
+    names = tuple(_rt.backend_table().get("visible_env") or ())
+    if not names:
+        return env
+    present = [n for n in names if env.get(n) is not None]
+    var = present[-1] if present else names[-1]
+    if var not in env:
+        env[var] = str(int(ordinal))
+        return env
+    entries = [e.strip() for e in env[var].split(",") if e.strip()]
+    if not 0 <= int(ordinal) < len(entries):
+        raise ProofCouldNotRun(f"the proof's card {ordinal} is not among the {len(entries)} card(s) {var}="
+                               f"{env[var]!r} lists")
+    env[var] = entries[int(ordinal)]
+    return env
+
+
 class _Worker:
     """ONE child process that serves a burst of proofs (orchestrator 23/11: a process and a device context per
     variant would put seconds times the variant count into a first launch) and holds NOTHING on the card while the
@@ -160,6 +220,7 @@ class _Worker:
         self.proc = None
         self.err = None
         self.idle = IDLE_SECONDS if idle is None else float(idle)
+        self.device: Tuple[int, int] = (-1, -1)      # (visible ordinal, free bytes at the choice) of the live worker
 
     def ask(self, job: dict, timeout: float = None) -> Tuple[int, str]:
         """(0, '') when the job finished; (exit code, its stderr since the job began) when the child died on it. A
@@ -196,10 +257,13 @@ class _Worker:
                                                      else f"timed out after {limit:g} s: {text[-400:]}")
 
     def _start(self):
-        """Start the worker process, its stderr kept in a temporary file."""
+        """Start the worker process on the freest card of the launch's stamp (`proof_device`, carried by its
+        environment: `worker_env`), its stderr kept in a temporary file."""
         self.err = tempfile.TemporaryFile("w+")
         from nbxtensor.memory.metal import SHADER_VALIDATION
-        env = dict(os.environ, CUDA_LAUNCH_BLOCKING="1")
+        self.device = proof_device()
+        env = worker_env(self.device[0]) if self.device[1] >= 0 else dict(os.environ)    # one device: as it is
+        env["CUDA_LAUNCH_BLOCKING"] = "1"
         if _metal():
             env[SHADER_VALIDATION] = "1"         # every access checked against its buffer's length (the guard)
         self.proc = subprocess.Popen([sys.executable, "-m", "nbxtensor.ops.ew_proof_child", "serve", repr(self.idle)],

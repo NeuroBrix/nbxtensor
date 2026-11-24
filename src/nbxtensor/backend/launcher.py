@@ -543,7 +543,12 @@ class CudaDriver(ModuleDriver):
 
     def compute_capability(self) -> int:
         from nbxtensor.memory.allocator import DeviceAllocator
-        dev = ctypes.c_int(int(DeviceAllocator.get_device()))
+        return self.capability_of(int(DeviceAllocator.get_device()))
+
+    def capability_of(self, ordinal: int) -> int:
+        """Compute capability (70 for sm_70) of the visible device `ordinal`, asked of the driver by its ordinal: a
+        device attribute, read without selecting the device and without a context on it."""
+        dev = ctypes.c_int(int(ordinal))
         major, minor = ctypes.c_int(), ctypes.c_int()
         self._check(self.lib.cuDeviceGetAttribute(ctypes.byref(major), self.CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, dev), "cuDeviceGetAttribute")
         self._check(self.lib.cuDeviceGetAttribute(ctypes.byref(minor), self.CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, dev), "cuDeviceGetAttribute")
