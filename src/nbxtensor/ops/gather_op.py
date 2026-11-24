@@ -37,6 +37,16 @@ def radix_strides(S, names, extents):
     return strides
 
 
+def outer_kept_at_zero(S, outer_strides, inner, dim):
+    """`inner_size` for a synthetic launch of this family: `inner` as drawn, or, when the variant has one of the
+    `outer_strides` i64 (a value past 2^31, `ew_synthetic.Synth.carry`), the smallest in its specialization with
+    dim x inner covering the ladder's largest count, so the outer index is 0 on every lane and the wide stride is
+    never dereferenced."""
+    if not any(S.ty(k) == "i64" for k in outer_strides if k in S.spec):
+        return inner
+    return S.int("inner_size", max(int(inner), -(-int(S.most) // int(dim))))
+
+
 def flat_reach(n, dim, inner, s_outer, s_dim, s_inner):
     """1 + the largest offset `s_outer * o + s_dim * d + s_inner * i` over the flat positions 0 .. n - 1 decomposed as
     the kernels of this family decompose them (i = off % inner, d = off // inner % dim, o = off // inner // dim):
@@ -59,6 +69,7 @@ def _gather_recipe(S):
     n, k = S.n, SYNTH_INDEXED_EXTENT
     inner = S.int("inner_size", 3)
     dim = S.int("dim_size", 2)
+    inner = outer_kept_at_zero(S, ["idx_stride_outer", "out_stride_outer", "inp_stride_outer"], inner, dim)
     outer = -(-n // (dim * inner))
     io, idd, ii = radix_strides(S, ["idx_stride_outer", "idx_stride_dim", "idx_stride_inner"], [outer, dim, inner])
     oo, od, oi = radix_strides(S, ["out_stride_outer", "out_stride_dim", "out_stride_inner"], [outer, dim, inner])

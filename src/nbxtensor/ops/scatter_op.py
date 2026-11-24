@@ -74,10 +74,11 @@ def _scatter_recipe(S):
     extent is 1 + the largest offset the kernel forms over its N positions (`gather_op.flat_reach`), the output's
     with the largest index an in-range index can take; every index drawn in [0, SYNTH_INDEXED_EXTENT). The grid is
     the call site's: cdiv(N, tile) on one axis."""
-    from nbxtensor.ops.gather_op import SYNTH_INDEXED_EXTENT, flat_reach, radix_strides
+    from nbxtensor.ops.gather_op import SYNTH_INDEXED_EXTENT, flat_reach, outer_kept_at_zero, radix_strides
     n, k = S.n, SYNTH_INDEXED_EXTENT
     inner = S.int("inner_size", 3)
     dim = S.int("dim_size", 2)
+    inner = outer_kept_at_zero(S, ["idx_stride_outer", "src_stride_outer", "out_stride_outer"], inner, dim)
     outer = -(-n // (dim * inner))
     io, idd, ii = radix_strides(S, ["idx_stride_outer", "idx_stride_dim", "idx_stride_inner"], [outer, dim, inner])
     so, sd, si = radix_strides(S, ["src_stride_outer", "src_stride_dim", "src_stride_inner"], [outer, dim, inner])

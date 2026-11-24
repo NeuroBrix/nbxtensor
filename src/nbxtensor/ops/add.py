@@ -80,8 +80,10 @@ def add_scalar_dev_kernel(
 def _bias_recipe(S):
     """The synthetic launch of `add_bias_broadcast_kernel` (`ops/ew_synthetic.py`): x and out of the ladder's count,
     a bias of `feat_dim` elements (a small width honouring its specialization) — the kernel reads bias[i % feat_dim]."""
+    from nbxtensor.ops.ew_synthetic import WIDE
     feat = S.int("feat_dim", 7)
-    return {"n_elements": S.n, "feat_dim": feat, "bias_ptr": S.buf("bias_ptr", feat)}, None
+    reads = feat if feat < WIDE else S.n                # a wide feat_dim (past 2^31): lane i < n reads bias[i]
+    return {"n_elements": S.n, "feat_dim": feat, "bias_ptr": S.buf("bias_ptr", reads)}, None
 
 
 _bias_recipe.count = "n_elements"

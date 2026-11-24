@@ -33,10 +33,12 @@ def _pixel_shuffle_recipe(S):
     """The synthetic launch of `pixel_shuffle_kernel`: `n_elements` = the ladder's count output elements of a
     contiguous [N, C_out, H*r, W*r] (N implicit in the count, its last image possibly partial), read from a
     contiguous [N, C_out*r*r, H, W]; (C_out, H, W, r) the smallest whose every derived size (OH, OW, the eight
-    strides) specialises as the variant (`ew_synthetic.solve_dims`). The output `n_elements` elements, the input 1 + the
+    strides) specialises as the variant (`ew_synthetic.solve_dims`; a batch stride the variant has i64 carried past
+    2^31 with one image covering the ladder, so N is 0 on every lane). The output `n_elements` elements, the input 1 + the
     largest offset a lane below the count reads (the op's index map); grid `cdiv(n_elements, tile)`."""
     import numpy as np
-    d = solve_dims(S, ["C_out", "H", "W", "r"], _shuffle_dims)
+    d = solve_dims(S, ["C_out", "H", "W", "r"], _shuffle_dims,
+                   batch=(("stride_in_n", "stride_out_n"), lambda v: v["C_out"] * v["OH"] * v["OW"]))
     idx = np.arange(S.n, dtype=np.int64)
     ow, t = idx % d["OW"], idx // d["OW"]
     oh, t = t % d["OH"], t // d["OH"]
@@ -128,10 +130,12 @@ def _pixel_shuffle_bcast_recipe(S):
     """The synthetic launch of `pixel_shuffle_broadcast_aware_kernel`: `n_elements` = the ladder's count output
     elements of a contiguous [N, C_out, OH, OW] (N implicit in the count), read through the stride-0 broadcast view
     the call site hands (`_bcast_dims`), (C_out, OH, OW, r, bcast) the smallest whose derived sizes specialise as the
-    variant (`ew_synthetic.solve_dims`). The output `n_elements` elements, the input (the pre-expand tensor) 1 + the largest
+    variant (`ew_synthetic.solve_dims`; a batch stride the variant has i64 carried past 2^31 with one image covering
+    the ladder, so N is 0 on every lane). The output `n_elements` elements, the input (the pre-expand tensor) 1 + the largest
     offset a lane below the count reads; grid `cdiv(n_elements, tile)`."""
     import numpy as np
-    d = solve_dims(S, ["C_out", "OH", "OW", "r", "bcast"], _bcast_dims)
+    d = solve_dims(S, ["C_out", "OH", "OW", "r", "bcast"], _bcast_dims,
+                   batch=(("stride_v_n", "stride_out_n"), lambda v: v["C_out"] * v["OH"] * v["OW"]))
     idx = np.arange(S.n, dtype=np.int64)
     ow, t = idx % d["OW"], idx // d["OW"]
     oh, t = t % d["OH"], t // d["OH"]

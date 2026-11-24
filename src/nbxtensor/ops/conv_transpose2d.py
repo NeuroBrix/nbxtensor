@@ -145,7 +145,7 @@ def _col2im1d_recipe(S):
     exactly L_in x C_out x K elements (the GEMM's [L_in, C_out x K]), the output exactly C_out x L_out. Grid
     (C_out, cdiv(L_out, tile)), the call site's `ew_grid_of(C_out, per_tile(L_out))`."""
     from nbxtensor.ops.elementwise_launch import per_tile
-    from nbxtensor.ops.ew_synthetic import NotSynthesisable, width
+    from nbxtensor.ops.ew_synthetic import NotSynthesisable
     taps = int(S.attr("TAPS")[1])
     C_out = int(S.int("C_out", 2))
     strides = [v for v in range(1, 400) if holds(S.attr("stride"), v)][:20]
@@ -157,7 +157,7 @@ def _col2im1d_recipe(S):
 
     def launch(stride, K, pad, L_in, L_out):
         """The launch of that geometry."""
-        args = {name: width(S.ty(name), v) for name, v in
+        args = {name: S.carry(name, v) for name, v in
                 (("C_out", C_out), ("K", K), ("L_in", L_in), ("L_out", L_out), ("stride", stride), ("pad", pad))}
         args["y_ptr"] = S.buf("y_ptr", L_in * C_out * K)
         args["out_ptr"] = S.buf("out_ptr", C_out * L_out)

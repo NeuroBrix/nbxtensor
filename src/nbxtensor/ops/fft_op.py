@@ -21,14 +21,19 @@ import triton.language as tl
 
 
 from nbxtensor.ops.ew_tile import synthetic, tile_dependent, tile_independent  # noqa: F401  (ops/ew_tile.py)
-from nbxtensor.ops.ew_synthetic import holds  # noqa: E402  helpers of the synthetic recipes
+from nbxtensor.ops.ew_synthetic import fit, holds  # noqa: E402  helpers of the synthetic recipes
 from nbxtensor.ops.ew_synthetic import flat
 
 
 def _as_int(S, name, v):
-    """`v` as parameter `name` carries it (64-bit for an i64 parameter)."""
-    from nbxtensor.ops.ew_synthetic import width
-    return width(S.ty(name), int(v))
+    """`v` as parameter `name` carries it: the variant's width (`ew_synthetic.Synth.carry`). A row length or a stage
+    the variant has i64 (a value past 2^31) is a row the lanes address through: refused by name, its wide form
+    cannot be proven on small buffers."""
+    from nbxtensor.ops.ew_synthetic import WideNotProvable
+    if S.ty(name) == "i64" and name not in S.counts:
+        raise WideNotProvable(f"{S.kernel.__name__}: its wide form cannot be proven on small buffers: {name} is i64 "
+                              f"in the variant (a row past 2^31 elements the lanes address)")
+    return S.carry(name, int(v))
 
 
 def _pow2_length(S, low: int, **attrs):
@@ -120,7 +125,7 @@ def _fft_stage_recipe(S):
     below `pairs` addresses row x N + its pair's two positions < N: the two buffers are exactly rows x N = 2 x pairs
     elements. Grid cdiv(pairs, tile), the call site's `_1d_grid(pairs)`."""
     from nbxtensor.ops.elementwise_launch import per_tile
-    stage = S.int("stage", 2)
+    stage = _as_int(S, "stage", fit(S.attr("stage"), 2))
     k = _pow2_length(S, max(1, int(stage)), n=lambda k: 1 << k)
     N = 1 << k
     pairs = _whole_rows(S, "pairs", N // 2)

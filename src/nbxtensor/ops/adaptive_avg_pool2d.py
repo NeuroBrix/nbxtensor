@@ -49,11 +49,14 @@ def _adaptive_avg_pool2d_recipe(S):
     largest window a lane below the count averages (the PyTorch window: floor start, ceil end); grid
     `cdiv(n_elements, tile)`."""
     import numpy as np
-    from nbxtensor.ops.ew_synthetic import solve_dims
+    from nbxtensor.ops.ew_synthetic import NotSynthesisable, solve_dims
     OH, OW = S.int("OH", 2), S.int("OW", 3)
-    d = solve_dims(S, ["stride_w", "IW", "IH", "C"], _pool_dims)
+    d = solve_dims(S, ["stride_w", "IW", "IH", "C"], _pool_dims)     # a wide stride_n (past 2^31) makes C wide: N is 0
     d.pop("C", None)
     C = d["stride_n"] // d["stride_c"]
+    if C < 1:
+        raise NotSynthesisable(f"adaptive_avg_pool2d_kernel: stride_n {d['stride_n']} below stride_c {d['stride_c']} "
+                               f"(a wide stride_c under a narrow stride_n): the kernel's C = stride_n // stride_c is 0")
     idx = np.arange(S.n, dtype=np.int64)
     ow, t = idx % OW, idx // OW
     oh, t = t % OH, t // OH

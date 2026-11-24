@@ -17,6 +17,17 @@ made of is drawn from that and from the kernel's signature:
   * BUFFERS of each pointer's dtype, of the extent the recipe gives, filled deterministically (`fill_bytes`):
     finite values of the dtype, or indices below a bound, or the shape and stride arrays themselves.
   * SCALARS drawn deterministically from the parameter's name, an integer honouring its specialization.
+  * EVERY INTEGER of the variant's OWN SIGNATURE (the project lead, 24/11/2026): each integer argument a recipe makes
+    passes through ONE helper (`Synth.carry`: `Synth.int`, `Synth.scalar` and `solve_dims` call it), which gives it
+    the width the variant was specialised with — an i32 a small value, an i64 the small value plus 2^31 (a value
+    past 2^31 with the same divisibility by 16, never 1: Triton's binder types it i64 exactly as the launch that
+    met the variant did) — and keeps its divisibility and its constant 1 as the recipe drew them. A COUNT (the
+    ladder's, and any the recipe names in `counts`: the extents the lanes are masked by) stays small, 64-bit by
+    declaration (`Int64`). A wide value is HARMLESS only where the kernel never dereferences it: a batch stride
+    whose index the ladder keeps at 0 (`solve_dims(..., batch=...)`: one outer item covers every count of the
+    ladder). Where it is dereferenced, the buffers the recipe sizes from it pass `SMALL` elements and the variant is
+    refused BY NAME (`WideNotProvable`: "its wide form cannot be proven on small buffers"), never proven on a
+    smaller value than its own.
 
 How a kernel's arguments become sizes — the RECIPE:
 
@@ -42,6 +53,8 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 #: the proof method: part of the proof table's stamp (`ew_proof.stamp`), so a table made by another method is not read
 METHOD = "synthetic-guarded-2"
 UNIT = 16                                  # Triton's divisibility unit ('D')
+WIDE = 1 << 31                             # the first value Triton's binder types i64 (an int >= 2^31 or < -2^31)
+SMALL = 1 << 24                            # elements a synthetic buffer or grid axis may hold when a wide value is in play
 LAYOUTS = ("contiguous", "permuted")
 _INT_TYPES = ("i32", "i64", "u64", "i8", "i16", "u8", "u16", "u32")
 
@@ -70,6 +83,17 @@ def width(ty: str, v):
 class NotSynthesisable(RuntimeError):
     """A variant no synthetic launch can be made for (by name): no recipe, a 64-bit count, a recipe that does not
     specialise as the variant."""
+
+
+class WideNotProvable(NotSynthesisable):
+    """A variant whose i64 scalar (a value past 2^31) the kernel dereferences: its wide form cannot be proven on small
+    synthetic buffers, refused by name (`synthesise`)."""
+
+
+def wide(v: int) -> int:
+    """`v` (a small value drawn in its specialization) carried past 2^31: v + 2^31, the same remainder mod 16 (2^31 is
+    a multiple of 16) and never 1, so the binder types it i64 with the divisibility `v` had."""
+    return WIDE + int(v)
 
 
 # ---------------------------------------------------------------------------
@@ -187,10 +211,14 @@ class Synth:
     `n`, the `layout`, and helpers that honour the specialization (`int`, `buf`, `index`, `values`, `scalar`,
     `shape`, `strided`)."""
 
-    def __init__(self, kernel, specialization, count: int, layout: str):
-        """The helper for ladder count `count` in `layout` of the variant `specialization` of `kernel`."""
+    def __init__(self, kernel, specialization, count: int, layout: str, counts=(), most: Optional[int] = None):
+        """The helper for ladder count `count` in `layout` of the variant `specialization` of `kernel`; `counts` the
+        parameters that walk as counts (small, 64-bit by declaration when i64), `most` the ladder's largest count."""
         from nbxtensor.backend.launcher import _param_table
         self.kernel, self.n, self.layout = kernel, count if isinstance(count, Int64) else int(count), layout
+        self.counts = tuple(counts)
+        self.most = int(count) if most is None else int(most)
+        self.wide: Dict[str, int] = {}             # the parameters this launch carries past 2^31, and their values
         table = _param_table(kernel)
         self.names = [p[0] for p in table]
         self.declared_constexpr = {p[0] for p in table if p[1]}
@@ -213,10 +241,27 @@ class Synth:
         return f"{self._qual}:{name}:{self.n}:{self.layout}"
 
     # -- making arguments ----------------------------------------------------
+    def carry(self, name: str, v):
+        """`v`, a small integer the recipe drew for parameter `name` in its divisibility, as the variant's signature
+        carries it: an i64 parameter past 2^31 (`wide`; recorded in `self.wide`), or small and 64-bit by declaration
+        (`Int64`) for a count; anything else as it is. The one place a synthetic integer gets its width."""
+        if name not in self.spec or isinstance(v, bool) or not isinstance(v, int) or self.ty(name) != "i64":
+            return v
+        if name in self.counts:
+            return Int64(v)
+        if int(v) >= 1 << 62:
+            raise WideNotProvable(f"{self.kernel.__name__}: its wide form cannot be proven on small buffers: {name} "
+                                  f"is derived from values past 2^31 ({sorted(self.wide)}) into {int(v)}, a product "
+                                  f"of wide values")
+        if int(v) >= WIDE:
+            return int(v)                          # derived from a wide value: already past 2^31
+        self.wide[name] = wide(v)
+        return self.wide[name]
+
     def int(self, name: str, near: int) -> int:
-        """An integer for `name` at or above `near`, specialised as the variant specialises it (`fit`), 64-bit for
-        an i64 parameter."""
-        return width(self.ty(name), fit(self.attr(name), near))
+        """An integer for `name` at or above `near`, specialised as the variant specialises it (`fit`), of the
+        variant's width (`carry`)."""
+        return self.carry(name, fit(self.attr(name), near))
 
     def buf(self, name: str, elements: int) -> Buf:
         """A buffer of `elements` finite values of the parameter's dtype."""
@@ -255,7 +300,7 @@ class Synth:
             if t not in ("i32", "i64"):
                 raise NotSynthesisable(f"{self.kernel.__name__}: scalar {name} is specialised {t}: no small value "
                                        f"draws it")
-            return width(t, fit(a, 2 + rng.randrange(7)))
+            return self.carry(name, fit(a, 2 + rng.randrange(7)))
         raise NotSynthesisable(f"{self.kernel.__name__}: scalar {name} of type {t} has no draw")
 
     def shape(self, rank: int, count: Optional[int] = None) -> List[int]:
@@ -391,16 +436,17 @@ def _count_param(kernel, specialization, recipe) -> Optional[str]:
 _DIMS_MEMO: dict = {}
 
 
-def walk(attr):
+def walk(attr, far: bool = False):
     """Small values in a specialization, smallest first: the constant itself, multiples of 16 ('D'), values neither
-    1 nor a multiple of 16 (''), any small size for a dimension that is no parameter (None)."""
+    1 nor a multiple of 16 (''), any small size for a dimension that is no parameter (None). `far` appends larger
+    ones (up to 1024), for dimensions that must cover the ladder (`solve_dims`' batch)."""
     if isinstance(attr, tuple):
         return [int(attr[1])]
     if attr == "D":
-        return [16, 32, 48, 64]
+        return [16, 32, 48, 64] + ([128, 256, 512, 1024] if far else [])
     if attr == "":
-        return [v for v in range(2, 20) if v % 16]
-    return list(range(1, 17)) + [32, 48, 64]
+        return [v for v in range(2, 20) if v % 16] + ([33, 65, 129, 257, 513, 1025] if far else [])
+    return list(range(1, 17)) + [32, 48, 64] + ([128, 256, 512, 1024] if far else [])
 
 
 def holds(attr, v) -> bool:
@@ -414,26 +460,36 @@ def holds(attr, v) -> bool:
     return True
 
 
-def solve_dims(S, free, derive):
+def solve_dims(S, free, derive, batch=None):
     """Dimensions for a synthetic launch whose sizes are tied by products (an output extent = an input extent x a
     factor, a contiguous stride = a product of extents): the first assignment of the `free` names (each walking small
     values of its own specialization, `walk`; a name that is no parameter walks any small size) for which
     `derive(values)` -> {parameter: value} (None to skip the assignment) gives every parameter it names the
-    variant's own specialization. Memoised per variant (the dimensions do not depend on the ladder's count); raises
-    NotSynthesisable naming the variant when no small assignment exists."""
+    variant's own specialization; each value then carried at the variant's width (`Synth.carry`: an i64 one past
+    2^31). `batch` = (stride names, per_item): the strides an implicit outer index multiplies and the elements one
+    outer item spans (a function of the values); when the variant has one of those strides i64, the assignment must
+    also have per_item >= the ladder's largest count (`S.most`), so that index is 0 on every lane the ladder runs
+    and the wide stride is never dereferenced (larger values walked, `walk(far=True)`). Memoised per variant and
+    ladder; raises NotSynthesisable naming the variant when no small assignment exists."""
     from itertools import product
-    key = (getattr(S.kernel, "__name__", "?"), tuple((k, str(t), repr(a)) for k, (t, a) in S.spec.items()))
+    names, per_item = batch if batch is not None else ((), None)
+    cover = any(k in S.spec and S.ty(k) == "i64" for k in names)
+    key = (getattr(S.kernel, "__name__", "?"), tuple((k, str(t), repr(a)) for k, (t, a) in S.spec.items()),
+           S.most if cover else None)
     hit = _DIMS_MEMO.get(key)
-    if hit is not None:
-        return dict(hit)
-    walks = [walk(S.attr(name) if name in S.spec else None) for name in free]
-    for combo in product(*walks):
-        full = derive(dict(zip(free, combo)))
-        if full is not None and all(holds(S.attr(k), v) for k, v in full.items() if k in S.spec):
-            _DIMS_MEMO[key] = full
-            return dict(full)
-    raise NotSynthesisable(f"{S.kernel.__name__}: no small dimensions over {free} specialise every derived size as "
-                           f"the variant does ({[(k, S.attr(k)) for k in S.names if k in S.spec]})")
+    if hit is None:
+        walks = [walk(S.attr(name) if name in S.spec else None, far=cover) for name in free]
+        for combo in product(*walks):
+            full = derive(dict(zip(free, combo)))
+            if full is not None and all(holds(S.attr(k), v) for k, v in full.items() if k in S.spec) \
+                    and (not cover or per_item(full) >= S.most):
+                hit = _DIMS_MEMO[key] = full
+                break
+    if hit is None:
+        raise NotSynthesisable(f"{S.kernel.__name__}: no small dimensions over {free} specialise every derived size "
+                               f"as the variant does ({[(k, S.attr(k)) for k in S.names if k in S.spec]})"
+                               + (f" with one outer item covering the ladder's {S.most}" if cover else ""))
+    return {k: S.carry(k, v) for k, v in hit.items()}
 
 
 def reach(offsets) -> int:
@@ -458,18 +514,39 @@ def synthesise(kernel, specialization, cands, recipe=None) -> List[Launch]:
         raise NotSynthesisable(f"{kernel.__name__}: its count {cname} is specialised {ctype!r}: no ladder of counts "
                                f"is that type; not provable on synthetic inputs")
     counts = [width(ctype, n) for n in ladder(probe.attr(cname), cands)]
+    named = (cname,) + tuple(getattr(recipe, "counts", ()))
     out: List[Launch] = []
     seen = set()
     for n in counts:
         for layout in getattr(recipe, "layouts", LAYOUTS[:1]):
-            S = Synth(kernel, specialization, n, layout)
+            S = Synth(kernel, specialization, n, layout, counts=named, most=max(int(c) for c in counts))
             args, axes = recipe(S)
             launch = _complete(S, dict(args), axes)
+            small(S, launch)
             check(kernel, specialization, launch)
             if launch.key() not in seen:
                 seen.add(launch.key())
                 out.append(launch)
     return out
+
+
+def small(S: Synth, launch: Launch) -> None:
+    """Refuse by name (`WideNotProvable`) a launch carrying a value past 2^31 (`S.wide`) whose buffers or grid the
+    recipe had to size past `SMALL` from it: the kernel dereferences the wide value, so its wide form cannot be
+    proven on small synthetic buffers."""
+    if not S.wide:
+        return
+    big = [(b.name, b.elements) for b in launch.bufs() if b.elements > SMALL]
+    big += [(n, int(v)) for n, v in launch.args.items()
+            if isinstance(v, int) and not isinstance(v, bool) and abs(int(v)) >= 1 << 62]
+    big += [(f"grid axis {i}", int(a)) for i, a in enumerate(launch.axes)
+            if not hasattr(a, "times") and int(a) > SMALL]
+    big += [(f"grid axis {i}", a.n * a.times) for i, a in enumerate(launch.axes)
+            if hasattr(a, "times") and a.n * a.times > SMALL * 16]
+    if big:
+        raise WideNotProvable(f"{S.kernel.__name__}: its wide form cannot be proven on small buffers: "
+                              f"{sorted(S.wide)} are i64 in the variant (values past 2^31) and the kernel dereferences "
+                              f"them ({', '.join(f'{n} would span {e} elements' for n, e in big)})")
 
 
 def _complete(S: Synth, args: Dict[str, Any], axes) -> Launch:

@@ -17,11 +17,13 @@ from nbxtensor.ops.ew_tile import synthetic, tile_dependent, tile_independent  #
 
 def _nearest_index(out_extent, in_extent):
     """The largest input index the kernel's nearest map reaches over [0, out_extent): min(trunc(o * fp32(in / out)),
-    in - 1), in fp32 as the kernel computes it (the scale passed as the call site passes it, in / out)."""
+    in - 1), in fp32 as the kernel computes it (the scale passed as the call site passes it, in / out). The map does
+    not decrease in o (an fp32 product by a positive scale, truncated), so its largest value is at o = out - 1: read
+    there, never over an array of the extent (an extent past 2^31 is a number here, not an allocation)."""
     import numpy as np
     scale = np.float32(in_extent / out_extent)
-    o = np.arange(out_extent, dtype=np.int64).astype(np.float32)
-    return int(np.minimum((o * scale).astype(np.int32), in_extent - 1).max()), float(in_extent / out_extent)
+    last = np.float32(int(out_extent) - 1) * scale
+    return int(min(int(np.float64(last)), int(in_extent) - 1)), float(in_extent / out_extent)
 
 
 def _upsample_nearest2d_recipe(S):

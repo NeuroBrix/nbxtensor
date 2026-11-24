@@ -52,6 +52,7 @@ def _cat_recipe(S):
 
 
 _cat_recipe.count = "total_elements_a"
+_cat_recipe.counts = ("total_elements_b", "total_elements_c", "total_elements_d")   # each input's own count
 _cat_recipe.description = "cat4(total_elements_a, four live inputs over (pre, dim_size_in, dim_prod_post))"
 
 

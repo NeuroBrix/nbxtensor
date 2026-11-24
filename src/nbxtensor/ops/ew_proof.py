@@ -298,11 +298,13 @@ def _why_failed(rec: dict, tile) -> str:
     return rec.get("struck", {}).get(f"{tile[0]}x{tile[1]}", "not among the tiles its record passes")
 
 
-_SAID: set = set()      # the classes whose move this process has said
+_SAID: set = set()      # (class, tile) of every move this process has said
 
 
 def _moved(kernel, grid, bound, options, tiles, tab, vid=None, tile=None):
-    """The class's winner failed this variant: move the class to the best common candidate, and this launch."""
+    """The class's winner failed this variant: move the class to the best common candidate, and this launch. The
+    move is said in ONE line per class and tile it moves to, per process (never per launch): the tile the class now
+    runs on, the tile it leaves, and why — the variant (kernel and id) whose record fails it, and its fault."""
     cls = tiles["tile"].ew_class
     best = tab.class_winner(cls, (int(tiles["tile"]), int(tiles.get("warps", options.get("num_warps", 0)))))
     if best is None:
@@ -310,14 +312,24 @@ def _moved(kernel, grid, bound, options, tiles, tab, vid=None, tile=None):
                            f"({sorted(tab.seen_classes.get(str(cls), ()))})")
     from nbxtensor.ops.elementwise_launch import move_class_winner
     meta = move_class_winner(cls, best[0], best[1])
-    if cls in _SAID:
+    if (cls, tuple(best)) in _SAID:
         return retiled(grid, bound, options, int(tiles["tile"]), meta, best[2])
-    _SAID.add(cls)                          # a class's move is said once per process, never per launch
-    why = _why_failed(tab.record(vid) or {}, tile) if vid is not None else "not among the tiles its record passes"
-    print(f"[ew-proof] class {cls}: {kernel.__name__} fails the class's tile "
-          f"{int(tiles['tile'])}x{int(tiles.get('warps', options.get('num_warps', 0)))} ({why}); the class moves to "
-          f"{best[0]}x{best[1]} (stages {best[2]}), the nearest on its ladder every proven variant passes", file=sys.stderr)
+    _SAID.add((cls, tuple(best)))
+    print(move_line(cls, kernel.__name__, vid, tile if tile is not None else (
+        int(tiles["tile"]), int(tiles.get("warps", options.get("num_warps", 0))), None), best,
+        _why_failed(tab.record(vid) or {}, tile) if vid is not None else "not among the tiles its record passes"),
+        file=sys.stderr)
     return retiled(grid, bound, options, int(tiles["tile"]), meta, best[2])
+
+
+def move_line(cls, kernel_name: str, vid, left, best, why: str) -> str:
+    """The one line a class's move is said in: the tile the class now runs on, and why — the tile it leaves and the
+    variant (kernel, short id) whose record fails it, with what that record says (its fault)."""
+    variant = stamp_key({"v": vid}) if vid is not None else "?"
+    stages = f" stages {left[2]}" if len(left) > 2 and left[2] is not None else ""
+    return (f"[ew-proof] class {cls} now runs on tile {best[0]}x{best[1]} (stages {best[2]}), the nearest on its "
+            f"ladder every proven variant passes: it left tile {left[0]}x{left[1]}{stages}, which variant {variant} "
+            f"of {kernel_name} fails ({why})")
 
 
 def retiled(grid, bound, options, old_block: int, meta: dict, stages: int):

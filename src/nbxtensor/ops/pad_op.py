@@ -30,7 +30,7 @@ from nbxtensor.ops.ew_synthetic import reach  # noqa: E402  helpers of the synth
 def _pad_before(S, name):
     """A leading pad in `name`'s specialization: 0 where the variant has it divisible by 16 (an unpadded side, the
     common case), else the smallest value it allows."""
-    return 0 if S.attr(name) == "D" else S.int(name, 2)
+    return S.carry(name, 0) if S.attr(name) == "D" else S.int(name, 2)
 
 
 def _cover(S, dims, n):
@@ -58,7 +58,7 @@ def _pad_nd_dims(S):
     for k in range(1, 5):
         ins[k], pbs[k] = S.int(f"in{k}", 3), _pad_before(S, f"pb{k}")
         outs[k] = S.int(f"out{k}", ins[k] + pbs[k] + 1)
-    if S.attr("out0") == ("constexpr", 1):
+    if S.attr("out0") == ("constexpr", 1) or S.ty("xs0") == "i64":      # an i64 xs0 (past 2^31) is never dereferenced
         dims = _cover(S, [[f"out{k}", outs[k]] for k in range(1, 5)], n)
         outs[1:] = [v for _n, v in dims]
     plane = outs[1] * outs[2] * outs[3] * outs[4]

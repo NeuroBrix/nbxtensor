@@ -35,7 +35,8 @@ def _pixel_unshuffle_recipe(S):
     largest offset a lane below the count reads (the op's index map); grid `cdiv(n_elements, tile)`."""
     import numpy as np
     from nbxtensor.ops.ew_synthetic import solve_dims
-    d = solve_dims(S, ["C", "H", "W", "r"], _unshuffle_dims)
+    d = solve_dims(S, ["C", "H", "W", "r"], _unshuffle_dims,
+                   batch=(("stride_in_n", "stride_out_n"), lambda v: v["C_out"] * v["H"] * v["W"]))
     idx = np.arange(S.n, dtype=np.int64)
     ow, t = idx % d["W"], idx // d["W"]
     oh, t = t % d["H"], t // d["H"]
