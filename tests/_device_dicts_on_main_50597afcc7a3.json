@@ -1,0 +1,10179 @@
+{
+ "capabilities": {
+  "10.0": {
+   "budget": 232448,
+   "profile": {
+    "_exact": true,
+    "_profile": "blackwell",
+    "_vendor": "nvidia",
+    "architecture": "blackwell",
+    "autotune": {
+     "compile_bound_s": 120
+    },
+    "compute_capability": "10.0",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "by_capability": {
+      "10.1": {
+       "max_registers_per_block": 65536,
+       "max_shared_memory_per_block": 232448
+      },
+      "10.3": {
+       "max_registers_per_block": 65536,
+       "max_shared_memory_per_block": 232448
+      },
+      "10.7": {
+       "max_registers_per_block": 65536,
+       "max_shared_memory_per_block": 334848
+      }
+     },
+     "max_registers_per_block": 65536,
+     "max_registers_per_thread": 255,
+     "max_shared_memory_per_block": 232448,
+     "runtime_context_mb": null,
+     "warp_size": 32
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": true
+     }
+    }
+   }
+  },
+  "10.1": {
+   "budget": 232448,
+   "profile": {
+    "_profile": "blackwell",
+    "_vendor": "nvidia",
+    "architecture": "blackwell",
+    "autotune": {
+     "compile_bound_s": 120
+    },
+    "compute_capability": "10.0",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "by_capability": {
+      "10.1": {
+       "max_registers_per_block": 65536,
+       "max_shared_memory_per_block": 232448
+      },
+      "10.3": {
+       "max_registers_per_block": 65536,
+       "max_shared_memory_per_block": 232448
+      },
+      "10.7": {
+       "max_registers_per_block": 65536,
+       "max_shared_memory_per_block": 334848
+      }
+     },
+     "max_registers_per_block": 65536,
+     "max_registers_per_thread": 255,
+     "max_shared_memory_per_block": 232448,
+     "runtime_context_mb": null,
+     "warp_size": 32
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": true
+     }
+    }
+   }
+  },
+  "10.3": {
+   "budget": 232448,
+   "profile": {
+    "_profile": "blackwell",
+    "_vendor": "nvidia",
+    "architecture": "blackwell",
+    "autotune": {
+     "compile_bound_s": 120
+    },
+    "compute_capability": "10.0",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "by_capability": {
+      "10.1": {
+       "max_registers_per_block": 65536,
+       "max_shared_memory_per_block": 232448
+      },
+      "10.3": {
+       "max_registers_per_block": 65536,
+       "max_shared_memory_per_block": 232448
+      },
+      "10.7": {
+       "max_registers_per_block": 65536,
+       "max_shared_memory_per_block": 334848
+      }
+     },
+     "max_registers_per_block": 65536,
+     "max_registers_per_thread": 255,
+     "max_shared_memory_per_block": 232448,
+     "runtime_context_mb": null,
+     "warp_size": 32
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": true
+     }
+    }
+   }
+  },
+  "10.7": {
+   "budget": 334848,
+   "profile": {
+    "_profile": "blackwell",
+    "_vendor": "nvidia",
+    "architecture": "blackwell",
+    "autotune": {
+     "compile_bound_s": 120
+    },
+    "compute_capability": "10.0",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "by_capability": {
+      "10.1": {
+       "max_registers_per_block": 65536,
+       "max_shared_memory_per_block": 232448
+      },
+      "10.3": {
+       "max_registers_per_block": 65536,
+       "max_shared_memory_per_block": 232448
+      },
+      "10.7": {
+       "max_registers_per_block": 65536,
+       "max_shared_memory_per_block": 334848
+      }
+     },
+     "max_registers_per_block": 65536,
+     "max_registers_per_thread": 255,
+     "max_shared_memory_per_block": 334848,
+     "runtime_context_mb": null,
+     "warp_size": 32
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": true
+     }
+    }
+   }
+  },
+  "12.0": {
+   "budget": 101376,
+   "profile": {
+    "_exact": true,
+    "_profile": "blackwell_consumer",
+    "_vendor": "nvidia",
+    "architecture": "blackwell_consumer",
+    "autotune": {
+     "compile_bound_s": 120
+    },
+    "compute_capability": "12.0",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "by_capability": {
+      "12.1": {
+       "max_registers_per_block": 65536,
+       "max_shared_memory_per_block": 101376
+      }
+     },
+     "max_registers_per_block": 65536,
+     "max_registers_per_thread": 255,
+     "max_shared_memory_per_block": 101376,
+     "runtime_context_mb": null,
+     "warp_size": 32
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": true
+     }
+    }
+   }
+  },
+  "12.1": {
+   "budget": 101376,
+   "profile": {
+    "_profile": "blackwell_consumer",
+    "_vendor": "nvidia",
+    "architecture": "blackwell_consumer",
+    "autotune": {
+     "compile_bound_s": 120
+    },
+    "compute_capability": "12.0",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "by_capability": {
+      "12.1": {
+       "max_registers_per_block": 65536,
+       "max_shared_memory_per_block": 101376
+      }
+     },
+     "max_registers_per_block": 65536,
+     "max_registers_per_thread": 255,
+     "max_shared_memory_per_block": 101376,
+     "runtime_context_mb": null,
+     "warp_size": 32
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": true
+     }
+    }
+   }
+  },
+  "5.0": {
+   "budget": 49152,
+   "profile": {
+    "_exact": true,
+    "_profile": "maxwell",
+    "_vendor": "nvidia",
+    "architecture": "maxwell",
+    "autotune": {
+     "compile_bound_s": 120
+    },
+    "compute_capability": "5.0",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "by_capability": {
+      "5.2": {
+       "max_registers_per_block": 65536,
+       "max_shared_memory_per_block": 49152
+      },
+      "5.3": {
+       "max_registers_per_block": 32768,
+       "max_shared_memory_per_block": 49152
+      }
+     },
+     "max_registers_per_block": 65536,
+     "max_registers_per_thread": 255,
+     "max_shared_memory_per_block": 49152,
+     "runtime_context_mb": null,
+     "warp_size": 32
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": true
+     }
+    }
+   }
+  },
+  "5.2": {
+   "budget": 49152,
+   "profile": {
+    "_profile": "maxwell",
+    "_vendor": "nvidia",
+    "architecture": "maxwell",
+    "autotune": {
+     "compile_bound_s": 120
+    },
+    "compute_capability": "5.0",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "by_capability": {
+      "5.2": {
+       "max_registers_per_block": 65536,
+       "max_shared_memory_per_block": 49152
+      },
+      "5.3": {
+       "max_registers_per_block": 32768,
+       "max_shared_memory_per_block": 49152
+      }
+     },
+     "max_registers_per_block": 65536,
+     "max_registers_per_thread": 255,
+     "max_shared_memory_per_block": 49152,
+     "runtime_context_mb": null,
+     "warp_size": 32
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": true
+     }
+    }
+   }
+  },
+  "5.3": {
+   "budget": 49152,
+   "profile": {
+    "_profile": "maxwell",
+    "_vendor": "nvidia",
+    "architecture": "maxwell",
+    "autotune": {
+     "compile_bound_s": 120
+    },
+    "compute_capability": "5.0",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "by_capability": {
+      "5.2": {
+       "max_registers_per_block": 65536,
+       "max_shared_memory_per_block": 49152
+      },
+      "5.3": {
+       "max_registers_per_block": 32768,
+       "max_shared_memory_per_block": 49152
+      }
+     },
+     "max_registers_per_block": 32768,
+     "max_registers_per_thread": 255,
+     "max_shared_memory_per_block": 49152,
+     "runtime_context_mb": null,
+     "warp_size": 32
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": true
+     }
+    }
+   }
+  },
+  "6.0": {
+   "budget": 49152,
+   "profile": {
+    "_exact": true,
+    "_profile": "pascal",
+    "_vendor": "nvidia",
+    "architecture": "pascal",
+    "autotune": {
+     "compile_bound_s": 120
+    },
+    "compute_capability": "6.0",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "by_capability": {
+      "6.1": {
+       "max_registers_per_block": 65536,
+       "max_shared_memory_per_block": 49152
+      },
+      "6.2": {
+       "max_registers_per_block": 32768,
+       "max_shared_memory_per_block": 49152
+      }
+     },
+     "max_registers_per_block": 65536,
+     "max_registers_per_thread": 255,
+     "max_shared_memory_per_block": 49152,
+     "runtime_context_mb": null,
+     "warp_size": 32
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": true
+     }
+    }
+   }
+  },
+  "6.1": {
+   "budget": 49152,
+   "profile": {
+    "_profile": "pascal",
+    "_vendor": "nvidia",
+    "architecture": "pascal",
+    "autotune": {
+     "compile_bound_s": 120
+    },
+    "compute_capability": "6.0",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "by_capability": {
+      "6.1": {
+       "max_registers_per_block": 65536,
+       "max_shared_memory_per_block": 49152
+      },
+      "6.2": {
+       "max_registers_per_block": 32768,
+       "max_shared_memory_per_block": 49152
+      }
+     },
+     "max_registers_per_block": 65536,
+     "max_registers_per_thread": 255,
+     "max_shared_memory_per_block": 49152,
+     "runtime_context_mb": null,
+     "warp_size": 32
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": true
+     }
+    }
+   }
+  },
+  "6.2": {
+   "budget": 49152,
+   "profile": {
+    "_profile": "pascal",
+    "_vendor": "nvidia",
+    "architecture": "pascal",
+    "autotune": {
+     "compile_bound_s": 120
+    },
+    "compute_capability": "6.0",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "by_capability": {
+      "6.1": {
+       "max_registers_per_block": 65536,
+       "max_shared_memory_per_block": 49152
+      },
+      "6.2": {
+       "max_registers_per_block": 32768,
+       "max_shared_memory_per_block": 49152
+      }
+     },
+     "max_registers_per_block": 32768,
+     "max_registers_per_thread": 255,
+     "max_shared_memory_per_block": 49152,
+     "runtime_context_mb": null,
+     "warp_size": 32
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": true
+     }
+    }
+   }
+  },
+  "7.0": {
+   "budget": 98304,
+   "profile": {
+    "_exact": true,
+    "_profile": "volta",
+    "_vendor": "nvidia",
+    "architecture": "volta",
+    "autotune": {
+     "buckets": {
+      "M": [
+       {
+        "step": 8,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 2048
+       },
+       {
+        "step": 256,
+        "up_to": 4096
+       },
+       {
+        "step": 512,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "bmm": {
+      "block_k": 32,
+      "block_m": 64,
+      "block_n": 64,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 160
+     },
+     "reduction": 1024
+    },
+    "compute_capability": "7.0",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": true
+    },
+    "matrix_unit": {
+     "accumulator_dtype": "float32",
+     "flash": [
+      {
+       "block_m": 128,
+       "block_n": 64,
+       "head_dim_le": 64,
+       "warps_m": 4
+      },
+      {
+       "block_m": 128,
+       "block_n": 32,
+       "head_dim_le": 96,
+       "warps_m": 4
+      },
+      {
+       "block_m": 64,
+       "block_n": 32,
+       "head_dim_le": 256,
+       "warps_m": 4
+      }
+     ],
+     "fp32_split": {
+      "conv": [
+       {
+        "block_k": 16,
+        "block_m": 128,
+        "block_n": 64,
+        "group_m": 8,
+        "kernel": [
+         1,
+         1
+        ],
+        "warps_m": 4,
+        "warps_n": 1
+       }
+      ],
+      "flash": [
+       {
+        "block_k": 32,
+        "block_m": 128,
+        "block_n": 32,
+        "head_dim_le": 96,
+        "warps_m": 8
+       },
+       {
+        "block_k": 32,
+        "block_m": 64,
+        "block_n": 16,
+        "head_dim_le": 160,
+        "warps_m": 4
+       }
+      ],
+      "mm": [
+       {
+        "block_k": 32,
+        "block_m": 64,
+        "block_n": 64,
+        "group_m": 8,
+        "warps_m": 2,
+        "warps_n": 2
+       }
+      ],
+      "operands": [
+       "float32",
+       "bfloat16"
+      ]
+     },
+     "mm": [
+      {
+       "block_k": 32,
+       "block_m": 128,
+       "block_n": 64,
+       "group_m": 8,
+       "warps_m": 4,
+       "warps_n": 1
+      },
+      {
+       "block_k": 32,
+       "block_m": 64,
+       "block_n": 64,
+       "group_m": 8,
+       "warps_m": 2,
+       "warps_n": 2
+      }
+     ],
+     "operand_dtype": "float16",
+     "shape": "m8n8k4"
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.5,
+     "by_capability": {
+      "7.2": {
+       "max_registers_per_block": 65536,
+       "max_shared_memory_per_block": 98304
+      }
+     },
+     "max_registers_per_block": 65536,
+     "max_registers_per_thread": 255,
+     "max_shared_memory_per_block": 98304,
+     "runtime_context_mb": 306,
+     "sdpa_math_max_chunks": 16,
+     "sdpa_math_max_scores_bytes": 2147483648,
+     "sdpa_math_min_chunk_rows": 128,
+     "sdpa_math_scores_device_fraction": 0.066,
+     "warp_size": 32
+    },
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": true
+     }
+    },
+    "sdpa_thresholds": [
+     {
+      "block_m": 16,
+      "block_n": 32,
+      "head_dim_ge": 256,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 64,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 32,
+      "block_n": 32,
+      "head_dim_ge": 256,
+      "num_warps": 4
+     },
+     {
+      "block_m": 64,
+      "block_n": 32,
+      "head_dim_ge": 128,
+      "num_warps": 8,
+      "qk_chunk": 32
+     },
+     {
+      "block_m": 64,
+      "block_n": 32,
+      "head_dim_lt": 128,
+      "num_warps": 8,
+      "qk_chunk": 32
+     }
+    ]
+   }
+  },
+  "7.2": {
+   "budget": 98304,
+   "profile": {
+    "_profile": "volta",
+    "_vendor": "nvidia",
+    "architecture": "volta",
+    "autotune": {
+     "buckets": {
+      "M": [
+       {
+        "step": 8,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 2048
+       },
+       {
+        "step": 256,
+        "up_to": 4096
+       },
+       {
+        "step": 512,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "bmm": {
+      "block_k": 32,
+      "block_m": 64,
+      "block_n": 64,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 160
+     },
+     "reduction": 1024
+    },
+    "compute_capability": "7.0",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": true
+    },
+    "matrix_unit": {
+     "accumulator_dtype": "float32",
+     "flash": [
+      {
+       "block_m": 128,
+       "block_n": 64,
+       "head_dim_le": 64,
+       "warps_m": 4
+      },
+      {
+       "block_m": 128,
+       "block_n": 32,
+       "head_dim_le": 96,
+       "warps_m": 4
+      },
+      {
+       "block_m": 64,
+       "block_n": 32,
+       "head_dim_le": 256,
+       "warps_m": 4
+      }
+     ],
+     "fp32_split": {
+      "conv": [
+       {
+        "block_k": 16,
+        "block_m": 128,
+        "block_n": 64,
+        "group_m": 8,
+        "kernel": [
+         1,
+         1
+        ],
+        "warps_m": 4,
+        "warps_n": 1
+       }
+      ],
+      "flash": [
+       {
+        "block_k": 32,
+        "block_m": 128,
+        "block_n": 32,
+        "head_dim_le": 96,
+        "warps_m": 8
+       },
+       {
+        "block_k": 32,
+        "block_m": 64,
+        "block_n": 16,
+        "head_dim_le": 160,
+        "warps_m": 4
+       }
+      ],
+      "mm": [
+       {
+        "block_k": 32,
+        "block_m": 64,
+        "block_n": 64,
+        "group_m": 8,
+        "warps_m": 2,
+        "warps_n": 2
+       }
+      ],
+      "operands": [
+       "float32",
+       "bfloat16"
+      ]
+     },
+     "mm": [
+      {
+       "block_k": 32,
+       "block_m": 128,
+       "block_n": 64,
+       "group_m": 8,
+       "warps_m": 4,
+       "warps_n": 1
+      },
+      {
+       "block_k": 32,
+       "block_m": 64,
+       "block_n": 64,
+       "group_m": 8,
+       "warps_m": 2,
+       "warps_n": 2
+      }
+     ],
+     "operand_dtype": "float16",
+     "shape": "m8n8k4"
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.5,
+     "by_capability": {
+      "7.2": {
+       "max_registers_per_block": 65536,
+       "max_shared_memory_per_block": 98304
+      }
+     },
+     "max_registers_per_block": 65536,
+     "max_registers_per_thread": 255,
+     "max_shared_memory_per_block": 98304,
+     "runtime_context_mb": 306,
+     "sdpa_math_max_chunks": 16,
+     "sdpa_math_max_scores_bytes": 2147483648,
+     "sdpa_math_min_chunk_rows": 128,
+     "sdpa_math_scores_device_fraction": 0.066,
+     "warp_size": 32
+    },
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": true
+     }
+    },
+    "sdpa_thresholds": [
+     {
+      "block_m": 16,
+      "block_n": 32,
+      "head_dim_ge": 256,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 64,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 32,
+      "block_n": 32,
+      "head_dim_ge": 256,
+      "num_warps": 4
+     },
+     {
+      "block_m": 64,
+      "block_n": 32,
+      "head_dim_ge": 128,
+      "num_warps": 8,
+      "qk_chunk": 32
+     },
+     {
+      "block_m": 64,
+      "block_n": 32,
+      "head_dim_lt": 128,
+      "num_warps": 8,
+      "qk_chunk": 32
+     }
+    ]
+   }
+  },
+  "7.5": {
+   "budget": 65536,
+   "profile": {
+    "_exact": true,
+    "_profile": "turing",
+    "_vendor": "nvidia",
+    "architecture": "turing",
+    "autotune": {
+     "compile_bound_s": 120
+    },
+    "compute_capability": "7.5",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "max_registers_per_block": 65536,
+     "max_registers_per_thread": 255,
+     "max_shared_memory_per_block": 65536,
+     "runtime_context_mb": null,
+     "warp_size": 32
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": true
+     }
+    }
+   }
+  },
+  "8.0": {
+   "budget": 166912,
+   "profile": {
+    "_exact": true,
+    "_profile": "ampere",
+    "_vendor": "nvidia",
+    "architecture": "ampere",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "bmm": {
+      "block_k": 32,
+      "block_m": 64,
+      "block_n": 64,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 216
+     },
+     "reduction": 1024
+    },
+    "compute_capability": "8.0",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.5,
+     "by_capability": {
+      "8.6": {
+       "max_registers_per_block": 65536,
+       "max_shared_memory_per_block": 101376
+      },
+      "8.7": {
+       "max_registers_per_block": 65536,
+       "max_shared_memory_per_block": 166912
+      }
+     },
+     "max_registers_per_block": 65536,
+     "max_registers_per_thread": 255,
+     "max_shared_memory_per_block": 166912,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pipelining": {
+     "max_num_stages": 8
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": true
+     }
+    },
+    "sdpa_thresholds": [
+     {
+      "block_m": 16,
+      "block_n": 32,
+      "head_dim_ge": 256,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 64,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 32,
+      "block_n": 32,
+      "head_dim_ge": 256,
+      "num_warps": 4
+     },
+     {
+      "block_m": 64,
+      "block_n": 64,
+      "head_dim_ge": 128,
+      "num_warps": 4
+     },
+     {
+      "block_m": 128,
+      "block_n": 64,
+      "head_dim_lt": 128,
+      "num_warps": 4
+     }
+    ]
+   }
+  },
+  "8.6": {
+   "budget": 101376,
+   "profile": {
+    "_profile": "ampere",
+    "_vendor": "nvidia",
+    "architecture": "ampere",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "bmm": {
+      "block_k": 32,
+      "block_m": 64,
+      "block_n": 64,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 216
+     },
+     "reduction": 1024
+    },
+    "compute_capability": "8.0",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.5,
+     "by_capability": {
+      "8.6": {
+       "max_registers_per_block": 65536,
+       "max_shared_memory_per_block": 101376
+      },
+      "8.7": {
+       "max_registers_per_block": 65536,
+       "max_shared_memory_per_block": 166912
+      }
+     },
+     "max_registers_per_block": 65536,
+     "max_registers_per_thread": 255,
+     "max_shared_memory_per_block": 101376,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pipelining": {
+     "max_num_stages": 8
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": true
+     }
+    },
+    "sdpa_thresholds": [
+     {
+      "block_m": 16,
+      "block_n": 32,
+      "head_dim_ge": 256,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 64,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 32,
+      "block_n": 32,
+      "head_dim_ge": 256,
+      "num_warps": 4
+     },
+     {
+      "block_m": 64,
+      "block_n": 64,
+      "head_dim_ge": 128,
+      "num_warps": 4
+     },
+     {
+      "block_m": 128,
+      "block_n": 64,
+      "head_dim_lt": 128,
+      "num_warps": 4
+     }
+    ]
+   }
+  },
+  "8.7": {
+   "budget": 166912,
+   "profile": {
+    "_profile": "ampere",
+    "_vendor": "nvidia",
+    "architecture": "ampere",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "bmm": {
+      "block_k": 32,
+      "block_m": 64,
+      "block_n": 64,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 216
+     },
+     "reduction": 1024
+    },
+    "compute_capability": "8.0",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.5,
+     "by_capability": {
+      "8.6": {
+       "max_registers_per_block": 65536,
+       "max_shared_memory_per_block": 101376
+      },
+      "8.7": {
+       "max_registers_per_block": 65536,
+       "max_shared_memory_per_block": 166912
+      }
+     },
+     "max_registers_per_block": 65536,
+     "max_registers_per_thread": 255,
+     "max_shared_memory_per_block": 166912,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pipelining": {
+     "max_num_stages": 8
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": true
+     }
+    },
+    "sdpa_thresholds": [
+     {
+      "block_m": 16,
+      "block_n": 32,
+      "head_dim_ge": 256,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 64,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 32,
+      "block_n": 32,
+      "head_dim_ge": 256,
+      "num_warps": 4
+     },
+     {
+      "block_m": 64,
+      "block_n": 64,
+      "head_dim_ge": 128,
+      "num_warps": 4
+     },
+     {
+      "block_m": 128,
+      "block_n": 64,
+      "head_dim_lt": 128,
+      "num_warps": 4
+     }
+    ]
+   }
+  },
+  "8.9": {
+   "budget": 101376,
+   "profile": {
+    "_exact": true,
+    "_profile": "ada",
+    "_vendor": "nvidia",
+    "architecture": "ada",
+    "autotune": {
+     "compile_bound_s": 120
+    },
+    "compute_capability": "8.9",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "max_registers_per_block": 65536,
+     "max_registers_per_thread": 255,
+     "max_shared_memory_per_block": 101376,
+     "runtime_context_mb": null,
+     "warp_size": 32
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": true
+     }
+    }
+   }
+  },
+  "9.0": {
+   "budget": 232448,
+   "profile": {
+    "_exact": true,
+    "_profile": "hopper",
+    "_vendor": "nvidia",
+    "architecture": "hopper",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "bmm": {
+      "block_k": 32,
+      "block_m": 64,
+      "block_n": 128,
+      "num_warps": 8
+     },
+     "conv2d": {
+      "block_h": 32,
+      "block_w": 32,
+      "num_warps": 8
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 264
+     },
+     "reduction": 2048
+    },
+    "compute_capability": "9.0",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.5,
+     "max_registers_per_block": 65536,
+     "max_registers_per_thread": 255,
+     "max_shared_memory_per_block": 232448,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pipelining": {
+     "max_num_stages": 8
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": true
+     }
+    },
+    "sdpa_thresholds": [
+     {
+      "block_m": 16,
+      "block_n": 64,
+      "head_dim_ge": 256,
+      "num_warps": 8,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 128,
+      "num_warps": 8,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 32,
+      "block_n": 32,
+      "head_dim_ge": 256,
+      "num_warps": 8
+     },
+     {
+      "block_m": 64,
+      "block_n": 64,
+      "head_dim_ge": 128,
+      "num_warps": 8
+     },
+     {
+      "block_m": 128,
+      "block_n": 128,
+      "head_dim_lt": 128,
+      "num_warps": 8
+     }
+    ]
+   }
+  },
+  "apple-m1": {
+   "budget": 32768,
+   "profile": {
+    "_exact": true,
+    "_profile": "apple_m1",
+    "_vendor": "apple",
+    "architecture": "apple_silicon",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "argmax": {
+      "num_warps": 32,
+      "tile_n": 1024
+     },
+     "argmin": {
+      "block_m": 8,
+      "num_warps": 32,
+      "tile_n": 128
+     },
+     "bmm": {
+      "block_k": 32,
+      "block_m": 32,
+      "block_n": 32,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 80
+     },
+     "reduction": 1024,
+     "reduction_2d": {
+      "block_m": 8,
+      "block_n": 128,
+      "num_warps": 32
+     }
+    },
+    "compute_capability": "apple-m1",
+    "compute_capability_matches": [
+     "apple-m1"
+    ],
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "dispatch": {
+     "max_command_buffers_in_flight": 32,
+     "max_dispatches_per_command_buffer": 512
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.25,
+     "max_registers_per_block": 32768,
+     "max_shared_memory_per_block": 32768,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": false
+     }
+    }
+   }
+  },
+  "apple-m1-max": {
+   "budget": 32768,
+   "profile": {
+    "_exact": true,
+    "_profile": "apple_m1_max",
+    "_vendor": "apple",
+    "architecture": "apple_silicon",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "argmax": {
+      "num_warps": 32,
+      "tile_n": 1024
+     },
+     "argmin": {
+      "block_m": 8,
+      "num_warps": 32,
+      "tile_n": 128
+     },
+     "bmm": {
+      "block_k": 32,
+      "block_m": 32,
+      "block_n": 32,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 80
+     },
+     "reduction": 1024,
+     "reduction_2d": {
+      "block_m": 8,
+      "block_n": 128,
+      "num_warps": 32
+     }
+    },
+    "compute_capability": "apple-m1-max",
+    "compute_capability_matches": [
+     "apple-m1-max"
+    ],
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "dispatch": {
+     "max_command_buffers_in_flight": 32,
+     "max_dispatches_per_command_buffer": 512
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.25,
+     "max_registers_per_block": 32768,
+     "max_shared_memory_per_block": 32768,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": false
+     }
+    }
+   }
+  },
+  "apple-m1-pro": {
+   "budget": 32768,
+   "profile": {
+    "_exact": true,
+    "_profile": "apple_m1_pro",
+    "_vendor": "apple",
+    "architecture": "apple_silicon",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "argmax": {
+      "num_warps": 32,
+      "tile_n": 1024
+     },
+     "argmin": {
+      "block_m": 8,
+      "num_warps": 32,
+      "tile_n": 128
+     },
+     "bmm": {
+      "block_k": 32,
+      "block_m": 32,
+      "block_n": 32,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 80
+     },
+     "reduction": 1024,
+     "reduction_2d": {
+      "block_m": 8,
+      "block_n": 128,
+      "num_warps": 32
+     }
+    },
+    "compute_capability": "apple-m1-pro",
+    "compute_capability_matches": [
+     "apple-m1-pro"
+    ],
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "dispatch": {
+     "max_command_buffers_in_flight": 32,
+     "max_dispatches_per_command_buffer": 512
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.25,
+     "max_registers_per_block": 32768,
+     "max_shared_memory_per_block": 32768,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": false
+     }
+    }
+   }
+  },
+  "apple-m1-ultra": {
+   "budget": 32768,
+   "profile": {
+    "_exact": true,
+    "_profile": "apple_m1_ultra",
+    "_vendor": "apple",
+    "architecture": "apple_silicon",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "argmax": {
+      "num_warps": 32,
+      "tile_n": 1024
+     },
+     "argmin": {
+      "block_m": 8,
+      "num_warps": 32,
+      "tile_n": 128
+     },
+     "bmm": {
+      "block_k": 32,
+      "block_m": 32,
+      "block_n": 32,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 80
+     },
+     "reduction": 1024,
+     "reduction_2d": {
+      "block_m": 8,
+      "block_n": 128,
+      "num_warps": 32
+     }
+    },
+    "compute_capability": "apple-m1-ultra",
+    "compute_capability_matches": [
+     "apple-m1-ultra"
+    ],
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "dispatch": {
+     "max_command_buffers_in_flight": 32,
+     "max_dispatches_per_command_buffer": 512
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.25,
+     "max_registers_per_block": 32768,
+     "max_shared_memory_per_block": 32768,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": false
+     }
+    }
+   }
+  },
+  "apple-m2": {
+   "budget": 32768,
+   "profile": {
+    "_exact": true,
+    "_profile": "apple_m2",
+    "_vendor": "apple",
+    "architecture": "apple_silicon",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "argmax": {
+      "num_warps": 32,
+      "tile_n": 1024
+     },
+     "argmin": {
+      "block_m": 8,
+      "num_warps": 32,
+      "tile_n": 128
+     },
+     "bmm": {
+      "block_k": 32,
+      "block_m": 32,
+      "block_n": 32,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 80
+     },
+     "reduction": 1024,
+     "reduction_2d": {
+      "block_m": 8,
+      "block_n": 128,
+      "num_warps": 32
+     }
+    },
+    "compute_capability": "apple-m2",
+    "compute_capability_matches": [
+     "apple-m2"
+    ],
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "dispatch": {
+     "max_command_buffers_in_flight": 32,
+     "max_dispatches_per_command_buffer": 512
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.25,
+     "max_registers_per_block": 32768,
+     "max_shared_memory_per_block": 32768,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": false
+     }
+    }
+   }
+  },
+  "apple-m2-max": {
+   "budget": 32768,
+   "profile": {
+    "_exact": true,
+    "_profile": "apple_m2_max",
+    "_vendor": "apple",
+    "architecture": "apple_silicon",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "argmax": {
+      "num_warps": 32,
+      "tile_n": 1024
+     },
+     "argmin": {
+      "block_m": 8,
+      "num_warps": 32,
+      "tile_n": 128
+     },
+     "bmm": {
+      "block_k": 32,
+      "block_m": 32,
+      "block_n": 32,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 80
+     },
+     "reduction": 1024,
+     "reduction_2d": {
+      "block_m": 8,
+      "block_n": 128,
+      "num_warps": 32
+     }
+    },
+    "compute_capability": "apple-m2-max",
+    "compute_capability_matches": [
+     "apple-m2-max"
+    ],
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "dispatch": {
+     "max_command_buffers_in_flight": 32,
+     "max_dispatches_per_command_buffer": 512
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.25,
+     "max_registers_per_block": 32768,
+     "max_shared_memory_per_block": 32768,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": false
+     }
+    }
+   }
+  },
+  "apple-m2-pro": {
+   "budget": 32768,
+   "profile": {
+    "_exact": true,
+    "_profile": "apple_m2_pro",
+    "_vendor": "apple",
+    "architecture": "apple_silicon",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "argmax": {
+      "num_warps": 32,
+      "tile_n": 1024
+     },
+     "argmin": {
+      "block_m": 8,
+      "num_warps": 32,
+      "tile_n": 128
+     },
+     "bmm": {
+      "block_k": 32,
+      "block_m": 32,
+      "block_n": 32,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 80
+     },
+     "reduction": 1024,
+     "reduction_2d": {
+      "block_m": 8,
+      "block_n": 128,
+      "num_warps": 32
+     }
+    },
+    "compute_capability": "apple-m2-pro",
+    "compute_capability_matches": [
+     "apple-m2-pro"
+    ],
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "dispatch": {
+     "max_command_buffers_in_flight": 32,
+     "max_dispatches_per_command_buffer": 512
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.25,
+     "max_registers_per_block": 32768,
+     "max_shared_memory_per_block": 32768,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": false
+     }
+    }
+   }
+  },
+  "apple-m2-ultra": {
+   "budget": 32768,
+   "profile": {
+    "_exact": true,
+    "_profile": "apple_m2_ultra",
+    "_vendor": "apple",
+    "architecture": "apple_silicon",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "argmax": {
+      "num_warps": 32,
+      "tile_n": 1024
+     },
+     "argmin": {
+      "block_m": 8,
+      "num_warps": 32,
+      "tile_n": 128
+     },
+     "bmm": {
+      "block_k": 32,
+      "block_m": 32,
+      "block_n": 32,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 80
+     },
+     "reduction": 1024,
+     "reduction_2d": {
+      "block_m": 8,
+      "block_n": 128,
+      "num_warps": 32
+     }
+    },
+    "compute_capability": "apple-m2-ultra",
+    "compute_capability_matches": [
+     "apple-m2-ultra"
+    ],
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "dispatch": {
+     "max_command_buffers_in_flight": 32,
+     "max_dispatches_per_command_buffer": 512
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.25,
+     "max_registers_per_block": 32768,
+     "max_shared_memory_per_block": 32768,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": false
+     }
+    }
+   }
+  },
+  "apple-m3": {
+   "budget": 32768,
+   "profile": {
+    "_exact": true,
+    "_profile": "apple_m3",
+    "_vendor": "apple",
+    "architecture": "apple_silicon",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "argmax": {
+      "num_warps": 32,
+      "tile_n": 1024
+     },
+     "argmin": {
+      "block_m": 8,
+      "num_warps": 32,
+      "tile_n": 128
+     },
+     "bmm": {
+      "block_k": 32,
+      "block_m": 32,
+      "block_n": 32,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 80
+     },
+     "reduction": 1024,
+     "reduction_2d": {
+      "block_m": 8,
+      "block_n": 128,
+      "num_warps": 32
+     }
+    },
+    "compute_capability": "apple-m3",
+    "compute_capability_matches": [
+     "apple-m3"
+    ],
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "dispatch": {
+     "max_command_buffers_in_flight": 32,
+     "max_dispatches_per_command_buffer": 512
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.25,
+     "max_registers_per_block": 32768,
+     "max_shared_memory_per_block": 32768,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": false
+     }
+    }
+   }
+  },
+  "apple-m3-max": {
+   "budget": 32768,
+   "profile": {
+    "_exact": true,
+    "_profile": "apple_m3_max",
+    "_vendor": "apple",
+    "architecture": "apple_silicon",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "argmax": {
+      "num_warps": 32,
+      "tile_n": 1024
+     },
+     "argmin": {
+      "block_m": 8,
+      "num_warps": 32,
+      "tile_n": 128
+     },
+     "bmm": {
+      "block_k": 32,
+      "block_m": 32,
+      "block_n": 32,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 80
+     },
+     "reduction": 1024,
+     "reduction_2d": {
+      "block_m": 8,
+      "block_n": 128,
+      "num_warps": 32
+     }
+    },
+    "compute_capability": "apple-m3-max",
+    "compute_capability_matches": [
+     "apple-m3-max"
+    ],
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "dispatch": {
+     "max_command_buffers_in_flight": 32,
+     "max_dispatches_per_command_buffer": 512
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.25,
+     "max_registers_per_block": 32768,
+     "max_shared_memory_per_block": 32768,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": false
+     }
+    }
+   }
+  },
+  "apple-m3-pro": {
+   "budget": 32768,
+   "profile": {
+    "_exact": true,
+    "_profile": "apple_m3_pro",
+    "_vendor": "apple",
+    "architecture": "apple_silicon",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "argmax": {
+      "num_warps": 32,
+      "tile_n": 1024
+     },
+     "argmin": {
+      "block_m": 8,
+      "num_warps": 32,
+      "tile_n": 128
+     },
+     "bmm": {
+      "block_k": 32,
+      "block_m": 32,
+      "block_n": 32,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 80
+     },
+     "reduction": 1024,
+     "reduction_2d": {
+      "block_m": 8,
+      "block_n": 128,
+      "num_warps": 32
+     }
+    },
+    "compute_capability": "apple-m3-pro",
+    "compute_capability_matches": [
+     "apple-m3-pro"
+    ],
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "dispatch": {
+     "max_command_buffers_in_flight": 32,
+     "max_dispatches_per_command_buffer": 512
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.25,
+     "max_registers_per_block": 32768,
+     "max_shared_memory_per_block": 32768,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": false
+     }
+    }
+   }
+  },
+  "apple-m3-ultra": {
+   "budget": 32768,
+   "profile": {
+    "_exact": true,
+    "_profile": "apple_m3_ultra",
+    "_vendor": "apple",
+    "architecture": "apple_silicon",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "argmax": {
+      "num_warps": 32,
+      "tile_n": 1024
+     },
+     "argmin": {
+      "block_m": 8,
+      "num_warps": 32,
+      "tile_n": 128
+     },
+     "bmm": {
+      "block_k": 32,
+      "block_m": 32,
+      "block_n": 32,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 80
+     },
+     "reduction": 1024,
+     "reduction_2d": {
+      "block_m": 8,
+      "block_n": 128,
+      "num_warps": 32
+     }
+    },
+    "compute_capability": "apple-m3-ultra",
+    "compute_capability_matches": [
+     "apple-m3-ultra"
+    ],
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "dispatch": {
+     "max_command_buffers_in_flight": 32,
+     "max_dispatches_per_command_buffer": 512
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.25,
+     "max_registers_per_block": 32768,
+     "max_shared_memory_per_block": 32768,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": false
+     }
+    }
+   }
+  },
+  "apple-m4": {
+   "budget": 32768,
+   "profile": {
+    "_exact": true,
+    "_profile": "apple_m4",
+    "_vendor": "apple",
+    "architecture": "apple_silicon",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "argmax": {
+      "num_warps": 32,
+      "tile_n": 1024
+     },
+     "argmin": {
+      "block_m": 8,
+      "num_warps": 32,
+      "tile_n": 128
+     },
+     "bmm": {
+      "block_k": 32,
+      "block_m": 32,
+      "block_n": 32,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 80
+     },
+     "reduction": 1024,
+     "reduction_2d": {
+      "block_m": 8,
+      "block_n": 128,
+      "num_warps": 32
+     }
+    },
+    "compute_capability": "apple-m4",
+    "compute_capability_matches": [
+     "apple-m4"
+    ],
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "dispatch": {
+     "max_command_buffers_in_flight": 32,
+     "max_dispatches_per_command_buffer": 512
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.25,
+     "max_registers_per_block": 32768,
+     "max_shared_memory_per_block": 32768,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": false
+     }
+    }
+   }
+  },
+  "apple-m4-max": {
+   "budget": 32768,
+   "profile": {
+    "_exact": true,
+    "_profile": "apple_m4_max",
+    "_vendor": "apple",
+    "architecture": "apple_silicon",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "argmax": {
+      "num_warps": 32,
+      "tile_n": 1024
+     },
+     "argmin": {
+      "block_m": 8,
+      "num_warps": 32,
+      "tile_n": 128
+     },
+     "bmm": {
+      "block_k": 32,
+      "block_m": 32,
+      "block_n": 32,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 80
+     },
+     "reduction": 1024,
+     "reduction_2d": {
+      "block_m": 8,
+      "block_n": 128,
+      "num_warps": 32
+     }
+    },
+    "compute_capability": "apple-m4-max",
+    "compute_capability_matches": [
+     "apple-m4-max"
+    ],
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "dispatch": {
+     "max_command_buffers_in_flight": 32,
+     "max_dispatches_per_command_buffer": 512
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.25,
+     "max_registers_per_block": 32768,
+     "max_shared_memory_per_block": 32768,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": false
+     }
+    }
+   }
+  },
+  "apple-m4-pro": {
+   "budget": 32768,
+   "profile": {
+    "_exact": true,
+    "_profile": "apple_m4_pro",
+    "_vendor": "apple",
+    "architecture": "apple_silicon",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 1073741824,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "argmax": {
+      "num_warps": 32,
+      "tile_n": 1024
+     },
+     "argmin": {
+      "block_m": 8,
+      "num_warps": 32,
+      "tile_n": 128
+     },
+     "bmm": {
+      "block_k": 32,
+      "block_m": 32,
+      "block_n": 32,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 80
+     },
+     "reduction": 1024,
+     "reduction_2d": {
+      "block_m": 8,
+      "block_n": 128,
+      "num_warps": 32
+     }
+    },
+    "compute_capability": "apple-m4-pro",
+    "compute_capability_matches": [
+     "apple-m4-pro"
+    ],
+    "conv": {
+     "weight_layout": "KRSC"
+    },
+    "dispatch": {
+     "max_command_buffers_in_flight": 32,
+     "max_dispatches_per_command_buffer": 16
+    },
+    "flash": {
+     "any_head_dim_correct": true,
+     "pow2_head_dim_correct": true
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.25,
+     "max_registers_per_block": 32768,
+     "max_shared_memory_per_block": 32768,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "metal_backend": "triton_ext",
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": false
+     }
+    }
+   }
+  },
+  "apple-m5": {
+   "budget": 32768,
+   "profile": {
+    "_exact": true,
+    "_profile": "apple_m5",
+    "_vendor": "apple",
+    "architecture": "apple_silicon",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "argmax": {
+      "num_warps": 32,
+      "tile_n": 1024
+     },
+     "argmin": {
+      "block_m": 8,
+      "num_warps": 32,
+      "tile_n": 128
+     },
+     "bmm": {
+      "block_k": 32,
+      "block_m": 32,
+      "block_n": 32,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 80
+     },
+     "reduction": 1024,
+     "reduction_2d": {
+      "block_m": 8,
+      "block_n": 128,
+      "num_warps": 32
+     }
+    },
+    "compute_capability": "apple-m5",
+    "compute_capability_matches": [
+     "apple-m5"
+    ],
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "dispatch": {
+     "max_command_buffers_in_flight": 32,
+     "max_dispatches_per_command_buffer": 512
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.25,
+     "max_registers_per_block": 32768,
+     "max_shared_memory_per_block": 32768,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": false
+     }
+    }
+   }
+  },
+  "apple-m5-max": {
+   "budget": 32768,
+   "profile": {
+    "_exact": true,
+    "_profile": "apple_m5_max",
+    "_vendor": "apple",
+    "architecture": "apple_silicon",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "argmax": {
+      "num_warps": 32,
+      "tile_n": 1024
+     },
+     "argmin": {
+      "block_m": 8,
+      "num_warps": 32,
+      "tile_n": 128
+     },
+     "bmm": {
+      "block_k": 32,
+      "block_m": 32,
+      "block_n": 32,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 80
+     },
+     "reduction": 1024,
+     "reduction_2d": {
+      "block_m": 8,
+      "block_n": 128,
+      "num_warps": 32
+     }
+    },
+    "compute_capability": "apple-m5-max",
+    "compute_capability_matches": [
+     "apple-m5-max"
+    ],
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "dispatch": {
+     "max_command_buffers_in_flight": 32,
+     "max_dispatches_per_command_buffer": 512
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.25,
+     "max_registers_per_block": 32768,
+     "max_shared_memory_per_block": 32768,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": false
+     }
+    }
+   }
+  },
+  "apple-m5-pro": {
+   "budget": 32768,
+   "profile": {
+    "_exact": true,
+    "_profile": "apple_m5_pro",
+    "_vendor": "apple",
+    "architecture": "apple_silicon",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "argmax": {
+      "num_warps": 32,
+      "tile_n": 1024
+     },
+     "argmin": {
+      "block_m": 8,
+      "num_warps": 32,
+      "tile_n": 128
+     },
+     "bmm": {
+      "block_k": 32,
+      "block_m": 32,
+      "block_n": 32,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 80
+     },
+     "reduction": 1024,
+     "reduction_2d": {
+      "block_m": 8,
+      "block_n": 128,
+      "num_warps": 32
+     }
+    },
+    "compute_capability": "apple-m5-pro",
+    "compute_capability_matches": [
+     "apple-m5-pro"
+    ],
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "dispatch": {
+     "max_command_buffers_in_flight": 32,
+     "max_dispatches_per_command_buffer": 512
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.25,
+     "max_registers_per_block": 32768,
+     "max_shared_memory_per_block": 32768,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": false
+     }
+    }
+   }
+  },
+  "apple-m5-ultra": {
+   "budget": 32768,
+   "profile": {
+    "_exact": true,
+    "_profile": "apple_m5_ultra",
+    "_vendor": "apple",
+    "architecture": "apple_silicon",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "argmax": {
+      "num_warps": 32,
+      "tile_n": 1024
+     },
+     "argmin": {
+      "block_m": 8,
+      "num_warps": 32,
+      "tile_n": 128
+     },
+     "bmm": {
+      "block_k": 32,
+      "block_m": 32,
+      "block_n": 32,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 80
+     },
+     "reduction": 1024,
+     "reduction_2d": {
+      "block_m": 8,
+      "block_n": 128,
+      "num_warps": 32
+     }
+    },
+    "compute_capability": "apple-m5-ultra",
+    "compute_capability_matches": [
+     "apple-m5-ultra"
+    ],
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "dispatch": {
+     "max_command_buffers_in_flight": 32,
+     "max_dispatches_per_command_buffer": 512
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.25,
+     "max_registers_per_block": 32768,
+     "max_shared_memory_per_block": 32768,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": false
+     }
+    }
+   }
+  },
+  "apple-m6": {
+   "budget": 32768,
+   "profile": {
+    "_exact": true,
+    "_profile": "apple_m6",
+    "_vendor": "apple",
+    "architecture": "apple_silicon",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "argmax": {
+      "num_warps": 32,
+      "tile_n": 1024
+     },
+     "argmin": {
+      "block_m": 8,
+      "num_warps": 32,
+      "tile_n": 128
+     },
+     "bmm": {
+      "block_k": 32,
+      "block_m": 32,
+      "block_n": 32,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 80
+     },
+     "reduction": 1024,
+     "reduction_2d": {
+      "block_m": 8,
+      "block_n": 128,
+      "num_warps": 32
+     }
+    },
+    "compute_capability": "apple-m6",
+    "compute_capability_matches": [
+     "apple-m6"
+    ],
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "dispatch": {
+     "max_command_buffers_in_flight": 32,
+     "max_dispatches_per_command_buffer": 512
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.25,
+     "max_registers_per_block": 32768,
+     "max_shared_memory_per_block": 32768,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": false
+     }
+    }
+   }
+  },
+  "apple9": {
+   "budget": 32768,
+   "profile": {
+    "_exact": true,
+    "_profile": "apple_silicon",
+    "_vendor": "apple",
+    "architecture": "apple_silicon",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "argmax": {
+      "num_warps": 32,
+      "tile_n": 1024
+     },
+     "argmin": {
+      "block_m": 8,
+      "num_warps": 32,
+      "tile_n": 128
+     },
+     "bmm": {
+      "block_k": 32,
+      "block_m": 32,
+      "block_n": 32,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 80
+     },
+     "reduction": 1024,
+     "reduction_2d": {
+      "block_m": 8,
+      "block_n": 128,
+      "num_warps": 32
+     }
+    },
+    "compute_capability": "apple9",
+    "compute_capability_matches": [
+     "apple-m"
+    ],
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "dispatch": {
+     "max_command_buffers_in_flight": 32,
+     "max_dispatches_per_command_buffer": 512
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.25,
+     "max_registers_per_block": 32768,
+     "max_shared_memory_per_block": 32768,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": false
+     }
+    }
+   }
+  },
+  "arl_h": {
+   "budget": 65536,
+   "profile": {
+    "_exact": true,
+    "_profile": "arl_h",
+    "_vendor": "intel",
+    "architecture": "xe_lpg",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "bmm": {
+      "block_k": 16,
+      "block_m": 64,
+      "block_n": 64,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "reduction": 1024
+    },
+    "compute_capability": "arl_h",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.5,
+     "max_registers_per_block": 65536,
+     "max_shared_memory_per_block": 65536,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pci_device_ids": [
+     32081,
+     32209
+    ],
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": false,
+      "triton": false
+     }
+    },
+    "sdpa_thresholds": [
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 32,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4
+     },
+     {
+      "block_m": 32,
+      "block_n": 32,
+      "head_dim_ge": 128,
+      "num_warps": 4
+     },
+     {
+      "block_m": 64,
+      "block_n": 64,
+      "head_dim_lt": 128,
+      "num_warps": 4
+     }
+    ],
+    "validation_status": "analytical"
+   }
+  },
+  "arl_s": {
+   "budget": 65536,
+   "profile": {
+    "_exact": true,
+    "_profile": "arl_s",
+    "_vendor": "intel",
+    "architecture": "xe_lpg",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "bmm": {
+      "block_k": 16,
+      "block_m": 64,
+      "block_n": 64,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "reduction": 1024
+    },
+    "compute_capability": "arl_s",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.5,
+     "max_registers_per_block": 65536,
+     "max_shared_memory_per_block": 65536,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pci_device_ids": [
+     32064,
+     32069,
+     32065,
+     32103
+    ],
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": false,
+      "triton": false
+     }
+    },
+    "sdpa_thresholds": [
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 32,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4
+     },
+     {
+      "block_m": 32,
+      "block_n": 32,
+      "head_dim_ge": 128,
+      "num_warps": 4
+     },
+     {
+      "block_m": 64,
+      "block_n": 64,
+      "head_dim_lt": 128,
+      "num_warps": 4
+     }
+    ],
+    "validation_status": "analytical"
+   }
+  },
+  "bmg": {
+   "budget": 131072,
+   "profile": {
+    "_exact": true,
+    "_profile": "bmg",
+    "_vendor": "intel",
+    "architecture": "xe2_hpg",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "bmm": {
+      "block_k": 16,
+      "block_m": 64,
+      "block_n": 64,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "reduction": 1024
+    },
+    "compute_capability": "bmg",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.5,
+     "max_registers_per_block": 131072,
+     "max_shared_memory_per_block": 131072,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pci_device_ids": [
+     57858,
+     57865,
+     57867,
+     57868,
+     57869,
+     57872,
+     57873,
+     57874,
+     57878,
+     57888,
+     57889,
+     57890,
+     57891
+    ],
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": false,
+      "triton": false
+     }
+    },
+    "sdpa_thresholds": [
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 32,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4
+     },
+     {
+      "block_m": 32,
+      "block_n": 32,
+      "head_dim_ge": 128,
+      "num_warps": 4
+     },
+     {
+      "block_m": 64,
+      "block_n": 64,
+      "head_dim_lt": 128,
+      "num_warps": 4
+     }
+    ],
+    "validation_status": "analytical"
+   }
+  },
+  "dg2": {
+   "budget": 65536,
+   "profile": {
+    "_exact": true,
+    "_profile": "dg2",
+    "_vendor": "intel",
+    "architecture": "xe_hpg",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "bmm": {
+      "block_k": 16,
+      "block_m": 64,
+      "block_n": 64,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "reduction": 1024
+    },
+    "compute_capability": "dg2",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.5,
+     "max_registers_per_block": 65536,
+     "max_shared_memory_per_block": 65536,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pci_device_ids": [
+     22176,
+     22177,
+     22178,
+     22206,
+     22207,
+     22160,
+     22161,
+     22162,
+     22181,
+     22182,
+     22192,
+     22193,
+     22202,
+     22203,
+     22204,
+     22205,
+     22163,
+     22164,
+     22165,
+     22179,
+     22180,
+     22194,
+     22195,
+     22166,
+     22167,
+     22208,
+     22210,
+     22209
+    ],
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": false,
+      "triton": false
+     }
+    },
+    "sdpa_thresholds": [
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 32,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4
+     },
+     {
+      "block_m": 32,
+      "block_n": 32,
+      "head_dim_ge": 128,
+      "num_warps": 4
+     },
+     {
+      "block_m": 64,
+      "block_n": 64,
+      "head_dim_lt": 128,
+      "num_warps": 4
+     }
+    ],
+    "validation_status": "analytical"
+   }
+  },
+  "gfx1100": {
+   "budget": 65536,
+   "profile": {
+    "_exact": true,
+    "_profile": "rdna3",
+    "_vendor": "amd",
+    "architecture": "rdna3",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "bmm": {
+      "block_k": 16,
+      "block_m": 64,
+      "block_n": 64,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "reduction": 1024
+    },
+    "compute_capability": "gfx1100",
+    "compute_capability_matches": [
+     "gfx11"
+    ],
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.5,
+     "max_registers_per_block": 65536,
+     "max_registers_per_thread": 256,
+     "max_shared_memory_per_block": 65536,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": true
+     }
+    },
+    "sdpa_thresholds": [
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 32,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4
+     },
+     {
+      "block_m": 32,
+      "block_n": 32,
+      "head_dim_ge": 128,
+      "num_warps": 4
+     },
+     {
+      "block_m": 64,
+      "block_n": 64,
+      "head_dim_lt": 128,
+      "num_warps": 4
+     }
+    ],
+    "validation_status": "analytical"
+   }
+  },
+  "gfx1201": {
+   "budget": 65536,
+   "profile": {
+    "_exact": true,
+    "_profile": "rdna4",
+    "_vendor": "amd",
+    "architecture": "rdna4",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "bmm": {
+      "block_k": 16,
+      "block_m": 64,
+      "block_n": 64,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "reduction": 1024
+    },
+    "compute_capability": "gfx1201",
+    "compute_capability_matches": [
+     "gfx120"
+    ],
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.5,
+     "max_registers_per_block": 65536,
+     "max_registers_per_thread": 256,
+     "max_shared_memory_per_block": 65536,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": true
+     }
+    },
+    "sdpa_thresholds": [
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 32,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4
+     },
+     {
+      "block_m": 32,
+      "block_n": 32,
+      "head_dim_ge": 128,
+      "num_warps": 4
+     },
+     {
+      "block_m": 64,
+      "block_n": 64,
+      "head_dim_lt": 128,
+      "num_warps": 4
+     }
+    ],
+    "validation_status": "analytical"
+   }
+  },
+  "gfx908": {
+   "budget": 65536,
+   "profile": {
+    "_exact": true,
+    "_profile": "cdna",
+    "_vendor": "amd",
+    "architecture": "cdna",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "bmm": {
+      "block_k": 16,
+      "block_m": 64,
+      "block_n": 64,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 240
+     },
+     "reduction": 1024
+    },
+    "compute_capability": "gfx908",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.5,
+     "max_registers_per_block": 65536,
+     "max_registers_per_thread": 256,
+     "max_shared_memory_per_block": 65536,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 64
+    },
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": true
+     }
+    },
+    "sdpa_thresholds": [
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 32,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4
+     },
+     {
+      "block_m": 32,
+      "block_n": 32,
+      "head_dim_ge": 128,
+      "num_warps": 4
+     },
+     {
+      "block_m": 64,
+      "block_n": 64,
+      "head_dim_lt": 128,
+      "num_warps": 4
+     }
+    ]
+   }
+  },
+  "gfx90a": {
+   "budget": 65536,
+   "profile": {
+    "_exact": true,
+    "_profile": "cdna2",
+    "_vendor": "amd",
+    "architecture": "cdna2",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "bmm": {
+      "block_k": 16,
+      "block_m": 64,
+      "block_n": 64,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 220
+     },
+     "reduction": 1024
+    },
+    "compute_capability": "gfx90a",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.5,
+     "max_registers_per_block": 65536,
+     "max_registers_per_thread": 256,
+     "max_shared_memory_per_block": 65536,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 64
+    },
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": true
+     }
+    },
+    "sdpa_thresholds": [
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 32,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4
+     },
+     {
+      "block_m": 32,
+      "block_n": 32,
+      "head_dim_ge": 128,
+      "num_warps": 4
+     },
+     {
+      "block_m": 64,
+      "block_n": 64,
+      "head_dim_lt": 128,
+      "num_warps": 4
+     }
+    ]
+   }
+  },
+  "gfx942": {
+   "budget": 65536,
+   "profile": {
+    "_exact": true,
+    "_profile": "cdna3",
+    "_vendor": "amd",
+    "architecture": "cdna3",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "bmm": {
+      "block_k": 16,
+      "block_m": 64,
+      "block_n": 64,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "dequant_gemv": {
+      "min_programs": 608
+     },
+     "reduction": 1024
+    },
+    "compute_capability": "gfx942",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.5,
+     "max_registers_per_block": 65536,
+     "max_registers_per_thread": 256,
+     "max_shared_memory_per_block": 65536,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 64
+    },
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": true
+     }
+    },
+    "sdpa_thresholds": [
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 32,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4
+     },
+     {
+      "block_m": 32,
+      "block_n": 32,
+      "head_dim_ge": 128,
+      "num_warps": 4
+     },
+     {
+      "block_m": 64,
+      "block_n": 64,
+      "head_dim_lt": 128,
+      "num_warps": 4
+     }
+    ]
+   }
+  },
+  "gfx950": {
+   "budget": 163840,
+   "profile": {
+    "_exact": true,
+    "_profile": "cdna4",
+    "_vendor": "amd",
+    "architecture": "cdna4",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "bmm": {
+      "block_k": 16,
+      "block_m": 64,
+      "block_n": 64,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "reduction": 1024
+    },
+    "compute_capability": "gfx950",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.5,
+     "max_registers_per_block": 65536,
+     "max_registers_per_thread": 256,
+     "max_shared_memory_per_block": 163840,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 64
+    },
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": true
+     }
+    },
+    "sdpa_thresholds": [
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 32,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4
+     },
+     {
+      "block_m": 32,
+      "block_n": 32,
+      "head_dim_ge": 128,
+      "num_warps": 4
+     },
+     {
+      "block_m": 64,
+      "block_n": 64,
+      "head_dim_lt": 128,
+      "num_warps": 4
+     }
+    ],
+    "validation_status": "analytical"
+   }
+  },
+  "lnl": {
+   "budget": 131072,
+   "profile": {
+    "_exact": true,
+    "_profile": "lnl",
+    "_vendor": "intel",
+    "architecture": "xe2_lpg",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "bmm": {
+      "block_k": 16,
+      "block_m": 64,
+      "block_n": 64,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "reduction": 1024
+    },
+    "compute_capability": "lnl",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.5,
+     "max_registers_per_block": 131072,
+     "max_shared_memory_per_block": 131072,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pci_device_ids": [
+     25632,
+     25760,
+     25776
+    ],
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": false,
+      "triton": false
+     }
+    },
+    "sdpa_thresholds": [
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 32,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4
+     },
+     {
+      "block_m": 32,
+      "block_n": 32,
+      "head_dim_ge": 128,
+      "num_warps": 4
+     },
+     {
+      "block_m": 64,
+      "block_n": 64,
+      "head_dim_lt": 128,
+      "num_warps": 4
+     }
+    ],
+    "validation_status": "analytical"
+   }
+  },
+  "mtl": {
+   "budget": 65536,
+   "profile": {
+    "_exact": true,
+    "_profile": "mtl",
+    "_vendor": "intel",
+    "architecture": "xe_lpg",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "bmm": {
+      "block_k": 16,
+      "block_m": 64,
+      "block_n": 64,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "reduction": 1024
+    },
+    "compute_capability": "mtl",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.5,
+     "max_registers_per_block": 65536,
+     "max_shared_memory_per_block": 65536,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pci_device_ids": [
+     32085,
+     32213
+    ],
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": false,
+      "triton": false
+     }
+    },
+    "sdpa_thresholds": [
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 32,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4
+     },
+     {
+      "block_m": 32,
+      "block_n": 32,
+      "head_dim_ge": 128,
+      "num_warps": 4
+     },
+     {
+      "block_m": 64,
+      "block_n": 64,
+      "head_dim_lt": 128,
+      "num_warps": 4
+     }
+    ],
+    "validation_status": "analytical"
+   }
+  },
+  "ptl_h": {
+   "budget": 131072,
+   "profile": {
+    "_exact": true,
+    "_profile": "ptl_h",
+    "_vendor": "intel",
+    "architecture": "xe3_lpg",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "bmm": {
+      "block_k": 16,
+      "block_m": 64,
+      "block_n": 64,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "reduction": 1024
+    },
+    "compute_capability": "ptl_h",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.5,
+     "max_registers_per_block": 131072,
+     "max_shared_memory_per_block": 131072,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pci_device_ids": [
+     45184,
+     45185,
+     45186,
+     45187,
+     45188,
+     45189,
+     45190,
+     45191,
+     45199,
+     45216,
+     45217,
+     45232
+    ],
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": false,
+      "triton": false
+     }
+    },
+    "sdpa_thresholds": [
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 32,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4
+     },
+     {
+      "block_m": 32,
+      "block_n": 32,
+      "head_dim_ge": 128,
+      "num_warps": 4
+     },
+     {
+      "block_m": 64,
+      "block_n": 64,
+      "head_dim_lt": 128,
+      "num_warps": 4
+     }
+    ],
+    "validation_status": "analytical"
+   }
+  },
+  "ptl_u": {
+   "budget": 131072,
+   "profile": {
+    "_exact": true,
+    "_profile": "wcl",
+    "_vendor": "intel",
+    "architecture": "xe3_lpg",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "bmm": {
+      "block_k": 16,
+      "block_m": 64,
+      "block_n": 64,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "reduction": 1024
+    },
+    "compute_capability": "ptl_u",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.5,
+     "max_registers_per_block": 131072,
+     "max_shared_memory_per_block": 131072,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pci_device_ids": [
+     64896,
+     64897
+    ],
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": false,
+      "triton": false
+     }
+    },
+    "sdpa_thresholds": [
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 32,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4
+     },
+     {
+      "block_m": 32,
+      "block_n": 32,
+      "head_dim_ge": 128,
+      "num_warps": 4
+     },
+     {
+      "block_m": 64,
+      "block_n": 64,
+      "head_dim_lt": 128,
+      "num_warps": 4
+     }
+    ],
+    "validation_status": "experimental"
+   }
+  },
+  "pvc": {
+   "budget": 131072,
+   "profile": {
+    "_exact": true,
+    "_profile": "pvc",
+    "_vendor": "intel",
+    "architecture": "xe_hpc",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "bmm": {
+      "block_k": 16,
+      "block_m": 64,
+      "block_n": 64,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "reduction": 1024
+    },
+    "compute_capability": "pvc",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.5,
+     "max_registers_per_block": 131072,
+     "max_shared_memory_per_block": 131072,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pci_device_ids": [
+     2921,
+     2926,
+     3028,
+     3029,
+     3030,
+     3031,
+     3032,
+     3033,
+     3034,
+     3035,
+     3040,
+     3041,
+     3045
+    ],
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": true,
+      "triton": true
+     }
+    },
+    "sdpa_thresholds": [
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 32,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4
+     },
+     {
+      "block_m": 32,
+      "block_n": 32,
+      "head_dim_ge": 128,
+      "num_warps": 4
+     },
+     {
+      "block_m": 64,
+      "block_n": 64,
+      "head_dim_lt": 128,
+      "num_warps": 4
+     }
+    ],
+    "validation_status": "analytical"
+   }
+  },
+  "tgllp": {
+   "budget": 65536,
+   "profile": {
+    "_exact": true,
+    "_profile": "xe_lp",
+    "_vendor": "intel",
+    "architecture": "xe_lp",
+    "autotune": {
+     "buckets": {
+      "W": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 2048,
+        "up_to": 16384
+       },
+       {
+        "step": 4096,
+        "up_to": 32768
+       },
+       {
+        "step": 8192,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": null
+       }
+      ],
+      "default": [
+       {
+        "step": 1,
+        "up_to": 64
+       },
+       {
+        "step": 16,
+        "up_to": 256
+       },
+       {
+        "step": 32,
+        "up_to": 1024
+       },
+       {
+        "step": 128,
+        "up_to": 8192
+       },
+       {
+        "step": 512,
+        "up_to": 16384
+       },
+       {
+        "step": 1024,
+        "up_to": 32768
+       },
+       {
+        "step": 2048,
+        "up_to": 65536
+       },
+       {
+        "step": 16384,
+        "up_to": 131072
+       },
+       {
+        "step": 32768,
+        "up_to": 262144
+       },
+       {
+        "step": 65536,
+        "up_to": 524288
+       },
+       {
+        "step": 131072,
+        "up_to": 1048576
+       },
+       {
+        "step": 262144,
+        "up_to": 2097152
+       },
+       {
+        "step": 524288,
+        "up_to": null
+       }
+      ],
+      "elements": [
+       {
+        "step": 65536,
+        "up_to": 65536
+       },
+       {
+        "step": 1048576,
+        "up_to": 1048576
+       },
+       {
+        "step": 16777216,
+        "up_to": 16777216
+       },
+       {
+        "step": 68719476736,
+        "up_to": null
+       }
+      ]
+     },
+     "compile_bound_s": 120
+    },
+    "autotune_screen_max_bytes": 33554432,
+    "autotune_screen_rtol": {
+     "bfloat16": 0.04,
+     "float16": 0.02,
+     "float32": 0.0001,
+     "float64": 1e-08,
+     "int64": 0.0
+    },
+    "block_sizes": {
+     "bmm": {
+      "block_k": 16,
+      "block_m": 64,
+      "block_n": 64,
+      "num_warps": 4
+     },
+     "conv2d": {
+      "block_h": 16,
+      "block_w": 16,
+      "num_warps": 4
+     },
+     "default": 1024,
+     "reduction": 1024
+    },
+    "compute_capability": "tgllp",
+    "conv": {
+     "weight_layout": "KCRS"
+    },
+    "flash": {
+     "pow2_head_dim_correct": false
+    },
+    "memory": {
+     "alloc_pool_parked_cap_fraction": 0.5,
+     "max_registers_per_block": 65536,
+     "max_shared_memory_per_block": 65536,
+     "runtime_context_mb": null,
+     "sdpa_math_max_scores_bytes": 0,
+     "sdpa_math_min_chunk_rows": 128,
+     "warp_size": 32
+    },
+    "pci_device_ids": [
+     39520,
+     39528,
+     39536,
+     39488,
+     39497,
+     39513,
+     39544,
+     39616,
+     39625,
+     39641,
+     39672,
+     19584,
+     19594,
+     19595,
+     19596,
+     19600,
+     19610,
+     18048,
+     18050,
+     18056,
+     18058,
+     18059,
+     18064,
+     18066,
+     18067,
+     18080,
+     18081,
+     18082,
+     18083,
+     18086,
+     18088,
+     18090,
+     17962,
+     17958,
+     17960,
+     18096,
+     18097,
+     18098,
+     18099,
+     18112,
+     18113,
+     18114,
+     18115,
+     18128,
+     18129,
+     18130,
+     18131,
+     18132,
+     42880,
+     42881,
+     42882,
+     42883,
+     42888,
+     42889,
+     42890,
+     42891,
+     42785,
+     42913,
+     42921,
+     42924,
+     42925,
+     42784,
+     42912,
+     42920,
+     42922,
+     42923,
+     18693,
+     18694,
+     18695,
+     18696,
+     18697
+    ],
+    "pipelining": {
+     "max_num_stages": 2
+    },
+    "precision": {
+     "attention_operands": "narrowest",
+     "kernels_carry_fp64": {
+      "compiled": false,
+      "triton": false
+     }
+    },
+    "sdpa_thresholds": [
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 32,
+      "num_warps": 4,
+      "seqlen_q_le": 16
+     },
+     {
+      "block_m": 16,
+      "block_n": 16,
+      "head_dim_ge": 256,
+      "num_warps": 4
+     },
+     {
+      "block_m": 32,
+      "block_n": 32,
+      "head_dim_ge": 128,
+      "num_warps": 4
+     },
+     {
+      "block_m": 64,
+      "block_n": 64,
+      "head_dim_lt": 128,
+      "num_warps": 4
+     }
+    ],
+    "validation_status": "experimental"
+   }
+  }
+ },
+ "main": "50597afcc7a3"
+}
