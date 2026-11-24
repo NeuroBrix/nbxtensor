@@ -2,6 +2,9 @@
 application's door to them: each answers from the module that holds the mechanism."""
 
 
+from nbxtensor.memory.tied import TiedWeightError  # (a tie refused by name: `bind_tied`, `join_weights`)
+
+
 def set_limit(nbytes, device=None) -> None:
     """Hold this process to a card of `nbytes` bytes on `device` (an ordinal; None: every device), or lift the limit
     (`nbytes` None): the allocator refuses what such a card refuses and its pool parks a fraction of the limit
@@ -21,6 +24,27 @@ def join_weights(held: dict, loaded: dict) -> dict:
     """`loaded` with its arenas joined to `held`'s, to update `held` with (`memory_pool.join_weights`)."""
     from nbxtensor.memory.memory_pool import join_weights as join
     return join(held, loaded)
+
+
+def bind_tied(weights: dict, param: str, source, *, shape=None, dtype=None):
+    """`weights[param]` made the tensor `source` (another component's loaded weight): an alias, no copy, kept across
+    the table's `release_weights` and `join_weights`; a shape or dtype that differs refused by name
+    (`tied.bind_tied`)."""
+    from nbxtensor.memory.tied import bind_tied as bind
+    return bind(weights, param, source, shape=shape, dtype=dtype)
+
+
+def tied_params(weights: dict) -> frozenset:
+    """The entries of a table (loaded, or released and due again at its reload) that are another component's tensor:
+    the ones a loader need not read (`tied.tied_params`)."""
+    from nbxtensor.memory.tied import tied_params as tied
+    return tied(weights)
+
+
+def weight_bytes(weights: dict) -> int:
+    """The bytes a table's own weights hold, each allocation once, a tied entry 0 (`tied.weight_bytes`)."""
+    from nbxtensor.memory.tied import weight_bytes as count
+    return count(weights)
 
 
 def pool_enabled() -> bool:

@@ -51,8 +51,10 @@ def release_weights(weights: dict) -> bool:
     pointer tables that pin experts) dropped; then, when the set is the library's (an NBXTensor in it, or its arenas
     under "_arenas", {device: ComponentArena}), every device holding one synchronised, the dict cleared (the
     finalizers free) and the pool's cached blocks given back — True. False, the dict untouched: another library's
-    weights."""
+    weights. A table's ties (`tied.bind_tied`) are kept apart for its reload (`join_weights`), the sources they alias
+    left alive by them while a loaded table holds them."""
     import sys
+    from nbxtensor.memory import tied
     from nbxtensor.tensor import NBXTensor
     for module, release in (("nbxtensor.ops.elementwise_wrappers", "clear_bias_caches"),
                             ("nbxtensor.memory.pointer_tables", "release_pinned_tables")):
@@ -61,12 +63,14 @@ def release_weights(weights: dict) -> bool:
     arenas = weights.get("_arenas")
     if arenas is None and not any(isinstance(t, NBXTensor) for t in weights.values()):
         return False
+    ties = tied.before_release(weights)
     devs = {getattr(a, "device_idx", None) for a in (arenas or {}).values()} - {None}
     devs |= {t.device_idx for t in weights.values() if isinstance(t, NBXTensor)}
     for d in sorted(devs):
         DeviceAllocator.device_synchronize(d)
     arenas = None                                   # the dict's references are the last: its clear frees them
     weights.clear()
+    tied.after_release(weights, ties)
     if devs:
         DeviceAllocator.empty_cache_pool()
     return True
@@ -75,7 +79,14 @@ def release_weights(weights: dict) -> bool:
 def join_weights(held: dict, loaded: dict) -> dict:
     """`loaded` with its arenas ("_arenas") merged into `held`'s, to `update` `held` with: every arena of both loads
     stays referenced — a weight of the first load points into its arena — a second arena on a device under a distinct
-    key (`release_weights` reads their devices, never their keys)."""
+    key (`release_weights` reads their devices, never their keys). `held`'s ties (`tied.bind_tied`) hold in the result:
+    each tied entry the source's tensor again, `held` a table being updated or one `release_weights` released (the
+    reload, `self.weights = join_weights(self.weights, loaded)`)."""
+    from nbxtensor.memory import tied
+    return tied.rejoin(held, _join_arenas(held, loaded))
+
+
+def _join_arenas(held: dict, loaded: dict) -> dict:
     if "_arenas" not in loaded:
         return loaded
     merged = dict(held.get("_arenas") or {})

@@ -131,7 +131,18 @@ The application's door (`nbxtensor.memory` itself), each name answered by the mo
 ```python
 def set_limit(nbytes, device=None) -> None
 def release_weights(weights: dict) -> bool                     # memory_pool.release_weights
-def join_weights(held: dict, loaded: dict) -> dict             # memory_pool.join_weights
+def join_weights(held: dict, loaded: dict) -> dict             # memory_pool.join_weights (a table's ties restored)
+def bind_tied(weights: dict, param: str, source, *, shape=None, dtype=None) -> NBXTensor   # tied.bind_tied
+    # weights[param] made the tensor `source` (another component's loaded weight): an alias, no copy, no allocation;
+    # a source that is not an NBXTensor, or a shape / dtype differing from the entry at `param` (or from `shape` /
+    # `dtype` when given), refused by name: TiedWeightError. The tie is recorded in the table's "_arenas" and kept:
+    # release_weights(weights) keeps it apart for the reload; join_weights(weights, loaded) puts the source's tensor
+    # back at `param` (the reload: `table = join_weights(table, loaded)`). Lifetime by reference: the source released
+    # while a loaded table holds the alias stays alive by it; released after the consumer was, it is forgotten and the
+    # consumer's reload refused by name (load the source, bind again).
+def tied_params(weights: dict) -> frozenset                    # the tied entries (a loader need not read them)
+def weight_bytes(weights: dict) -> int                         # a table's own bytes, each allocation once, a tie 0
+TiedWeightError                                                # a tie refused by name (ValueError)
 def pool_enabled() -> bool                                      # pool.parks_freed_blocks
 def pool_parked_cap_bytes(vendor, architecture, total_bytes) -> int   # pool.parked_cap_bytes
 def pool_fit_slack(vendor, architecture) -> float              # pool.fit_slack
