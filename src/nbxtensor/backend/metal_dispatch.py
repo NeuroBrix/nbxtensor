@@ -148,6 +148,15 @@ def assert_block(pipe: Pipeline, layout) -> Any:
     return held[1]
 
 
+def drop_assert_blocks() -> None:
+    """Drop every kernel's status block, and the pending ones with them: the runtime that allocated them is being
+    dropped (`metal_device.reset_runtime_for_tests`). Kept, the next asserting launch would bind an address the new
+    runtime never issued and be refused ("lies in no allocation of this Metal runtime"); it allocates a fresh block.
+    The pipelines stay: they are built on the system's one `MTLDevice`, which the next runtime is handed again."""
+    _ASSERT_BLOCKS.clear()
+    _PENDING.clear()
+
+
 def _words(block) -> Any:
     """The status words, read in place (shared memory: no copy, no wait)."""
     import ctypes

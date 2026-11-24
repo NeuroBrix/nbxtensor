@@ -3015,6 +3015,8 @@ def gpu_cores() -> int
     # This GPU's core count, read from the IORegistry; refused by name when it does not say.
 def assert_block(pipe, layout)
     # The zeroed status block an asserting kernel writes, checked later, never by a wait after the launch.
+def drop_assert_blocks() -> None
+    # Drop every kernel's status block and the pending ones: the runtime that allocated them is being dropped.
 def raise_landed_asserts() -> None
     # Before a launch: raise for an earlier failed assert the host already sees.
 def raise_failed_asserts() -> None
@@ -3757,6 +3759,7 @@ def check_device_faults() -> None   # Raise if any kernel reported a broken cont
 def device_fault_buffer(device_idx: int) -> 'NBXTensor'   # This device's zeroed one-word status buffer.
 def device_fault_code(message: str, *, armed: bool=None) -> int   # The code a kernel should be compiled with: its own where the backend
 def device_fault_code_cached(message: str) -> int   # `device_fault_code` memoised per message — it runs at every launch of
+def drop_device_fault_buffers() -> None   # Drop every device's status word: the runtime that allocated them is
 def fault_channel(message: str, spare: 'NBXTensor') -> tuple   # `(pointer_argument, FAULT_CODE)` for a kernel that carries the channel.
 def register_device_fault(message: str) -> int   # Reserve a fault code for `message`. Called at import by the kernel
 ```

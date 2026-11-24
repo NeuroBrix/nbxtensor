@@ -1366,6 +1366,15 @@ def reset_runtime_for_tests() -> None:
     #   * `_INT64_ARRAY_CACHE` holds shape/stride tensors forever by design
     #     (a frozen replay plan records their raw device pointers), which
     #     also means forever across a reset.
+    #   * `faults._FAULT_BUFFERS` holds each device's one-word status buffer,
+    #     never freed for the same reason: kept across the reset, the first
+    #     armed launch after it (an embedding, an index_select) binds an
+    #     address the new runtime never issued and is refused.
+    #   * `metal_dispatch._ASSERT_BLOCKS` (and `_PENDING`) hold each asserting
+    #     kernel's status block, kept per pipeline: the same refusal at the
+    #     first asserting launch after the reset. The pipelines themselves
+    #     stay — they are built on the system's one `MTLDevice`, the very
+    #     object the next runtime is handed (checked 2026-11-24).
     from nbxtensor import tensor as nbx_tensor
     import nbxtensor.memory.allocator as _nbx_allocator
     import nbxtensor.backend.runtime as _nbx_runtime
@@ -1374,6 +1383,10 @@ def reset_runtime_for_tests() -> None:
     except Exception:                                   # pragma: no cover
         pass                                            # nothing to release
     nbx_tensor._INT64_ARRAY_CACHE.clear()
+    from nbxtensor.backend import faults as _nbx_faults
+    _nbx_faults.drop_device_fault_buffers()
+    from nbxtensor.backend import metal_dispatch as _nbx_dispatch
+    _nbx_dispatch.drop_assert_blocks()
 
     # Everything issued so far belongs to the runtime about to be dropped.
     # The flush above released what was parked; a tensor still ALIVE right

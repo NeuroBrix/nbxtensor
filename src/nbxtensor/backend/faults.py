@@ -143,6 +143,19 @@ def device_fault_buffer(device_idx: int) -> 'NBXTensor':
     return buf
 
 
+def drop_device_fault_buffers() -> None:
+    """Drop every device's status word: the runtime that allocated them is
+    being dropped (`metal_device.reset_runtime_for_tests`).
+
+    "Never freed" holds for the life of a runtime, not across one: a word the
+    dropped runtime's allocator handed out is an address the next runtime never
+    issued, and the first armed launch after the reset would bind it and be
+    refused ("lies in no allocation of this Metal runtime"). The next armed
+    launch allocates a fresh word on the new runtime."""
+    with _FAULT_LOCK:
+        _FAULT_BUFFERS.clear()
+
+
 def check_device_faults() -> None:
     """Raise if any kernel reported a broken contract since the last check.
 
