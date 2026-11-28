@@ -135,6 +135,28 @@ def host_pinned_allocated() -> int:
     return _allocator().host_pinned_allocated()
 
 
+def empty_host_pinned_cache() -> int:
+    """Release all cached unused pinned host buffers back to the backend; returns bytes freed."""
+    from nbxtensor.memory.pinned_pool import empty_host_pinned_cache as _empty
+    return _empty()
+
+
+def host_pinned_pool_stats() -> dict:
+    """Counters and byte totals of the default `CachingHostAllocator`."""
+    from nbxtensor.memory.pinned_pool import host_pinned_pool_stats as _stats
+    return _stats()
+
+
+def get_pinned_host_allocator():
+    """Return the process-wide default `CachingHostAllocator`."""
+    from nbxtensor.memory.pinned_pool import get_pinned_host_allocator as _get
+    return _get()
+
+
+from nbxtensor.memory.pinned_pool import CachingHostAllocator  # noqa: E402
+from nbxtensor.memory.streams import NBXEvent, NBXStream, copy_async  # noqa: E402
+
+
 def empty_cache_pool() -> int:
     """Every block the pool keeps parked given back to the driver; the bytes freed (0 with the pool off)."""
     return _allocator().empty_cache_pool()

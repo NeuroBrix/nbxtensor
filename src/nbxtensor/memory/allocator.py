@@ -1252,14 +1252,20 @@ class DeviceAllocator:
         DeviceAllocator._range_del(start)
 
     @staticmethod
-    def malloc_host_pinned(nbytes: int) -> int:
-        """Allocate page-locked host memory. Enables non_blocking H2D DMA.
+    def _host_pinned_pool_active() -> bool:
+        if os.environ.get("NBX_HOST_PINNED_POOL", "1").strip() == "0":
+            return False
+        try:
+            if _rt.gpu_backend() == "metal":
+                # Metal uses unified memory shared MTLBuffers that must unexpose immediately on free.
+                return False
+        except Exception:
+            pass
+        return True
 
-        Uses cudaMallocHost (or hipHostMalloc on ROCm). The returned
-        pointer is a HOST address — numpy can wrap it via
-        np.frombuffer(ctypes.string_at(ptr, nbytes), ...) or ctypes
-        casting, and cudaMemcpy kind=1 (H2D) uses it as src.
-        """
+    @staticmethod
+    def _raw_malloc_host_pinned(nbytes: int) -> int:
+        """Direct driver page-locked host allocation (`cudaMallocHost` / `hipHostMalloc`), bypassing the host cache."""
         if nbytes == 0:
             return 0
         dm = _rt.device_memory()
@@ -1274,8 +1280,35 @@ class DeviceAllocator:
             DeviceAllocator.clear_last_error()   # a refused call must not poison the next one
             raise RuntimeError(
                 f"Host pinned malloc failed (error {ret}) for {nbytes} bytes")
-        DeviceAllocator._host_pinned_ptr_size[p] = nbytes
         DeviceAllocator._range_add(p, nbytes)      # device-mapped (UVA): a kernel may read it, so holds() knows it
+        return p
+
+    @staticmethod
+    def _raw_free_host_pinned(ptr: int) -> None:
+        """Direct driver page-locked host release (`cudaFreeHost` / `hipHostFree`), bypassing the host cache."""
+        if ptr:
+            dm = _rt.device_memory()
+            if not dm.supports("host_free"):
+                return
+            dm.host_free(ptr)
+            DeviceAllocator._range_del(ptr)
+
+    @staticmethod
+    def malloc_host_pinned(nbytes: int) -> int:
+        """Allocate page-locked host memory. Enables non_blocking H2D DMA.
+
+        Uses `CachingHostAllocator` (backed by `cudaMallocHost` / `hipHostMalloc`)
+        so repeated pinned allocations reuse pooled host pages without repeated
+        OS page-locking syscalls. Disable pooling via `NBX_HOST_PINNED_POOL=0`.
+        """
+        if nbytes == 0:
+            return 0
+        if DeviceAllocator._host_pinned_pool_active():
+            from nbxtensor.memory.pinned_pool import get_pinned_host_allocator
+            p = get_pinned_host_allocator().alloc(nbytes)
+        else:
+            p = DeviceAllocator._raw_malloc_host_pinned(nbytes)
+        DeviceAllocator._host_pinned_ptr_size[p] = nbytes
         DeviceAllocator._host_pinned_live_bytes += nbytes
         if DeviceAllocator._host_pinned_live_bytes > DeviceAllocator._host_pinned_peak_bytes:
             DeviceAllocator._host_pinned_peak_bytes = DeviceAllocator._host_pinned_live_bytes
@@ -1312,14 +1345,14 @@ class DeviceAllocator:
     @staticmethod
     def free_host_pinned(ptr: int):
         if ptr:
-            dm = _rt.device_memory()
-            if not dm.supports("host_free"):
-                return
-            dm.host_free(ptr)
             nbytes = DeviceAllocator._host_pinned_ptr_size.pop(ptr, None)
-            DeviceAllocator._range_del(ptr)
             if nbytes is not None:
                 DeviceAllocator._host_pinned_live_bytes -= nbytes
+            if DeviceAllocator._host_pinned_pool_active():
+                from nbxtensor.memory.pinned_pool import get_pinned_host_allocator
+                get_pinned_host_allocator().free(ptr, nbytes)
+            else:
+                DeviceAllocator._raw_free_host_pinned(ptr)
 
     # ------------------------------------------------------------------
     # Accounting API — use instead of cudaMemGetInfo for per-NeuroBrix

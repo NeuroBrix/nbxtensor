@@ -299,14 +299,14 @@ class PagedTritonKVCache:
         if layer_idx == self.num_layers - 1:
             self.length = start + t
 
-    def decode(self, layer_idx: int, q, k, v, scale: float, q_round=None):
+    def decode(self, layer_idx: int, q, k, v, scale: float, q_round=None, q_scale=None, k_scale=None):
         """One decode step of one layer: append its new K / V `[B, H_kv, 1, D]` at the device length, advance it, and
         attend `q [B, H, 1, D]` over the sequence's pages. Returns `[B, H, 1, D_v]`."""
         import triton
         from nbxtensor.ops import wrappers as W
         from nbxtensor.ops import attention_wrappers as _nbx_attention_wrappers  # the family the moved names live in (M2 split)
         from nbxtensor.backend.runtime import set_device
-        from nbxtensor.ops.paged_decode_attn import paged_kv_append_step_kernel, paged_lens_advance_kernel
+        from nbxtensor.ops.paged_decode_attn import paged_kv_append_step_kernel
         if int(k.shape[2]) != 1:
             raise RuntimeError(f"PagedTritonKVCache.decode: {int(k.shape[2])} new positions — a decode step brings one")
         new_len = self.length + 1
@@ -317,26 +317,30 @@ class PagedTritonKVCache:
         kp, vp, lens = self.k_pools[layer_idx], self.v_pools[layer_idx], self.lens[layer_idx]
         bt = self.block_tables[self.layer_device[layer_idx]]
         set_device(kp)
-        paged_kv_append_step_kernel[(self.batch, self.num_kv_heads)](
+        paged_kv_append_step_kernel[(self.batch, 1)](
             k2, v2, kp, vp, bt, lens, self.page_tokens,
             k2.stride(0), k2.stride(1), v2.stride(0), v2.stride(1),
             kp.stride(0), kp.stride(1), kp.stride(2),
             vp.stride(0), vp.stride(1), vp.stride(2),
             bt.stride(0),
             BLOCK_D=max(triton.next_power_of_2(max(self.k_head_dim, self.v_head_dim)), 16),
-            D_K=self.k_head_dim, D_V=self.v_head_dim, num_warps=1)
-        paged_lens_advance_kernel[(self.batch,)](lens, 1)
-        host = self._host_partial(layer_idx, q, scale, q_round) if self.spilled else None
+            D_K=self.k_head_dim, D_V=self.v_head_dim,
+            ADVANCE_LENS=True, NUM_KV_HEADS=self.num_kv_heads, num_warps=1)
+        eff_scale = float(scale) * (float(k_scale) if k_scale is not None else 1.0)
+        host = self._host_partial(layer_idx, q, eff_scale, q_round, q_scale=q_scale) if self.spilled else None
         out = _nbx_attention_wrappers.paged_decode_attention(q, kp, vp, bt, lens, scale, new_len - self.spilled,
-                                                             q_round=q_round, host_partial=host)
+                                                             q_round=q_round, host_partial=host,
+                                                             q_scale=q_scale, k_scale=k_scale)
         if layer_idx == self.num_layers - 1:
             self.length = new_len
         return out
 
-    def _host_partial(self, layer_idx: int, q, scale: float, q_round):
+    def _host_partial(self, layer_idx: int, q, scale: float, q_round, q_scale=None):
         """The spilled positions' partial for this step's query rows, q read as the card reads it (rounded to q_round)."""
         heads = int(q.shape[1])
         qh = (q.to(q_round) if q_round is not None and q.nbx_dtype != q_round else q).to(NBXDtype.float32).numpy()
+        if q_scale is not None:
+            qh = qh * np.float32(q_scale)
         return self.host_spill.partial(layer_idx, qh.reshape(heads, -1), heads // self.num_kv_heads, scale)
 
     # -- a session's cache between turns (memory/kv_session.py) --------------------------------------------------

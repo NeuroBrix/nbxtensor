@@ -60,7 +60,7 @@ def rms_norm_forward_kernel(
     output = inp * inv_rms[:, None]
 
     if scale_by_weight:
-        weight = tl.load(weight_ptr + feat_offset, mask=feat_mask)
+        weight = tl.load(weight_ptr + feat_offset, mask=feat_mask).to(tl.float32)
         output *= weight
 
     if SATURATE_F16:
@@ -72,5 +72,5 @@ def rms_norm_forward_kernel(
         is_finite = (output == output) & (output != float("inf")) & (output != float("-inf"))
         clamped = tl.minimum(tl.maximum(output, -65504.0), 65504.0)
         output = tl.where(is_finite, clamped, output)
-    tl.store(output_ptr, output,
+    tl.store(output_ptr, output.to(output_ptr.dtype.element_ty),
              mask=batch_mask[:, None] & feat_mask[None, :])

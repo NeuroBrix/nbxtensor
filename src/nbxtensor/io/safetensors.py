@@ -112,15 +112,24 @@ def spans(n: int, unit: int, align: int, workers: int):
     return [(a, min(a + step, n)) for a in range(0, n, step)]
 
 
+# macOS/BSD preadv(2) and pread(2) reject counts > INT_MAX (0x7FFFFFFF) with EINVAL
+# ([Errno 22] Invalid argument), whereas Linux silently caps at MAX_RW_COUNT (0x7FFFF000).
+# Cap every single positioned read to a 64 KiB-aligned size strictly below INT_MAX so
+# tensors >= 2 GiB (e.g. UMT5-XXL fp32 shared.weight = 4.20 GB) loop cleanly on all OSes.
+_MAX_PREAD_BYTES = 0x7FFF0000
+
+
 def _read_at(fd: int, view: memoryview, offset: int) -> int:
     """Read into `view` from the file's byte `offset`, at that offset and never through a shared file position (the
     workers read one file at once): `os.preadv` where the system has it (Linux, macOS); on Windows, which has neither
     preadv nor pread, `ReadFile` with an OVERLAPPED offset on the descriptor's handle — a positioned read. Returns the
     bytes read (0 at the end of the file)."""
     if hasattr(os, "preadv"):
-        return os.preadv(fd, [view], offset)
+        chunk = view[:_MAX_PREAD_BYTES] if len(view) > _MAX_PREAD_BYTES else view
+        return os.preadv(fd, [chunk], offset)
     if hasattr(os, "pread"):
-        data = os.pread(fd, len(view), offset)
+        n = min(len(view), _MAX_PREAD_BYTES)
+        data = os.pread(fd, n, offset)
         view[:len(data)] = data
         return len(data)
     import msvcrt

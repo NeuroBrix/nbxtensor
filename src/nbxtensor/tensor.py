@@ -950,7 +950,7 @@ class NBXTensor:
 
     @staticmethod
     def empty_cpu(shape, dtype: 'Optional[NBXDtype]' = None,
-                  pinned: bool = False) -> 'NBXTensor':
+                  pinned: bool = False, *, pin_memory: bool = False) -> 'NBXTensor':
         """Allocate a CPU-backed NBXTensor.
 
         Unpinned (pinned=False, default): backed by a numpy array. Cheap
@@ -975,7 +975,7 @@ class NBXTensor:
             return NBXTensor(0, shape, contiguous_strides(shape), nbx_dt,
                              'cpu', device_idx=0)
 
-        if pinned:
+        if pinned or pin_memory:
             ptr = DeviceAllocator.malloc_host_pinned(nbytes)
             return NBXTensor(ptr, shape, contiguous_strides(shape), nbx_dt,
                              'cpu', owns_data=True, device_idx=0,
@@ -1045,7 +1045,7 @@ class NBXTensor:
         return NBXTensor(ptr, src._shape, src._strides, src._dtype,
                          'cuda', owns_data=True, device_idx=device_idx)
 
-    def to_cuda_async(self, device_idx: int = 0, stream: int = 0) -> 'NBXTensor':
+    def to_cuda_async(self, device_idx: int = 0, stream=0) -> 'NBXTensor':
         """Non-blocking variant of to_cuda for zero3 pipelining.
 
         Enqueues the memcpy on `stream` instead of running synchronously.
@@ -1068,9 +1068,10 @@ class NBXTensor:
         ptr = DeviceAllocator.malloc_cuda(src._nbytes)
         if src._nbytes > 0:
             kind = 1 if src._device == 'cpu' else 3
+            stream_handle = int(stream) if stream is not None else 0
             DeviceAllocator.memcpy_async(
                 ptr, src.data_ptr(), src._nbytes,
-                kind=kind, stream=stream)
+                kind=kind, stream=stream_handle)
         return NBXTensor(ptr, src._shape, src._strides, src._dtype,
                          'cuda', owns_data=True, device_idx=device_idx)
 
@@ -1142,6 +1143,24 @@ class NBXTensor:
         if self._pinned:
             return self
         return self.to_cpu(pinned=True)
+
+    def pin_memory(self) -> 'NBXTensor':
+        """PyTorch-equivalent alias for ``pin_host()``."""
+        return self.pin_host()
+
+    def to_cpu_async(self, *, pinned: bool = True, stream=0) -> 'NBXTensor':
+        """Non-blocking D2H / H2H copy into a CPU NBXTensor on ``stream``."""
+        if self._device == 'cpu' and self._pinned == pinned:
+            return self
+        dst = NBXTensor.empty_cpu(self._shape, self._dtype, pinned=pinned)
+        src = self if self.is_contiguous() else self.contiguous()
+        if src._nbytes > 0:
+            kind = 2 if src._device == 'cuda' else 0
+            stream_handle = int(stream) if stream is not None else 0
+            DeviceAllocator.memcpy_async(
+                dst.data_ptr(), src.data_ptr(), src._nbytes,
+                kind=kind, stream=stream_handle)
+        return dst
 
     # ========================================================================
     # METADATA OPS — pure Python, zero data movement
@@ -1753,14 +1772,39 @@ class NBXTensor:
     def to(self, *args, **kwargs) -> 'NBXTensor':
         if _to_census.PATH:
             self._note_device_naming(args, kwargs)
+        non_blocking = bool(kwargs.get("non_blocking", False))
+        stream = kwargs.get("stream", None)
+        explicit_async = non_blocking or (stream is not None)
         target = None
+        device_arg = kwargs.get("device", None)
         if args:
             target, as_it_is = _positional_target(args[0])
             if as_it_is:
-                return self               # .to(device) / .to(tensor) — "already on device", whatever it names
+                if not explicit_async:
+                    return self               # .to(device) / .to(tensor) — "already on device", whatever it names
+                device_arg = args[0]
         if 'dtype' in kwargs:
             d = kwargs['dtype']
             target = d if isinstance(d, NBXDtype) else parse_dtype(str(d))
+        if explicit_async and device_arg is not None:
+            dev_str = device_arg if isinstance(device_arg, str) else (
+                f"{device_arg.type}:{device_arg.index}"
+                if getattr(device_arg, "type", None) == "cuda" and getattr(device_arg, "index", None) is not None
+                else getattr(device_arg, "type", str(device_arg))
+            )
+            stream_handle = int(stream) if stream is not None else 0
+            if dev_str == "cpu":
+                use_pinned = bool(kwargs.get("pinned", kwargs.get("pin_memory", True)))
+                moved = self.to_cpu_async(pinned=use_pinned, stream=stream_handle)
+            elif dev_str.startswith("cuda"):
+                head, _, tail = dev_str.partition(":")
+                dev_idx = int(tail) if tail.isdigit() else 0
+                moved = self.to_cuda_async(device_idx=dev_idx, stream=stream_handle)
+            else:
+                moved = self
+            if target is not None and target != moved._dtype:
+                return moved.to(target)
+            return moved
         if target is None or target == self._dtype:
             return self
         # Complex tensors must never be downcast to a REAL dtype via .to():

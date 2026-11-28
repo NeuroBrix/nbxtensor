@@ -118,6 +118,8 @@ def paged_decode_attn_split_kernel(
     Q_TO: tl.constexpr = None,        # a dtype: Q is rounded to it on load (the cache's), as the contiguous read does
     Q_SATURATE: tl.constexpr = False,
     BLOCK_N: tl.constexpr = 32,
+    q_scale=1.0,                      # optional scalar folded into Q on load (HAS_Q_SCALE=True)
+    HAS_Q_SCALE: tl.constexpr = False,
 ):
     pid_q = tl.program_id(0).to(tl.int64)        # b * H_q + h_q
     pid_s = tl.program_id(1).to(tl.int64)        # split index
@@ -128,6 +130,8 @@ def paged_decode_attn_split_kernel(
     mask_d = offs_d < D
     mask_dv = offs_d < D_V
     q = _round_q(tl.load(q_ptr + pid_q * stride_qh + offs_d, mask=mask_d, other=0.0), Q_TO, Q_SATURATE)
+    if HAS_Q_SCALE:
+        q = q * q_scale
 
     T_b = tl.load(seq_lens_ptr + b).to(tl.int32)
     # Positions per split, read from the DEVICE lengths: the longest sequence over the grid's splits, in whole tiles
@@ -199,25 +203,41 @@ def paged_kv_append_step_kernel(
     BLOCK_D: tl.constexpr,
     D_K: tl.constexpr,
     D_V: tl.constexpr,
+    ADVANCE_LENS: tl.constexpr = False,
+    NUM_KV_HEADS: tl.constexpr = 1,
 ):
     """A decode step's append with no host input: the position is read from the layer's DEVICE length and its page from
-    the block table, so the launch's arguments are the same at every step (a recorded replay replays it unchanged). One
-    program per (sequence, KV head); `paged_lens_advance_kernel`, launched after it on the same stream, moves the
-    length."""
+    the block table, so the launch's arguments are the same at every step (a recorded replay replays it unchanged).
+
+    When `ADVANCE_LENS=False` (default): one program per `(sequence, KV head)` — `grid=(B, H_kv)`; caller advances
+    `lens` separately with `paged_lens_advance_kernel`.
+    When `ADVANCE_LENS=True`: one program per sequence — `grid=(B, 1)` with `NUM_KV_HEADS=H_kv` — writes all KV heads
+    and then advances `lens[b] = pos + 1` in the same program, race-free, eliminating the `paged_lens_advance_kernel`
+    launch."""
     pid_b = tl.program_id(0).to(tl.int64)
-    pid_h = tl.program_id(1).to(tl.int64)
     pos = tl.load(lens_ptr + pid_b).to(tl.int64)
     page = tl.load(block_table_ptr + pid_b * stride_bt + pos // page_tokens).to(tl.int64)
     slot = pos % page_tokens
     offs = tl.arange(0, BLOCK_D)
     mk = offs < D_K
     mv = offs < D_V
-    k = tl.load(k_new_ptr + pid_b * stride_kb + pid_h * stride_kh + offs, mask=mk, other=0.0)
-    v = tl.load(v_new_ptr + pid_b * stride_vb + pid_h * stride_vh + offs, mask=mv, other=0.0)
-    tl.store(k_pool_ptr + page * stride_kp + pid_h * stride_kph + slot * stride_ks + offs,
-             k.to(k_pool_ptr.dtype.element_ty), mask=mk)
-    tl.store(v_pool_ptr + page * stride_vp + pid_h * stride_vph + slot * stride_vs + offs,
-             v.to(v_pool_ptr.dtype.element_ty), mask=mv)
+    if ADVANCE_LENS:
+        for h in range(0, NUM_KV_HEADS):
+            k = tl.load(k_new_ptr + pid_b * stride_kb + h * stride_kh + offs, mask=mk, other=0.0)
+            v = tl.load(v_new_ptr + pid_b * stride_vb + h * stride_vh + offs, mask=mv, other=0.0)
+            tl.store(k_pool_ptr + page * stride_kp + h * stride_kph + slot * stride_ks + offs,
+                     k.to(k_pool_ptr.dtype.element_ty), mask=mk)
+            tl.store(v_pool_ptr + page * stride_vp + h * stride_vph + slot * stride_vs + offs,
+                     v.to(v_pool_ptr.dtype.element_ty), mask=mv)
+        tl.store(lens_ptr + pid_b, (pos + 1).to(tl.int32))
+    else:
+        pid_h = tl.program_id(1).to(tl.int64)
+        k = tl.load(k_new_ptr + pid_b * stride_kb + pid_h * stride_kh + offs, mask=mk, other=0.0)
+        v = tl.load(v_new_ptr + pid_b * stride_vb + pid_h * stride_vh + offs, mask=mv, other=0.0)
+        tl.store(k_pool_ptr + page * stride_kp + pid_h * stride_kph + slot * stride_ks + offs,
+                 k.to(k_pool_ptr.dtype.element_ty), mask=mk)
+        tl.store(v_pool_ptr + page * stride_vp + pid_h * stride_vph + slot * stride_vs + offs,
+                 v.to(v_pool_ptr.dtype.element_ty), mask=mv)
 
 
 @triton.jit

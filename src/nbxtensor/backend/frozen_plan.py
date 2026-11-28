@@ -583,15 +583,26 @@ class FrozenPlan:
         """Phase 4a direct C-launcher replay of the action list (the whole plan's through its bound actions)."""
         if records is None:
             records = self._bound_actions()
-        for idx, (tag, rec) in enumerate(records):
-            try:
-                _run_action(tag, rec)
-            except BaseException as e:
-                name = (getattr(rec[0], "name", "?") if tag == KERNEL
-                        else getattr(getattr(rec[0], "pipe", rec[0]), "name", tag) if tag == BOUND else tag)
-                raise RuntimeError(
-                    f"replay action {idx}/{len(self.records)} "
-                    f"({name}) failed: {e}") from e
+        metal_rt = None
+        if os.environ.get("NBX_METAL_REPLAY_BATCH") == "1" and _profile.SESSION is None:
+            from nbxtensor.backend import runtime as _rt
+            if _rt.gpu_backend() == "metal":
+                from nbxtensor.backend.metal_device import runtime as _metal_runtime
+                metal_rt = _metal_runtime()
+                metal_rt.begin_batch(0)
+        try:
+            for idx, (tag, rec) in enumerate(records):
+                try:
+                    _run_action(tag, rec)
+                except BaseException as e:
+                    name = (getattr(rec[0], "name", "?") if tag == KERNEL
+                            else getattr(getattr(rec[0], "pipe", rec[0]), "name", tag) if tag == BOUND else tag)
+                    raise RuntimeError(
+                        f"replay action {idx}/{len(self.records)} "
+                        f"({name}) failed: {e}") from e
+        finally:
+            if metal_rt is not None:
+                metal_rt.end_batch(0)
 
 
 def _bound(tag, rec) -> Tuple[str, tuple]:

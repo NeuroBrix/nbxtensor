@@ -290,6 +290,7 @@ def index_select_wrapper(x, dim: int, index) :
     assert dim >= -x.ndim and dim < x.ndim
     if index.ndim == 0:
         index = index.unsqueeze(0)
+    index = index.contiguous()
     dim = dim % x.ndim
     inp_shape = list(x.shape)
     index_len = index.numel()
@@ -641,6 +642,19 @@ def bucketize_wrapper(x, boundaries, out_int32: bool = False,
     return out
 
 
+def _is_broadcastable_to(src_shape, dst_shape) -> bool:
+    """Return True iff `src_shape` is broadcastable to `dst_shape` under
+    PyTorch unidirectional broadcasting (len(src) <= len(dst) and each
+    right-aligned dim is either 1 or equal to the target dim)."""
+    if len(src_shape) > len(dst_shape):
+        return False
+    pad = len(dst_shape) - len(src_shape)
+    for s, d in zip(src_shape, dst_shape[pad:]):
+        if s != d and s != 1:
+            return False
+    return True
+
+
 def index_put_wrapper(x, indices, values, accumulate: bool = False):
     """aten::index_put / index_put_ — scatter-write `values` into `x`.
 
@@ -651,10 +665,11 @@ def index_put_wrapper(x, indices, values, accumulate: bool = False):
     Scope = the decomposed-ATen norm: exactly ONE non-None *integer*
     index tensor on the leading dim (covers MoE-v2 expert aggregation,
     KV-cache indexed writes, post-`aten::nonzero` masked scatter).
-    k>=2 advanced indices, non-leading-dim indexing, boolean masks, and
-    un-broadcastable `values` raise NotImplementedError with a named
-    follow-up rather than silently mis-scattering (ZERO-FALLBACK — a
-    visible crash beats the previous identity-lambda silent data loss).
+    `values` is broadcast to `(*idx.shape, *x.shape[1:])` following PyTorch
+    broadcasting rules (via stride-0 `expand` + `contiguous`, zero host
+    fallback).  k>=2 advanced indices and non-leading-dim indexing raise
+    NotImplementedError with a named follow-up; genuinely incompatible
+    `values` shapes raise RuntimeError.
     """
     from nbxtensor.dtype.nbx_dtype import NBXDtype
 
@@ -735,18 +750,23 @@ def index_put_wrapper(x, indices, values, accumulate: bool = False):
     if N == 0:
         return out
 
+    target_shape = tuple(int(s) for s in idx.shape) + tuple(int(s) for s in x.shape[1:])
+    val_shape = tuple(int(s) for s in values.shape)
     vnumel = values.numel()
     if vnumel == 1:
         val_scalar = True
         vbuf = values.contiguous()
-    elif vnumel == N:
+    elif val_shape == target_shape:
         val_scalar = False
         vbuf = values.contiguous()
+    elif _is_broadcastable_to(val_shape, target_shape):
+        val_scalar = False
+        vbuf = values.expand(target_shape).contiguous()
     else:
-        raise NotImplementedError(
-            f"aten::index_put values numel {vnumel} != idx*tail {N} "
-            "and not scalar — value broadcasting unwired (follow-up "
-            "P-INDEX-PUT-ADVANCED-GENERAL).")
+        raise RuntimeError(
+            f"aten::index_put shape mismatch: value tensor of shape "
+            f"{list(val_shape)} cannot be broadcast to indexing result "
+            f"of shape {list(target_shape)}.")
 
     set_device(out)
     index_put_kernel[_ew._1d_grid(N)](

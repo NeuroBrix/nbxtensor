@@ -319,6 +319,10 @@ class MetalRuntime:
         # `_exposed` (GPU address -> buffer): the buffers whose addresses a kernel may load and read through.
         self._open, self._exposed = {}, {}
         self._dispatch_cap: Optional[int] = None
+        # Per-stream re-entrant batch depth (`begin_batch` / `end_batch` / `batch`):
+        # while > 0, `note_dispatch` defers auto-commits at `_dispatches_per_buffer()`
+        # so a caller can submit an entire sequence of dispatches in one command buffer.
+        self._batch_depth: Dict[int, int] = {}
 
         # An encoder that is FREED while still open aborts the whole process:
         #   -[_MTLCommandEncoder dealloc]:134: failed assertion
@@ -770,15 +774,57 @@ class MetalRuntime:
         # which is what makes one encoder able to carry a whole graph.
         return command_buffer.computeCommandEncoder()
 
+    def begin_batch(self, stream: int = 0) -> None:
+        """Enter a command-buffer batch on `stream` (re-entrant).
+
+        While a batch is active (and no kernel-time profiling session is open),
+        `note_dispatch` defers auto-commits at `_dispatches_per_buffer()` so
+        all dispatches stay in one open command buffer until `end_batch` (or an
+        explicit `flush` / `close_stream`)."""
+        key = int(stream or 0)
+        with self._lock:
+            self._batch_depth[key] = self._batch_depth.get(key, 0) + 1
+
+    def end_batch(self, stream: int = 0, commit: bool = True) -> None:
+        """Leave a command-buffer batch on `stream`; commits when outermost."""
+        key = int(stream or 0)
+        with self._lock:
+            depth = self._batch_depth.get(key, 0)
+            if depth <= 0:
+                raise RuntimeError("MetalRuntime.end_batch called without matching begin_batch")
+            depth -= 1
+            if depth == 0:
+                self._batch_depth.pop(key, None)
+            else:
+                self._batch_depth[key] = depth
+        if depth == 0 and commit:
+            self.close_stream(key)
+
+    def batch(self, stream: int = 0, commit: bool = True):
+        """Context manager wrapping `begin_batch` / `end_batch`."""
+        from contextlib import contextmanager
+
+        @contextmanager
+        def _cm():
+            self.begin_batch(stream)
+            try:
+                yield
+            finally:
+                self.end_batch(stream, commit=commit)
+
+        return _cm()
+
     def note_dispatch(self, stream: int) -> None:
         """One more piece of work encoded on this stream; commit if the
-        buffer has carried enough of them."""
+        buffer has carried enough of them (unless batched)."""
         key = int(stream or 0)
         with self._lock:
             entry = self._open.get(key)
             if entry is None:
                 return
             entry[3] += 1
+            if self._batch_depth.get(key, 0) > 0 and _profile.SESSION is None:
+                return
             if entry[3] < self._dispatches_per_buffer():
                 return
         self.close_stream(key)

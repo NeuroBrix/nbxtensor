@@ -32,8 +32,10 @@ launch read one-step-STALE inputs (deterministic-looking token
 doubling, masked by any diagnostic D2H sync, which made every
 bisection "boundary" a timing artifact until the dump-run-correct /
 plain-run-wrong pair exposed the observer effect). launch() therefore
-brackets cuGraphLaunch with device-wide syncs: before (inputs land)
-and after (legacy consumers read the graph's writes).
+brackets cuGraphLaunch with GPU-side event syncs between the legacy
+stream (0) and the capture stream: before (inputs land) and after
+(legacy consumers read the graph's writes) — identical memory
+visibility with zero host CPU stall.
 
 During stream capture NOTHING executes — the actions are recorded into
 the graph. The capturing step therefore launches the instantiated
@@ -52,6 +54,8 @@ from nbxtensor.memory.allocator import DeviceAllocator
 _CUDA_SUCCESS = 0
 _CU_STREAM_NON_BLOCKING = 1
 _CU_STREAM_CAPTURE_MODE_RELAXED = 2
+_CU_EVENT_DISABLE_TIMING = 0x2
+_LEGACY_STREAM = ctypes.c_void_p(0)
 
 
 class GraphReplayError(RuntimeError):
@@ -112,6 +116,12 @@ class _CudaGraphAPI:
             "cuMemsetD8Async", [vp, ctypes.c_ubyte, sz, vp])
         self.get_nodes = bind(
             "cuGraphGetNodes", [vp, vp, ctypes.POINTER(sz)])
+        self.event_create = bind(
+            "cuEventCreate", [ctypes.POINTER(vp), ctypes.c_uint])
+        self.event_destroy = bind("cuEventDestroy_v2", [vp])
+        self.event_record = bind("cuEventRecord", [vp, vp])
+        self.stream_wait_event = bind(
+            "cuStreamWaitEvent", [vp, vp, ctypes.c_uint])
         self.ctx_sync = bind("cuCtxSynchronize", [])
 
     @classmethod
@@ -124,8 +134,8 @@ class _CudaGraphAPI:
 class CapturedPlan:
     """One bucket's action list as an instantiated CUDA graph."""
 
-    __slots__ = ("api", "stream", "graph", "gexec", "staging",
-                 "launches")
+    __slots__ = ("api", "stream", "pre_event", "post_event",
+                 "graph", "gexec", "staging", "launches")
 
     def __init__(self, records: List[Tuple[str, tuple]],
                  dev_idx) -> None:
@@ -134,12 +144,16 @@ class CapturedPlan:
         # 2026-11-14 it fell into the memset branch ("expected 3, got 1") and every single-card capture was refused
         # to the direct replay. A device SYNC the recording made on that same card (`frozen_plan.SYNC`) makes no node
         # either: one stream orders every node after the one before, no host work runs between them, and `launch`
-        # synchronises the context before and after the graph. A plan whose records name another card (a SETDEV or a
-        # SYNC: a peer copy waiting on its source card) is `SegmentedPlan`'s, refused here by name.
+        # orders the capture stream against the legacy stream via GPU events before and after the graph. A plan whose
+        # records name another card (a SETDEV or a SYNC: a peer copy waiting on its source card) is `SegmentedPlan`'s,
+        # refused here by name.
         records, dev_idx = self._one_card(records, dev_idx)
         api = _CudaGraphAPI.get()
         self.api = api
         self.staging: List[int] = []
+        self.stream = ctypes.c_void_p()
+        self.pre_event = ctypes.c_void_p()
+        self.post_event = ctypes.c_void_p()
         self.graph = ctypes.c_void_p()
         self.gexec = ctypes.c_void_p()
         if dev_idx is not None:
@@ -151,8 +165,14 @@ class CapturedPlan:
         self.stream = stream
         n_launch = 0
         capturing = False
-        staged = self._stage_snapshots(records, dev_idx)
         try:
+            _ck(api.event_create(ctypes.byref(self.pre_event),
+                                 _CU_EVENT_DISABLE_TIMING),
+                "cuEventCreate(pre)")
+            _ck(api.event_create(ctypes.byref(self.post_event),
+                                 _CU_EVENT_DISABLE_TIMING),
+                "cuEventCreate(post)")
+            staged = self._stage_snapshots(records, dev_idx)
             _ck(api.begin(stream, _CU_STREAM_CAPTURE_MODE_RELAXED),
                 "cuStreamBeginCapture_v2")
             capturing = True
@@ -246,25 +266,30 @@ class CapturedPlan:
         return staged
 
     def launch(self) -> None:
-        # DEVICE-wide sync BEFORE the graph: the per-step input copies
-        # (replay's slot scan) ride the LEGACY stream as async work,
-        # and a NON_BLOCKING capture stream does NOT wait for the
-        # legacy stream — without this barrier the graph read STALE
-        # inputs (measured on r535/V100: one-step-lagged token
-        # doubling, masked by any diagnostic D2H sync — the entire
-        # 2026-08-17 bisection's "clean/broken boundaries" were timing
-        # artifacts of that race).
-        _ck(self.api.ctx_sync(), "cuCtxSynchronize(pre)")
+        # GPU-side stream ordering BEFORE the graph: the per-step input
+        # copies (replay's slot scan) ride the LEGACY stream (0) as async
+        # work, and a NON_BLOCKING capture stream does NOT implicitly wait
+        # for the legacy stream (the 2026-08-17 root cause). Recording
+        # `pre_event` on stream 0 and making `self.stream` wait on it
+        # preserves identical memory visibility with zero host CPU stall.
+        _ck(self.api.event_record(self.pre_event, _LEGACY_STREAM),
+            "cuEventRecord(pre)")
+        _ck(self.api.stream_wait_event(self.stream, self.pre_event, 0),
+            "cuStreamWaitEvent(pre)")
         _ck(self.api.launch(self.gexec, self.stream), "cuGraphLaunch")
-        # ...and AFTER: downstream consumers (output copies, sampler)
-        # are legacy-stream work that would not wait for S either. A
-        # failure HERE means the graph's work was already submitted —
-        # the device state (e.g. KV position counters) has advanced,
-        # so re-running the action list would double-advance it: mark
-        # the error as post-execution so the caller crashes loudly
-        # instead of "recovering" into corrupt state.
+        # ...and AFTER: downstream consumers (output copies, D2H reads,
+        # sampler) run on the legacy stream (0) and would not wait for
+        # `self.stream` without a barrier. Record `post_event` on
+        # `self.stream` and order stream 0 after it on the GPU. A failure
+        # HERE means the graph's work was already submitted — device state
+        # (e.g. KV position counters) has advanced, so mark the error as
+        # post-execution so the caller crashes loudly instead of
+        # "recovering" into corrupt state.
         try:
-            _ck(self.api.ctx_sync(), "cuCtxSynchronize(post)")
+            _ck(self.api.event_record(self.post_event, self.stream),
+                "cuEventRecord(post)")
+            _ck(self.api.stream_wait_event(_LEGACY_STREAM, self.post_event, 0),
+                "cuStreamWaitEvent(post)")
         except GraphReplayError as e:
             e.executed = True
             raise
@@ -282,6 +307,12 @@ class CapturedPlan:
                 # device staging buffers (see the "h" action handler)
                 DeviceAllocator.free_cuda(p)
         self.staging = []
+        if self.post_event.value:
+            api.event_destroy(self.post_event)
+            self.post_event = ctypes.c_void_p()
+        if self.pre_event.value:
+            api.event_destroy(self.pre_event)
+            self.pre_event = ctypes.c_void_p()
         if self.stream.value:
             api.stream_destroy(self.stream)
             self.stream = ctypes.c_void_p()

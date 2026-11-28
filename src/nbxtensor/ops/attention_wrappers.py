@@ -680,6 +680,37 @@ def paged_kv_append(new, pool, slot_mapping):
     return pool
 
 
+def paged_kv_append_step(k_new, v_new, k_pool, v_pool, block_table, lens, advance_lens: bool = False):
+    """Append one decode position per sequence into paged K/V pools using device lengths.
+
+    k_new [B, H_kv, D_k], v_new [B, H_kv, D_v], pools [num_pages, H_kv, page_tokens, D],
+    block_table [B, max_pages] int32, lens [B] int32.
+    When `advance_lens=True`, writes all KV heads per sequence in a single program (`grid=(B, 1)`)
+    and advances `lens[b] += 1` race-free without launching `paged_lens_advance_kernel`."""
+    from nbxtensor.ops.paged_decode_attn import paged_kv_append_step_kernel
+    batch, h_kv, d_k = (int(x) for x in k_new.shape)
+    d_v = int(v_new.shape[2])
+    page_tokens = int(k_pool.shape[2])
+    if (int(v_new.shape[0]), int(v_new.shape[1])) != (batch, h_kv):
+        raise ValueError(f"paged_kv_append_step: k_new {list(k_new.shape)} vs v_new {list(v_new.shape)}")
+    if k_new.stride(2) != 1 or v_new.stride(2) != 1 or k_pool.stride(3) != 1 or v_pool.stride(3) != 1:
+        raise ValueError("paged_kv_append_step: head dim must be contiguous")
+    set_device(k_pool)
+    grid = (batch, 1) if advance_lens else (batch, h_kv)
+    paged_kv_append_step_kernel[grid](
+        k_new, v_new, k_pool, v_pool, block_table, lens, page_tokens,
+        k_new.stride(0), k_new.stride(1), v_new.stride(0), v_new.stride(1),
+        k_pool.stride(0), k_pool.stride(1), k_pool.stride(2),
+        v_pool.stride(0), v_pool.stride(1), v_pool.stride(2),
+        block_table.stride(0),
+        BLOCK_D=max(triton.next_power_of_2(max(d_k, d_v)), _fa_min_tile()),
+        D_K=d_k, D_V=d_v,
+        ADVANCE_LENS=bool(advance_lens),
+        NUM_KV_HEADS=h_kv,
+        num_warps=1)
+    return k_pool, v_pool
+
+
 def paged_kv_gather(pool, block_table, positions, heads, dtype):
     """A layer's K (or V) of every sequence as WHOLE PAGES, contiguous (docs/design/prism_kv.md §5bis: a prefill chunk
     over a session's cache attends over keys gathered page by page, its key length a whole number of pages).
@@ -715,7 +746,7 @@ def paged_kv_gather(pool, block_table, positions, heads, dtype):
 
 
 def paged_decode_attention(q, k_pool, v_pool, block_table, seq_lens, softmax_scale, max_seq_len, q_round=None,
-                           host_partial=None):
+                           host_partial=None, q_scale=None, k_scale=None):
     """Decode attention (one query position) read through the page table — the vector split-KV kernel of
     ops/decode_attn_vec.py on paged K / V, merged by the fixed-order `flash_decode_reduce_kernel`.
 
@@ -761,12 +792,14 @@ def paged_decode_attention(q, k_pool, v_pool, block_table, seq_lens, softmax_sca
     q_to = _TL_DTYPE[q_round] if q_round is not None else None
     q_saturate = (q_round == NBXDtype.float16
                   and q.nbx_dtype in (NBXDtype.float32, NBXDtype.float64, NBXDtype.bfloat16))
+    eff_scale = float(softmax_scale) * (float(k_scale) if k_scale is not None else 1.0)
+    has_q_scale = q_scale is not None
     out = NBXTensor.empty((bhq, 1, d_v), dtype=out_dtype, device=dev)
     set_device(q)
     paged_decode_attn_split_kernel[(bhq, split)](
         q2, k_pool, v_pool, block_table, seq_lens,
         opart, mpart, lpart,
-        batch, page_tokens, split, float(softmax_scale), nheads,
+        batch, page_tokens, split, eff_scale, nheads,
         q2.stride(0),
         k_pool.stride(0), k_pool.stride(1), k_pool.stride(2),
         v_pool.stride(0), v_pool.stride(1), v_pool.stride(2),
@@ -774,7 +807,9 @@ def paged_decode_attention(q, k_pool, v_pool, block_table, seq_lens, softmax_sca
         opart.stride(0), opart.stride(1),
         mpart.stride(0),
         GQA_GROUPS=groups, BLOCK_D=BLOCK_D, D=headdim, D_V=d_v, SPLIT_ALIGN=PAGED_DECODE_SPLIT_ALIGN,
-        Q_TO=q_to, Q_SATURATE=q_saturate)
+        Q_TO=q_to, Q_SATURATE=q_saturate,
+        q_scale=float(q_scale) if has_q_scale else 1.0,
+        HAS_Q_SCALE=has_q_scale)
     if host_partial is not None:
         import numpy as np
         acc, m, l = (np.ascontiguousarray(x, dtype=np.float32) for x in host_partial)
